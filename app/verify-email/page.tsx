@@ -1,10 +1,10 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import logo from "../assets/icononly.png";
 
-const VerifyEmail: React.FC = () => {
+const VerifyEmailInner: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextRoute = searchParams.get("next") ?? "/signin";
@@ -134,6 +134,14 @@ const VerifyEmail: React.FC = () => {
 
       </div>
     </div>
+  );
+};
+
+const VerifyEmail: React.FC = () => {
+  return (
+    <Suspense fallback={null}>
+      <VerifyEmailInner />
+    </Suspense>
   );
 };
 
