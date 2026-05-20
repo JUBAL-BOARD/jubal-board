@@ -83,6 +83,7 @@ const IndividualProfile: React.FC = () => {
   const [selectedCountry, setSelectedCountry] = useState<CountryOption | null>(null);
   const [selectedState, setSelectedState] = useState<string>("");
   const [phoneCode, setPhoneCode] = useState<string>("");
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [descTouched, setDescTouched] = useState(false);
   const [projectFiles, setProjectFiles] = useState<File[]>([]);
@@ -100,14 +101,15 @@ const IndividualProfile: React.FC = () => {
   useEffect(() => {
     const fetchCountries = async () => {
       try {
-        const response = await fetch('/api/v1/platform/countries', { credentials: "include" });
+        const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://16.171.168.144:3000";
+        const response = await fetch(`${BASE_URL}/api/v1/platform/countries`, { credentials: "include" });
         if (response.ok) {
           const apiResponse = await response.json();
           if (apiResponse.success && apiResponse.data?.countries) {
             setCountries(apiResponse.data.countries);
           }
         }
-      } catch (e) {
+      } catch {
         console.warn("Countries could not be loaded.");
       }
     };
@@ -177,6 +179,12 @@ const IndividualProfile: React.FC = () => {
   const handleSave = async () => {
     if (!form.fullName || !phoneNumber || !form.country || selectedCategories.length === 0) {
       setError("Please fill in all required fields marked with *");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    if (phoneNumber.length < 7 || phoneNumber.length > 15) {
+      setError("Please enter a valid contact number.");
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -282,7 +290,7 @@ const IndividualProfile: React.FC = () => {
             </div>
             <div>
               <label className={labelClass}>Contact Number{reqStar}</label>
-              <div className={`${inputClass} flex items-center gap-0 p-0 overflow-hidden`}>
+              <div className={`${inputClass} flex items-center gap-0 p-0 overflow-hidden ${phoneError ? "border-red-400" : ""}`}>
                 {phoneCode && (
                   <span className="px-3 py-[1px] text-[13px] text-black border-r border-gray-200 flex-shrink-0 select-none">
                     {phoneCode}
@@ -293,12 +301,24 @@ const IndividualProfile: React.FC = () => {
                   onChange={(e) => {
                     const val = e.target.value.replace(/[^0-9]/g, "");
                     setPhoneNumber(val);
+                    if (phoneError) setPhoneError(null);
+                  }}
+                  onBlur={() => {
+                    if (!phoneNumber) return;
+                    if (phoneNumber.length < 7 || phoneNumber.length > 15) {
+                      setPhoneError("Enter a valid phone number (7–15 digits).");
+                    } else {
+                      setPhoneError(null);
+                    }
                   }}
                   placeholder="8012345678"
                   inputMode="numeric"
                   className="flex-1 px-3 py-[1px] text-[13px] text-black outline-none bg-white border-none"
                 />
               </div>
+              {phoneError && (
+                <p className="text-xs text-red-500 mt-1">{phoneError}</p>
+              )}
             </div>
           </div>
 

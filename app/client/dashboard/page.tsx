@@ -147,7 +147,7 @@ const ClientDashboard: React.FC = () => {
           <SearchBar />
           <QuickActions availableBalance={availableBalance} />
           <SuggestedCreatives />
-          <ServicesCarousel services={services} />
+          <ServicesCarousel />
           <div className="lg:flex gap-6">
             <ActiveProjects />
             <IncomingPitches />
