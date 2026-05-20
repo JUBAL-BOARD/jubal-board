@@ -1,25 +1,35 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Smile, Paperclip, ArrowLeft, Mic } from "lucide-react";
-import { Conversation } from "@/app/types";
-import { useMessageStore } from "../../../lib/stores/messageStore";
+import { Smile, Paperclip, ArrowLeft, Mic, Loader2 } from "lucide-react";
+import { Conversation } from "@/app/lib/api/messageApi";
+import { useConversationDetail } from "@/app/lib/hooks/useConversationDetail";
+import { sendMessage } from "@/app/lib/api/messageApi";
 import TopicChips from "@/app/components/creative/messages/topicChips";
 import { Topic } from "../../../lib/topic";
+import { formatDistanceToNow } from "date-fns";
 
 interface Props {
   conversation: Conversation;
+  currentUserId: string;
   onBack?: () => void;
 }
 
-const ChatWindow: React.FC<Props> = ({ conversation, onBack }) => {
+const ChatWindow: React.FC<Props> = ({
+  conversation,
+  currentUserId,
+  onBack,
+}) => {
   const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
   const [showChips, setShowChips] = useState(true);
-  const sendMessage = useMessageStore((s) => s.sendMessage);
-  const conversations = useMessageStore((s) => s.conversations);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const messages =
-    conversations.find((c) => c.id === conversation.id)?.messages ?? [];
+  const { detail, loading, refetch } = useConversationDetail(
+    conversation.id,
+    conversation.type
+  );
+
+  const messages = detail?.messages.data ?? [];
 
   useEffect(() => {
     setShowChips(true);
@@ -29,18 +39,27 @@ const ChatWindow: React.FC<Props> = ({ conversation, onBack }) => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = (text?: string) => {
-    const content = text ?? input;
-    if (!content.trim()) return;
-    sendMessage(conversation.id, content.trim());
-    setInput("");
+  const handleSend = async (text?: string) => {
+    const content = (text ?? input).trim();
+    if (!content || sending) return;
+    try {
+      setSending(true);
+      setInput("");
+      await sendMessage(conversation.id, {
+        content,
+        contentType: "TEXT",
+      });
+      await refetch();
+    } catch (err) {
+      console.error("Send failed:", err);
+    } finally {
+      setSending(false);
+    }
   };
 
-  const handleTopicSelect = (topic: Topic, breadcrumb: string) => {
-    sendMessage(conversation.id, topic.label);
-    if (!topic.subtopics?.length) {
-      setShowChips(false);
-    }
+  const handleTopicSelect = (topic: Topic) => {
+    handleSend(topic.label);
+    if (!topic.subtopics?.length) setShowChips(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -50,9 +69,13 @@ const ChatWindow: React.FC<Props> = ({ conversation, onBack }) => {
     }
   };
 
+  const participant = conversation.otherParticipant;
+  const avatarFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    participant.name
+  )}&background=1a1a2e&color=fff&size=64`;
+
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
-
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-white flex-shrink-0">
         {onBack && (
@@ -64,80 +87,85 @@ const ChatWindow: React.FC<Props> = ({ conversation, onBack }) => {
           </button>
         )}
         <div className="relative">
-          {conversation.type === "group" ? (
-            <div className="w-9 h-9 relative">
-              {conversation.members?.slice(0, 2).map((m, i) => (
-                <img
-                  key={i}
-                  src={m.avatar}
-                  alt={m.name}
-                  className={`w-6 h-6 rounded-full object-cover border-2 border-white absolute ${
-                    i === 0 ? "top-0 left-0" : "bottom-0 right-0"
-                  }`}
-                />
-              ))}
+          {conversation.type === "GROUP" ? (
+            <div className="w-9 h-9 bg-orange-100 rounded-full flex items-center justify-center">
+              <span className="text-orange-500 text-xs font-bold">G</span>
             </div>
           ) : (
-            <>
-              <img
-                src={conversation.avatar}
-                alt={conversation.name}
-                className="w-9 h-9 rounded-full object-cover"
-              />
-              {conversation.isOnline && (
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
-              )}
-            </>
+            <img
+              src={participant.avatarUrl || avatarFallback}
+              alt={participant.name}
+              className="w-9 h-9 rounded-full object-cover"
+            />
           )}
         </div>
         <div>
           <p className="font-semibold text-gray-900 text-sm">
-            {conversation.name}
+            {participant.name}
           </p>
-          <p className="text-xs text-gray-400">
-            {conversation.type === "group"
-              ? `${conversation.members?.length ?? 0} members`
-              : conversation.isOnline
-              ? "Online"
-              : "typically replies in 10 minutes"}
-          </p>
+          <p className="text-xs text-gray-400">{conversation.topic.name}</p>
         </div>
       </div>
 
-      {/* 👇 Messages area — scrollable */}
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-3 bg-white min-h-0">
-
-        {/* Greeting */}
-        {/* <div className="flex flex-col items-start gap-1">
-          <div className="bg-gray-100 text-gray-800 px-4 py-2.5 rounded-2xl rounded-bl-sm text-sm max-w-[75%]">
-            👋 Hi there! What would you like to talk about today?
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="animate-spin text-[#E2554F]" size={24} />
           </div>
-          <span className="text-[11px] text-gray-400 ml-1">Just now</span>
-        </div> */}
-
-        {/* Messages */}
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex flex-col ${
-              msg.fromMe ? "items-end" : "items-start"
-            }`}
-          >
-            <div
-              className={`max-w-[80%] lg:max-w-[65%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                msg.fromMe
-                  ? "bg-orange-400 text-white rounded-br-sm"
-                  : "bg-gray-100 text-gray-800 rounded-bl-sm"
-              }`}
-            >
-              {msg.text}
-            </div>
-            <span className="text-[11px] text-gray-400 mt-1">{msg.time}</span>
+        ) : messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-sm text-gray-400">
+              No messages yet. Say hello!
+            </p>
           </div>
-        ))}
+        ) : (
+          messages.map((msg) => {
+            const fromMe = msg.senderId === currentUserId;
+            return (
+              <div
+                key={msg.id}
+                className={`flex flex-col ${
+                  fromMe ? "items-end" : "items-start"
+                }`}
+              >
+                <div
+                  className={`max-w-[80%] lg:max-w-[65%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                    fromMe
+                      ? "bg-orange-400 text-white rounded-br-sm"
+                      : "bg-gray-100 text-gray-800 rounded-bl-sm"
+                  }`}
+                >
+                  {msg.contentType === "TEXT" && msg.content}
+                  {msg.contentType === "IMAGE" && (
+                    <img
+                      src={msg.fileUrl || ""}
+                      alt="image"
+                      className="rounded-lg max-w-full"
+                    />
+                  )}
+                  {msg.contentType === "FILE" && (
+                    <a
+                      href={msg.fileUrl || "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline flex items-center gap-1"
+                    >
+                      <Paperclip size={12} /> {msg.content || "File"}
+                    </a>
+                  )}
+                </div>
+                <span className="text-[11px] text-gray-400 mt-1">
+                  {formatDistanceToNow(new Date(msg.createdAt), {
+                    addSuffix: true,
+                  })}
+                </span>
+              </div>
+            );
+          })
+        )}
 
-        {/* Topic chips inside chat */}
-        {showChips && (
+        {showChips && messages.length === 0 && (
           <TopicChips onSelect={handleTopicSelect} />
         )}
 
@@ -161,15 +189,23 @@ const ChatWindow: React.FC<Props> = ({ conversation, onBack }) => {
           <Paperclip size={19} />
         </button>
 
-        {/* 👇 Mic when empty, Send when typing */}
         {input.trim() ? (
           <button
             onClick={() => handleSend()}
-            className="w-8 h-8 bg-[#1a1a2e] hover:bg-[#2a2a4e] rounded-full flex items-center justify-center transition-colors flex-shrink-0"
+            disabled={sending}
+            className="w-8 h-8 bg-[#1a1a2e] hover:bg-[#2a2a4e] rounded-full flex items-center justify-center transition-colors flex-shrink-0 disabled:opacity-50"
           >
-            <svg viewBox="0 0 20 20" fill="white" className="w-4 h-4 rotate-90">
-              <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-            </svg>
+            {sending ? (
+              <Loader2 size={14} className="animate-spin text-white" />
+            ) : (
+              <svg
+                viewBox="0 0 20 20"
+                fill="white"
+                className="w-4 h-4 rotate-90"
+              >
+                <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+              </svg>
+            )}
           </button>
         ) : (
           <button className="w-8 h-8 bg-[#1a1a2e] hover:bg-[#2a2a4e] rounded-full flex items-center justify-center transition-colors flex-shrink-0">
@@ -177,7 +213,6 @@ const ChatWindow: React.FC<Props> = ({ conversation, onBack }) => {
           </button>
         )}
       </div>
-
     </div>
   );
 };

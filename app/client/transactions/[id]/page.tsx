@@ -1,12 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Sidebar from "@/app/components/client/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/client/dashboard/dashboardTopbar";
 import Breadcrumb from "@/app/components/client/my-desk/breadcrumb";
 import { useParams, useRouter } from "next/navigation";
-import { X, BadgeCheck } from "lucide-react";
+import { X, BadgeCheck, Loader2 } from "lucide-react";
+
+type ClientProfile = {
+  name: string;
+  clientProfile: {
+    fullName: string;
+    imageUrl: string | null;
+  };
+};
 
 const briefRows = [
   { label: "Job Title",             value: "Logo Design" },
@@ -47,15 +55,52 @@ export default function ClientTransactionDetailPage() {
   const router = useRouter();
   const id = params.id as string;
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  return (
-    <div className="flex flex-col min-h-screen bg-white">
-      <DashboardTopbar
-        userName="Charles Eden"
-        userAvatar="https://i.pravatar.cc/150?img=33"
-        sidebarOpen={sidebarOpen}
-        onMenuClick={() => setSidebarOpen(!sidebarOpen)}
-      />
+  const [profile, setProfile] = useState<ClientProfile | null>(null);
+    const [profileLoading, setProfileLoading] = useState(true);
+  
+  
+    useEffect(() => {
+      const fetchProfile = async () => {
+        try {
+          const tokenRes = await fetch("/api/auth/session/token");
+          const { token } = await tokenRes.json();
+          const res = await fetch("/api/v1/clients/me", {
+            headers: { Authorization: `Bearer ${token}` },
+            credentials: "include",
+          });
+          const json = await res.json();
+          setProfile(json.data);
+        } catch {
+          // fail silently
+        } finally {
+          setProfileLoading(false);
+        }
+      };
+      fetchProfile();
+    }, []);
+  
+  
+    const userName = profile?.clientProfile?.fullName || profile?.name || "Client";
+    const userAvatar =
+      profile?.clientProfile?.imageUrl ||
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
+  
+    if (profileLoading) {
+      return (
+        <div className="flex h-screen w-screen items-center justify-center bg-white">
+          <Loader2 className="animate-spin text-[#E2554F]" size={40} />
+        </div>
+      );
+    }
+  
+    return (
+      <div className="flex flex-col min-h-screen bg-white">
+        <DashboardTopbar
+          userName={userName}
+          userAvatar={userAvatar}
+          sidebarOpen={sidebarOpen}
+          onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+        />
       <div className="flex flex-1">
         {sidebarOpen && (
           <div className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />
@@ -70,7 +115,7 @@ export default function ClientTransactionDetailPage() {
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
           <Breadcrumb crumbs={[
             { label: "Dashboard", path: "/client/dashboard" },
-            { label: "My Wallet", path: "/client/wallet" },
+            { label: "My Wallet", path: "/client/my-wallet" },
             { label: "Transaction Details" },
           ]} />
 

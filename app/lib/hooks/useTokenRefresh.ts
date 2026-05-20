@@ -21,7 +21,7 @@ export function useTokenRefresh() {
   }, [router]);
 
   useEffect(() => {
-    const interval = setInterval(refresh, 10 * 60 * 1000); // refresh every 10 min
+    const interval = setInterval(refresh, 8 * 60 * 1000); // refresh every 8 min
     return () => clearInterval(interval);
   }, [refresh]);
 }

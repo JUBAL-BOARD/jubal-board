@@ -6,6 +6,7 @@ import GigListItem from "@/app/components/creative/my-gigs/gigListItem";
 import GigsPagination from "@/app/components/creative/my-gigs/gigsPagination";
 import { Search, SlidersHorizontal, ChevronDown } from "lucide-react";
 import { MyGig } from "@/app/types";
+import { useRouter } from "next/navigation";
 
 interface ApiGig {
   id: string;
@@ -77,7 +78,11 @@ const getProgress = (status: string): number => {
   return map[status] ?? 0;
 };
 
+const getAvatarFallback = (name: string) =>
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a2e&color=fff&size=128`;
+
 const MyGigsContent: React.FC = () => {
+  const router = useRouter();
   const [activeChip, setActiveChip] = useState("All Gigs");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -94,36 +99,68 @@ const MyGigsContent: React.FC = () => {
       const tokenRes = await fetch("/api/auth/session/token");
       const { token } = await tokenRes.json();
 
-      const params = new URLSearchParams({ filter });
-      const res = await fetch(`/api/v1/projects/creative?${params.toString()}`, {
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+      if (!token) {
+        router.push("/sign-up");
+        return;
+      }
 
-      if (!res.ok) throw new Error(`Failed to fetch gigs (${res.status})`);
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
 
-      const json = await res.json();
-      const list: ApiGig[] = Array.isArray(json.data) ? json.data : [];
-      setTotal(json.total ?? list.length);
+      // Fetch gigs and approved pitches in parallel
+      const [gigsRes, pitchRes] = await Promise.all([
+        fetch(`/api/v1/projects/creative?filter=${filter}`, { credentials: "include", headers }),
+        fetch(`/api/v1/pitches/me?status=APPROVED`, { credentials: "include", headers }),
+      ]);
 
+      if (!gigsRes.ok) throw new Error(`Failed to fetch gigs (${gigsRes.status})`);
+
+      const gigsJson = await gigsRes.json();
+      const list: ApiGig[] = Array.isArray(gigsJson.data) ? gigsJson.data : [];
+      setTotal(gigsJson.total ?? list.length);
+
+      // Build clientId → avatar map from approved pitches
+      const clientAvatarMap: Record<string, string> = {};
+      if (pitchRes.ok) {
+        const pitchJson = await pitchRes.json();
+        const pitchList = Array.isArray(pitchJson.data) ? pitchJson.data : [];
+
+        await Promise.all(
+          pitchList.map(async (p: any) => {
+            try {
+              const r = await fetch(`/api/v1/briefs/${p.briefId}`, {
+                credentials: "include",
+                headers,
+              });
+              if (r.ok) {
+                const json = await r.json();
+                const client = json.data?.client;
+                if (client?.name) {
+                  clientAvatarMap[client.name] =
+                    client.imageUrl ??
+                    client.avatarUrl ??
+                    getAvatarFallback(client.name ?? "CL");
+                }
+              }
+            } catch { }
+          })
+        );
+      }
+
+      // Fetch gig details and map
       const mapped: MyGig[] = (await Promise.all(
         list.map(async (g) => {
           try {
             const detailRes = await fetch(`/api/v1/projects/${g.id}`, {
               credentials: "include",
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
+              headers,
             });
 
             if (!detailRes.ok) throw new Error("Detail fetch failed");
             const detailJson = await detailRes.json();
             const detail: ApiGigDetail = detailJson.data;
-            console.log("Unwrapped detail:", detail);
 
             return {
               id: detail.id,
@@ -131,7 +168,7 @@ const MyGigsContent: React.FC = () => {
               thumbnail: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
               client: {
                 name: g.clientName ?? "Unknown Client",
-                avatar: "https://i.pravatar.cc/150?img=1",
+                avatar: clientAvatarMap[g.clientName] ?? getAvatarFallback(g.clientName ?? "CL"),
               },
               dueIn: detail.dueDate
                 ? getDueIn(detail.dueDate)
@@ -148,7 +185,7 @@ const MyGigsContent: React.FC = () => {
               thumbnail: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
               client: {
                 name: g.clientName ?? "Unknown Client",
-                avatar: "https://i.pravatar.cc/150?img=1",
+                avatar: clientAvatarMap[g.clientId] ?? getAvatarFallback(g.clientName ?? "CL"),
               },
               dueIn: g.collabDeadline ? getDueIn(g.collabDeadline) : "No deadline",
               progress: getProgress(g.status),
@@ -164,7 +201,7 @@ const MyGigsContent: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     fetchGigs(chipToFilter[activeChip]);
@@ -214,8 +251,8 @@ const MyGigsContent: React.FC = () => {
             key={chip}
             onClick={() => { setActiveChip(chip); setPage(1); }}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeChip === chip
-              ? "bg-[#E2554F] text-white"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                ? "bg-[#E2554F] text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
           >
             {chip}

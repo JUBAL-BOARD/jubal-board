@@ -4,17 +4,48 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMessageStore } from "../../../lib/stores/messageStore";
-import { X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import ClientChatWindow from "../../../components/client/messages/chatWindow";
 import ClientConversationList from "../../../components/client/messages/conversationList";
 import Sidebar from "@/app/components/client/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/creative/dashboard/dashboardTopbar";
+
+type ClientProfile = {
+  name: string;
+  clientProfile: {
+    fullName: string;
+    imageUrl: string | null;
+  };
+};
 
 export default function ClientConversationPage() {
   const { conversationId } = useParams();
   const router = useRouter();
   const { conversations, setActiveConversation } = useMessageStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profile, setProfile] = useState<ClientProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const tokenRes = await fetch("/api/auth/session/token");
+        const { token } = await tokenRes.json();
+        const res = await fetch("/api/v1/clients/me", {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
+        });
+        const json = await res.json();
+        setProfile(json.data);
+      } catch {
+        // fail silently
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   useEffect(() => {
     if (conversationId) {
@@ -25,14 +56,27 @@ export default function ClientConversationPage() {
   const conversation = conversations.find((c) => c.id === conversationId);
   if (!conversation) return null;
 
+  const userName = profile?.clientProfile?.fullName || profile?.name || "Client";
+  const userAvatar =
+    profile?.clientProfile?.imageUrl ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
+
+  if (profileLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-white">
+        <Loader2 className="animate-spin text-[#E2554F]" size={40} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-white">
 
       {/* Topbar */}
       <div className="flex-shrink-0">
         <DashboardTopbar
-          userName="Charles Eden"
-          userAvatar="https://i.pravatar.cc/150?img=12"
+          userName={userName}
+          userAvatar={userAvatar}
           sidebarOpen={sidebarOpen}
           onMenuClick={() => setSidebarOpen(!sidebarOpen)}
         />

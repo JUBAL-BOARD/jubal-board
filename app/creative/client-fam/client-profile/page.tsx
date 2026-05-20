@@ -7,11 +7,34 @@ import Breadcrumb from "@/app/components/creative/dashboard/breadcrumb";
 import ProfileHeader from "@/app/components/creative/client-fam/client-profile/profileHeader";
 import ProfileInfoSection from "@/app/components/creative/client-fam/client-profile/profileInfoSection";
 import { userProfile } from "@/app/data/profileData";
-import { X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
+import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
 
 const Profile: React.FC = () => {
   const [profile] = useState(userProfile);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { profile: creativeProfile, loading: profileLoading, error } = useCreativeProfile();
+
+  if (profileLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 size={48} className="animate-spin text-gray-500" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-red-500">Error loading profile: {error}</p>
+      </div>
+    );
+  }
+
+  const userName = creativeProfile?.fullName || "Creative";
+  const userAvatar =
+    creativeProfile?.avatar ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
 
   const personalFields = [
     { label: "Full Name",              value: profile.fullName },
@@ -32,8 +55,8 @@ const Profile: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <DashboardTopbar
-        userName="Natasha John"
-        userAvatar="https://i.pravatar.cc/150?img=47"
+        userName={userName}
+        userAvatar={userAvatar}
         sidebarOpen={sidebarOpen}
         onMenuClick={() => setSidebarOpen(!sidebarOpen)}
       />

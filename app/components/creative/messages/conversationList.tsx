@@ -1,47 +1,51 @@
 "use client";
-
 import { useState } from "react";
-import { Search } from "lucide-react";
-import { useMessageStore } from "../../../lib/stores/messageStore";
-import { useOpenChat } from "../../../lib/hooks/useOpenChat";
-import { Conversation } from "@/app/types";
+import { Search, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useConversations } from "@/app/lib/hooks/useConversations";
+import { Conversation } from "@/app/lib/api/messageApi";
+import { formatDistanceToNow } from "date-fns";
 
-type Props = {};
+interface Props {
+  activeId?: string;
+}
 
-const ConversationList = () => {
+const ConversationList: React.FC<Props> = ({ activeId }) => {
   const [search, setSearch] = useState("");
-  const conversations = useMessageStore((s) => s.conversations);
-  const activeConversationId = useMessageStore((s) => s.activeConversationId);
-  const { openDM, openGroup } = useOpenChat();
+  const router = useRouter();
+  const { conversations, loading, error } = useConversations();
 
   const filtered = conversations.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase())
+    c.otherParticipant.name.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleSelect = (convo: Conversation) => {
-  if (convo.type === "group" || convo.isGroup) {
-    openGroup({
-      id: convo.id, // 👈 pass full id, don't strip
-      title: convo.name,
-      members: convo.members ?? [],
-    });
-  } else {
-    openDM({
-      id: convo.id, // 👈 pass full id, don't strip
-      name: convo.name,
-      avatar: convo.avatar ?? "",
-      isOnline: convo.isOnline,
-    });
+    router.push(`/creative/messages/${convo.id}`);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="animate-spin text-[#E2554F]" size={24} />
+      </div>
+    );
   }
-};
+
+  if (error) {
+    return (
+      <p className="text-xs text-red-400 text-center mt-10 px-4">{error}</p>
+    );
+  }
 
   return (
     <div className="w-full flex flex-col overflow-hidden">
-
       {/* Search */}
       <div className="p-3 border-b border-gray-100 flex-shrink-0">
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          />
           <input
             type="text"
             placeholder="Search"
@@ -55,68 +59,78 @@ const ConversationList = () => {
       {/* List */}
       <div className="flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
-          <p className="text-xs text-gray-400 text-center mt-10">No conversations yet.</p>
+          <p className="text-xs text-gray-400 text-center mt-10">
+            No conversations yet.
+          </p>
         ) : (
-          filtered.map((convo) => (
-            <div
-              key={convo.id}
-              onClick={() => handleSelect(convo)}
-              className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors border-b border-gray-50 ${activeConversationId === convo.id ? "bg-amber-50" : "hover:bg-gray-50"
+          filtered.map((convo) => {
+            const participant = convo.otherParticipant;
+            const avatarFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+              participant.name
+            )}&background=1a1a2e&color=fff&size=64`;
+            const isActive = convo.id === activeId;
+
+            return (
+              <div
+                key={convo.id}
+                onClick={() => handleSelect(convo)}
+                className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors border-b border-gray-50 ${
+                  isActive ? "bg-amber-50" : "hover:bg-gray-50"
                 }`}
-            >
-              {/* Avatar */}
-              <div className="relative flex-shrink-0">
-                {convo.type === "group" ? (
-                  // Group avatar — stack first 2 member avatars
-                  <div className="w-10 h-10 relative">
-                    {convo.members?.slice(0, 2).map((m, i) => (
-                      <img
-                        key={i}
-                        src={m.avatar}
-                        alt={m.name}
-                        className={`w-7 h-7 rounded-full object-cover border-2 border-white absolute ${i === 0 ? "top-0 left-0" : "bottom-0 right-0"
-                          }`}
-                      />
-                    ))}
-                    <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-orange-400 rounded-full flex items-center justify-center">
-                      <span className="text-white text-[8px] font-bold">G</span>
+              >
+                {/* Avatar */}
+                <div className="relative flex-shrink-0">
+                  {convo.type === "GROUP" ? (
+                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                      <span className="text-orange-500 text-xs font-bold">G</span>
                     </div>
-                  </div>
-                ) : (
-                  <div className="relative">
+                  ) : (
                     <img
-                      src={convo.avatar}
-                      alt={convo.name}
+                      src={participant.avatarUrl || avatarFallback}
+                      alt={participant.name}
                       className="w-10 h-10 rounded-full object-cover"
                     />
-                    {convo.isOnline && (
-                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-0.5">
-                  <p className="text-sm font-semibold text-gray-900 truncate">{convo.name}</p>
-                  <span className="text-[11px] text-gray-400 flex-shrink-0 ml-1">{convo.lastTime}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-gray-400 truncate">
-                    {convo.type === "group" && convo.lastMessage
-                      ? `${convo.lastSender ?? "Someone"}: ${convo.lastMessage}`
-                      : convo.lastMessage}
-                  </p>
-                  {(convo.unread ?? 0) > 0 && (
-                    <span className="ml-1 flex-shrink-0 w-4 h-4 bg-[#E2554F] rounded-full flex items-center justify-center text-white text-[10px] font-bold">
-                      {convo.unread}
+                  )}
+                  {convo.unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#E2554F] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                      {convo.unreadCount > 9 ? "9+" : convo.unreadCount}
                     </span>
                   )}
                 </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      {participant.name}
+                    </p>
+                    {convo.lastMessage && (
+                      <span className="text-[11px] text-gray-400 flex-shrink-0 ml-1">
+                        {formatDistanceToNow(
+                          new Date(convo.lastMessage.createdAt),
+                          { addSuffix: true }
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-400 truncate">
+                      <span className="text-[10px] bg-gray-100 text-gray-500 rounded px-1 py-0.5 mr-1">
+                        {convo.topic.name}
+                      </span>
+                      {convo.lastMessage
+                        ? convo.lastMessage.contentType === "TEXT"
+                          ? convo.lastMessage.content
+                          : convo.lastMessage.contentType === "IMAGE"
+                          ? "📷 Image"
+                          : "📎 File"
+                        : "No messages yet"}
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

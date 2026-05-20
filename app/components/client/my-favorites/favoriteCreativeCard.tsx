@@ -1,6 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import { Star, BadgeCheck, MessageSquare } from "lucide-react";
-import type { FavoriteCreative } from "../../../data/favoritesData";
+import { FavoriteCreative } from "@/app/data/favoritesData";
 
 interface Props {
   creative: FavoriteCreative;
@@ -11,16 +13,14 @@ interface Props {
 const FavoriteCreativeCard: React.FC<Props> = ({ creative, isSelected, onSelect }) => {
   return (
     <div
-      onClick={() => onSelect(creative.id)}
+      onClick={() => onSelect(creative.id as unknown as number)}
       className="flex flex-col lg:flex-row lg:items-center gap-3 px-4 py-3.5 rounded-[10px] mb-2.5 cursor-pointer transition-all duration-150"
       style={{
         border: `1.5px solid ${isSelected ? "#E85D3A" : "#e5e7eb"}`,
         background: isSelected ? "#fff5f2" : "white",
       }}
     >
-      {/* Top row on mobile — avatar + info + actions */}
       <div className="flex items-start gap-3 flex-1 min-w-0">
-
         {/* Avatar */}
         <div className="relative flex-shrink-0">
           <Image
@@ -52,19 +52,18 @@ const FavoriteCreativeCard: React.FC<Props> = ({ creative, isSelected, onSelect 
           </div>
         </div>
 
-        {/* Actions — inline on mobile (top right), column on desktop */}
+        {/* Actions */}
         <div className="flex flex-col items-end gap-2 flex-shrink-0">
           <div className="w-[30px] h-[30px] rounded-full bg-[#1a1a2e] flex items-center justify-center cursor-pointer">
             <MessageSquare size={14} stroke="white" />
           </div>
           <button
-            onClick={(e) => { e.stopPropagation(); onSelect(creative.id); }}
+            onClick={(e) => { e.stopPropagation(); onSelect(creative.id as unknown as number); }}
             className="bg-[#E2554F] border-none rounded-md px-3 lg:px-3.5 py-1.5 cursor-pointer text-white font-semibold text-xs whitespace-nowrap hover:bg-[#d44a44] transition-colors"
           >
             Send Brief
           </button>
         </div>
-
       </div>
     </div>
   );

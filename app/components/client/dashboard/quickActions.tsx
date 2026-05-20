@@ -1,11 +1,14 @@
 import { Briefcase, ClipboardList } from "lucide-react";
 import Link from "next/link";
 
-const QuickActions: React.FC = () => {
+interface Props {
+  availableBalance: string | null;
+}
+
+const QuickActions: React.FC<Props> = ({ availableBalance }) => {
   return (
     <div className="flex mb-7 gap-4 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 snap-x snap-mandatory scroll-smooth scrollbar-hide">
-
-      {/* Explore Skills */}
+      {/* Hire A Pro */}
       <Link href="/client/explore-skills">
         <div className="flex items-center justify-center gap-3.5 flex-shrink-0 w-[75vw] lg:w-auto lg:flex-1 bg-[#E6E6E699] h-[150px] lg:h-[200px] border-[1.5px] border-gray-200 rounded-[10px] px-5 py-4 cursor-pointer hover:border-gray-300 transition-colors snap-start">
           <Briefcase size={48} stroke="#E2554F" />
@@ -35,10 +38,11 @@ const QuickActions: React.FC = () => {
       <Link href="/client/my-wallet">
         <div className="flex flex-col items-center justify-center gap-3.5 flex-shrink-0 w-[75vw] lg:w-auto lg:flex-1 bg-[#FFD70033] h-[150px] lg:h-[200px] border-[1.5px] border-gray-200 rounded-[10px] px-5 py-4 cursor-pointer hover:border-gray-300 transition-colors snap-start">
           <p className="m-0 text-lg text-black font-heading font-medium">Available Balance:</p>
-          <p className="m-0 mt-1 text-4xl font-heading font-extrabold text-black">$5,000.00</p>
+          <p className="m-0 mt-1 text-4xl font-heading font-extrabold text-black">
+            {availableBalance ?? "—"}
+          </p>
         </div>
       </Link>
-
     </div>
   );
 };

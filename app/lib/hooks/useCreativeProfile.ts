@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { apiRequest, ApiError } from '../api';
 
 export interface CreativeProfileData {
+  id: string;
   fullName: string;
   avatar?: string;
   dateOfBirth?: string;
@@ -82,6 +83,7 @@ export const useCreativeProfile = () => {
         : (activeProfile?.preferredSocialLinks || []).filter(Boolean);
 
       setProfile({
+        id: payload.user?.id || "",
         fullName: extractedName,
         avatar: extractedAvatar,
         dateOfBirth: activeProfile?.dateOfBirth || '',

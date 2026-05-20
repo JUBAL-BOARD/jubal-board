@@ -5,10 +5,11 @@ import Image from "next/image";
 import Sidebar from "@/app/components/creative/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/creative/dashboard/dashboardTopbar";
 import Breadcrumb from "@/app/components/creative/dashboard/breadcrumb";
-import { X, Upload } from "lucide-react";
+import { Loader2, X, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCollabStore } from "@/app/lib/stores/collabStore";
+import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
 
 interface CollabTask {
     id: string;
@@ -78,6 +79,28 @@ export default function CollabProgressPage() {
     const [tasks] = useState<CollabTask[]>(initialTasks);
     const router = useRouter();
     const setActiveProjectTitle = useCollabStore((s) => s.setActiveProjectTitle);
+    const { profile, loading, error } = useCreativeProfile();
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <Loader2 size={48} className="animate-spin text-gray-500" />
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <p className="text-red-500">Error loading profile: {error}</p>
+            </div>
+        );
+    }
+
+    const userName = profile?.fullName || "Creative";
+    const userAvatar =
+        profile?.avatar ||
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
 
     const projectTitle = "Creative Campaign"; // 👈 later this comes from your API/store
 
@@ -88,8 +111,8 @@ export default function CollabProgressPage() {
     return (
         <div className="flex flex-col min-h-screen bg-white">
             <DashboardTopbar
-                userName="Natasha John"
-                userAvatar="https://i.pravatar.cc/150?img=47"
+                userName={userName}
+                userAvatar={userAvatar}
                 sidebarOpen={sidebarOpen}
                 onMenuClick={() => setSidebarOpen(!sidebarOpen)}
             />

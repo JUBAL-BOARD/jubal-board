@@ -76,99 +76,104 @@ const IncomingPitches: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
+  const [projects, setProjects] = useState<any[]>([]);
 
   const fetchAllPitches = useCallback(async () => {
-  setLoading(true);
-  setError(null);
-  try {
-    const tokenRes = await fetch("/api/auth/session/token");
-    const { token } = await tokenRes.json();
-    const headers = {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    };
-
-    // 1. Fetch Suggested Creatives to build the Image Map (Match Hook Logic)
-    const imageMap: Record<string, string> = {};
+    setLoading(true);
+    setError(null);
     try {
-      const suggestedRes = await fetch("/api/v1/creatives/suggested", { headers, credentials: "include" });
-      if (suggestedRes.ok) {
-        const suggestedJson = await suggestedRes.json();
-        (Array.isArray(suggestedJson.data) ? suggestedJson.data : []).forEach((c: any) => {
-          if (c.name && c.imageUrl) imageMap[c.name] = c.imageUrl;
-        });
-      }
-    } catch { /* fail silently */ }
+      const tokenRes = await fetch("/api/auth/session/token");
+      const { token } = await tokenRes.json();
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
 
-    // 2. Fetch profile and briefs
-    const [profileRes, briefsRes] = await Promise.all([
-      fetch("/api/v1/clients/me", { headers, credentials: "include" }),
-      fetch("/api/v1/briefs/me", { headers, credentials: "include" }),
-    ]);
-
-    const profileJson = await profileRes.json();
-    setProfile(profileJson.data ?? profileJson);
-
-    const briefsJson = await briefsRes.json();
-    const briefList: Brief[] = Array.isArray(briefsJson)
-      ? briefsJson
-      : Array.isArray(briefsJson.data)
-        ? briefsJson.data
-        : briefsJson.data?.briefs ?? [];
-
-    if (briefList.length === 0) {
-      setPitches([]);
-      return;
-    }
-
-    // 3. Fetch pitches and apply the Image Map logic
-    const pitchResults = await Promise.all(
-      briefList.map(async (brief) => {
-        try {
-          const res = await fetch(`/api/v1/briefs/${brief.id}/pitches`, {
-            headers,
-            credentials: "include",
+      const imageMap: Record<string, string> = {};
+      try {
+        const suggestedRes = await fetch("/api/v1/creatives/suggested", { headers, credentials: "include" });
+        if (suggestedRes.ok) {
+          const suggestedJson = await suggestedRes.json();
+          (Array.isArray(suggestedJson.data) ? suggestedJson.data : []).forEach((c: any) => {
+            if (c.name && c.imageUrl) imageMap[c.name] = c.imageUrl;
           });
-          if (!res.ok) return [];
-          const json = await res.json();
-          const list = json.data?.pitches ?? json.data ?? json ?? [];
-          
-          return (Array.isArray(list) ? list : []).map((p: any) => {
-            const cp = p.creativeProfile;
-            const name = cp?.fullName ?? cp?.name ?? "Creative";
-            
-            // Apply Hook Avatar Logic
-            const finalAvatar = 
-              imageMap[name] ?? 
-              cp?.avatarUrl ?? 
-              cp?.imageUrl ?? 
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a2e&color=fff&size=128`;
-
-            return {
-              ...p,
-              briefTitle: brief.jobTitle,
-              creativeProfile: {
-                ...cp,
-                avatarUrl: finalAvatar // Inject the mapped avatar here
-              }
-            };
-          });
-        } catch {
-          return [];
         }
-      })
-    );
+      } catch { /* fail silently */ }
 
-    const allPitches: Pitch[] = pitchResults.flat();
-    allPitches.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    setPitches(allPitches);
-  } catch (err) {
-    setError(err instanceof Error ? err.message : "Something went wrong.");
-  } finally {
-    setLoading(false);
-  }
-}, []);
+      const [profileRes, briefsRes, projectsRes] = await Promise.all([
+        fetch("/api/v1/clients/me", { headers, credentials: "include" }),
+        fetch("/api/v1/briefs/me", { headers, credentials: "include" }),
+        fetch("/api/v1/projects", { headers, credentials: "include" }),
+      ]);
 
+      const profileJson = await profileRes.json();
+      setProfile(profileJson.data ?? profileJson);
+
+      const projectsJson = await projectsRes.json();
+      const projectList = Array.isArray(projectsJson.data)
+        ? projectsJson.data
+        : Array.isArray(projectsJson)
+          ? projectsJson
+          : [];
+      setProjects(projectList);
+
+      const briefsJson = await briefsRes.json();
+      const briefList: Brief[] = Array.isArray(briefsJson)
+        ? briefsJson
+        : Array.isArray(briefsJson.data)
+          ? briefsJson.data
+          : briefsJson.data?.briefs ?? [];
+
+      if (briefList.length === 0) {
+        setPitches([]);
+        return;
+      }
+
+      const pitchResults = await Promise.all(
+        briefList.map(async (brief) => {
+          try {
+            const res = await fetch(`/api/v1/briefs/${brief.id}/pitches`, {
+              headers,
+              credentials: "include",
+            });
+            if (!res.ok) return [];
+            const json = await res.json();
+            const list = json.data?.pitches ?? json.data ?? json ?? [];
+
+            return (Array.isArray(list) ? list : []).map((p: any) => {
+              const cp = p.creativeProfile;
+              const name = cp?.fullName ?? cp?.name ?? "Creative";
+
+              const finalAvatar =
+                imageMap[name] ??
+                cp?.avatarUrl ??
+                cp?.imageUrl ??
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a2e&color=fff&size=128`;
+
+              return {
+                ...p,
+                briefTitle: brief.jobTitle,
+                creativeProfile: {
+                  ...cp,
+                  avatarUrl: finalAvatar,
+                },
+              };
+            });
+          } catch {
+            return [];
+          }
+        })
+      );
+
+      const allPitches: Pitch[] = pitchResults.flat();
+      allPitches.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setPitches(allPitches);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchAllPitches();
@@ -249,10 +254,11 @@ const IncomingPitches: React.FC = () => {
               <button
                 key={tab}
                 onClick={() => { setActiveFilter(tab); setVisibleCount(12); }}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeFilter === tab
-                  ? "bg-[#E05C5C] text-white"
-                  : "bg-white border border-gray-200 text-black"
-                  }`}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  activeFilter === tab
+                    ? "bg-[#E05C5C] text-white"
+                    : "bg-white border border-gray-200 text-black"
+                }`}
               >
                 {filterLabels[tab]}
               </button>
@@ -285,88 +291,115 @@ const IncomingPitches: React.FC = () => {
               ) : (
                 <div className="bg-[#fafafa] border border-gray-100 rounded-2xl overflow-hidden">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0">
-                    {visible.map((pitch) => (
-                      <div
-                        key={pitch.id}
-                        className="bg-white m-4 p-4 flex items-start gap-3 border border-gray-100 rounded-xl"
-                      >
-                        {/* Avatar */}
-                        <div className="relative shrink-0">
-                          <img
-                            src={
-                              pitch.creativeProfile?.avatarUrl ||
-                              `https://ui-avatars.com/api/?name=${encodeURIComponent(pitch.creativeProfile?.fullName ?? "C")}&background=1a1a2e&color=fff&size=128`
-                            }
-                            alt={pitch.creativeProfile?.fullName ?? "Creative"}
-                            className="w-14 h-14 rounded-full object-cover"
-                          />
-                        </div>
+                    {visible.map((pitch) => {
+                      // Match project using pitchId — this is the correct key from the API
+                      const matchedProject = projects.find((proj: any) => proj.pitchId === pitch.id);
+                      const needsPayment = matchedProject?.status === "PENDING_PAYMENT";
 
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-semibold text-gray-900 text-sm">
-                                {pitch.creativeProfile?.fullName ?? "Creative"}
-                              </span>
-                              {pitch.creativeProfile?.isPremium && (
-                                <span className="bg-[#E05C5C] text-white text-[10px] font-bold px-2 py-0.5 rounded">
-                                  Premium
+                      return (
+                        <div
+                          key={pitch.id}
+                          className="bg-white m-4 p-4 flex items-start gap-3 border border-gray-100 rounded-xl"
+                        >
+                          {/* Avatar */}
+                          <div className="relative shrink-0">
+                            <img
+                              src={
+                                pitch.creativeProfile?.avatarUrl ||
+                                `https://ui-avatars.com/api/?name=${encodeURIComponent(pitch.creativeProfile?.fullName ?? "C")}&background=1a1a2e&color=fff&size=128`
+                              }
+                              alt={pitch.creativeProfile?.fullName ?? "Creative"}
+                              className="w-14 h-14 rounded-full object-cover"
+                            />
+                          </div>
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-semibold text-gray-900 text-sm">
+                                  {pitch.creativeProfile?.fullName ?? "Creative"}
                                 </span>
-                              )}
-                            </div>
-                            <button className="w-8 h-8 rounded-full bg-[#1E2A3B] flex items-center justify-center shrink-0">
-                              <MessageCircle size={14} className="text-white" />
-                            </button>
-                          </div>
-
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {pitch.creativeProfile?.professionalRole ?? "Creative"}
-                          </p>
-
-                          {/* Brief title */}
-                          <p className="text-xs text-[#E05C5C] mt-0.5 truncate">
-                            Brief: {pitch.briefTitle ?? "—"}
-                          </p>
-
-                          <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500 flex-wrap">
-                            <span className="flex items-center gap-1">
-                              <Star size={11} className="text-yellow-400 fill-yellow-400" />
-                              {pitch.creativeProfile?.overallRating?.toFixed(1) ?? "—"}
-                            </span>
-                            <span className="font-medium text-gray-700">
-                              ${pitch.proposedAmount?.toLocaleString() ?? "—"}
-                            </span>
-                            <span>{formatDate(pitch.deliveryDate)}</span>
-                          </div>
-
-                          {/* Status badge */}
-                          <div className="flex items-center justify-between mt-2">
-                            <div className="flex items-center gap-4">
-                              <button className="text-xs text-[#E05C5C] font-medium hover:underline">
-                                View Profile
-                              </button>
-                              <button
-                                onClick={() => router.push(
-                                  `/client/pitches/${pitch.id}?name=${encodeURIComponent(pitch.creativeProfile?.fullName ?? "")}&avatar=${encodeURIComponent(pitch.creativeProfile?.avatarUrl ?? "")}`
+                                {pitch.creativeProfile?.isPremium && (
+                                  <span className="bg-[#E05C5C] text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                                    Premium
+                                  </span>
                                 )}
-                                className="text-xs text-[#E05C5C] font-medium hover:underline"
-                              >
-                                See Pitch
+                              </div>
+                              <button className="w-8 h-8 rounded-full bg-[#1E2A3B] flex items-center justify-center shrink-0">
+                                <MessageCircle size={14} className="text-white" />
                               </button>
                             </div>
-                            <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${pitch.status === "ACCEPTED"
-                              ? "bg-green-100 text-green-600"
-                              : pitch.status === "REJECTED"
-                                ? "bg-red-100 text-red-500"
-                                : "bg-yellow-100 text-yellow-600"
-                              }`}>
-                              {pitch.status}
-                            </span>
+
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {pitch.creativeProfile?.professionalRole ?? "Creative"}
+                            </p>
+
+                            <p className="text-xs text-[#E05C5C] mt-0.5 truncate">
+                              Brief: {pitch.briefTitle ?? "—"}
+                            </p>
+
+                            <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500 flex-wrap">
+                              <span className="flex items-center gap-1">
+                                <Star size={11} className="text-yellow-400 fill-yellow-400" />
+                                {pitch.creativeProfile?.overallRating?.toFixed(1) ?? "—"}
+                              </span>
+                              <span className="font-medium text-gray-700">
+                                ${pitch.proposedAmount?.toLocaleString() ?? "—"}
+                              </span>
+                              <span>{formatDate(pitch.deliveryDate)}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between mt-2">
+                              <div className="flex items-center gap-4">
+                                <button className="text-xs text-[#E05C5C] font-medium hover:underline">
+                                  View Profile
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    router.push(
+                                      `/client/pitches/${pitch.id}?name=${encodeURIComponent(pitch.creativeProfile?.fullName ?? "")}&avatar=${encodeURIComponent(pitch.creativeProfile?.avatarUrl ?? "")}`
+                                    )
+                                  }
+                                  className="text-xs text-[#E05C5C] font-medium hover:underline"
+                                >
+                                  See Pitch
+                                </button>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {/* Complete Payment button — shows when a matched project needs payment */}
+                                {needsPayment && (
+                                  <button
+                                    onClick={() =>
+                                      router.push(
+                                        `/client/pitches/${pitch.id}/payment?pitchId=${pitch.id}&projectId=${matchedProject.id}&name=${encodeURIComponent(pitch.creativeProfile?.fullName ?? "")}&avatar=${encodeURIComponent(pitch.creativeProfile?.avatarUrl ?? "")}`
+                                      )
+                                    }
+                                    className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-[#E05C5C] text-white hover:bg-[#c94c4c] transition-colors"
+                                  >
+                                    Complete Payment
+                                  </button>
+                                )}
+
+                                {/* Status badge */}
+                                <span
+                                  className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${
+                                    pitch.status === "ACCEPTED"
+                                      ? "bg-green-100 text-green-600"
+                                      : pitch.status === "REJECTED"
+                                        ? "bg-red-100 text-red-500"
+                                        : "bg-yellow-100 text-yellow-600"
+                                  }`}
+                                >
+                                  {pitch.status}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

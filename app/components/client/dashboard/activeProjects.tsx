@@ -87,9 +87,9 @@ const ActiveProjects: React.FC = () => {
         // 1. BUILD IMAGE MAP FROM SUGGESTED CREATIVES (Match Hook Logic)
         const imageMap: Record<string, string> = {};
         try {
-          const suggestedRes = await fetch("/api/v1/creatives/suggested", { 
-            headers, 
-            credentials: "include" 
+          const suggestedRes = await fetch("/api/v1/creatives/suggested", {
+            headers,
+            credentials: "include"
           });
           if (suggestedRes.ok) {
             const suggestedJson = await suggestedRes.json();
@@ -101,13 +101,15 @@ const ActiveProjects: React.FC = () => {
           // Fail silently
         }
 
-        const res = await fetch("/api/v1/projects?status=PENDING_PAYMENT", {
+        const res = await fetch("/api/v1/projects", {
           headers,
           credentials: "include",
         });
 
         const json = await res.json();
-        const list = json.data?.data ?? json.data ?? [];
+        const list = (json.data?.data ?? json.data ?? []).filter(
+          (p: any) => p.status !== "COMPLETED"
+        );
 
         const mapped: Project[] = (
           await Promise.all(
@@ -150,11 +152,11 @@ const ActiveProjects: React.FC = () => {
 
               // 2. APPLY AVATAR FALLBACK HIERARCHY (Match Hook Logic)
               const assigneeName = creative?.fullName ?? creative?.name ?? "Creative";
-              
+
               const assigneeAvatar =
                 imageMap[assigneeName] ??         // Check suggested map first
                 creative?.avatarUrl ??            // Then creative profile props
-                creative?.imageUrl ?? 
+                creative?.imageUrl ??
                 `https://ui-avatars.com/api/?name=${encodeURIComponent(assigneeName)}&background=1a1a2e&color=fff&size=128`;
 
               return {

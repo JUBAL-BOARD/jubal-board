@@ -10,7 +10,7 @@ import SuggestedCreatives from "@/app/components/client/dashboard/suggestedCreat
 import ServicesCarousel from "@/app/components/client/dashboard/servicesCarousel";
 import ActiveProjects from "@/app/components/client/dashboard/activeProjects";
 import IncomingPitches from "@/app/components/client/dashboard/incomingPitches";
-import { suggestedCreatives, services, activeProjects, incomingPitches } from "../../data";
+import { services } from "../../data";
 import { useState, useEffect } from "react";
 import { X, Loader2 } from "lucide-react";
 import { useKycStatus } from "../../lib/hooks/useKycStatus";
@@ -37,32 +37,45 @@ const ClientDashboard: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [availableBalance, setAvailableBalance] = useState<string | null>(null);
   const { kycStatus, loading: kycLoading } = useKycStatus();
   const [showKycModal, setShowKycModal] = useState(false);
 
   useEffect(() => {
-  console.log("kycLoading:", kycLoading, "kycStatus:", kycStatus);
-  if (!kycLoading && kycStatus !== null && kycStatus === "UNVERIFIED") {
-    setShowKycModal(true);
-  }
-}, [kycStatus, kycLoading]);
+    console.log("kycLoading:", kycLoading, "kycStatus:", kycStatus);
+    if (!kycLoading && kycStatus !== null && kycStatus === "UNVERIFIED") {
+      setShowKycModal(true);
+    }
+  }, [kycStatus, kycLoading]);
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchAll = async () => {
       try {
         const tokenRes = await fetch("/api/auth/session/token");
         if (!tokenRes.ok) return;
         const { token } = await tokenRes.json();
         if (!token) return;
 
-        const res = await fetch("/api/v1/clients/me", {
-          headers: { Authorization: `Bearer ${token}` },
-          credentials: "include",
-        });
-        if (!res.ok) return;
+        const headers = { Authorization: `Bearer ${token}` };
 
-        const json = await res.json();
-        setProfile(json.data);
+        const [profileRes, walletRes] = await Promise.all([
+          fetch("/api/v1/clients/me", { headers, credentials: "include" }),
+          fetch("/api/v1/wallet", { headers, credentials: "include" }),
+        ]);
+
+        if (profileRes.ok) {
+          const json = await profileRes.json();
+          setProfile(json.data);
+        }
+
+        if (walletRes.ok) {
+          const walletJson = await walletRes.json();
+          const w = walletJson.data ?? walletJson;
+          const balance = w.availableBalance ?? 0;
+          setAvailableBalance(
+            `₦${balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+          );
+        }
       } catch {
         // fail silently
       } finally {
@@ -70,7 +83,7 @@ const ClientDashboard: React.FC = () => {
       }
     };
 
-    fetchProfile();
+    fetchAll();
   }, []);
 
   if (loading || kycLoading) {
@@ -132,7 +145,7 @@ const ClientDashboard: React.FC = () => {
           <UpdateBanner />
           <WelcomeBar userName={userName} />
           <SearchBar />
-          <QuickActions />
+          <QuickActions availableBalance={availableBalance} />
           <SuggestedCreatives />
           <ServicesCarousel services={services} />
           <div className="lg:flex gap-6">

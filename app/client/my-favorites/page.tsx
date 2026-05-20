@@ -1,45 +1,159 @@
 "use client";
-
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Sidebar from "../../components/client/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/client/dashboard/dashboardTopbar";
 import Breadcrumb from "../../components/client/my-desk/breadcrumb";
 import FavoriteCreativeCard from "../../components/client/my-favorites/favoriteCreativeCard";
 import SendBriefForm from "../../components/client/my-favorites/sendBriefForm";
-import { favoriteCreatives } from "../../data/favoritesData";
-import { Search, X } from "lucide-react";
+import { FavoriteCreative } from "../../data/favoritesData";
+import { Loader2, Search, X } from "lucide-react";
+
+type ClientProfile = {
+  name: string;
+  clientProfile: {
+    fullName: string;
+    imageUrl: string | null;
+  };
+};
 
 const Favorites: React.FC = () => {
   const [search, setSearch] = useState<string>("");
-  const [selectedId, setSelectedId] = useState<number>(1);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profile, setProfile] = useState<ClientProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [favorites, setFavorites] = useState<FavoriteCreative[]>([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(true);
 
-  const filtered = favoriteCreatives.filter((c) =>
+  // fetch profile
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const tokenRes = await fetch("/api/auth/session/token");
+        const { token } = await tokenRes.json();
+        const res = await fetch("/api/v1/clients/me", {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
+        });
+        const json = await res.json();
+        setProfile(json.data);
+      } catch {
+        // fail silently
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  // fetch favorites
+  const fetchFavorites = useCallback(async () => {
+    setFavoritesLoading(true);
+    try {
+      const tokenRes = await fetch("/api/auth/session/token");
+      const { token } = await tokenRes.json();
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
+
+      // Step 1: get favorited IDs
+      const favRes = await fetch("/api/v1/favorites", {
+        headers,
+        credentials: "include",
+      });
+      if (!favRes.ok) return;
+      const favJson = await favRes.json();
+      const favList: { id: string; targetId: string }[] =
+        Array.isArray(favJson.data) ? favJson.data : [];
+
+      if (favList.length === 0) {
+        setFavorites([]);
+        return;
+      }
+
+      // Step 2: fetch each creative's public profile
+      const profiles = await Promise.all(
+        favList.map(async (fav) => {
+          try {
+            const res = await fetch(
+              `/api/v1/creatives/${fav.targetId}/public-profile`,
+              { headers, credentials: "include" }
+            );
+            if (!res.ok) return null;
+            const json = await res.json();
+            const c = json.data ?? json;
+            const name = c.name ?? "Creative";
+
+            return {
+              id: fav.targetId,
+              name,
+              role: c.categoriesOfInterest?.[0]?.name ?? "Creative",
+              avatar:
+                c.avatarUrl ??
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a2e&color=fff&size=128`,
+              rating: c.averageRating ?? 0,
+              rate: c.services?.[0]
+                ? `$${c.services[0].priceFrom.toLocaleString()}`
+                : "—",
+              completedProjects: c.completedProjects ?? 0,
+              online: c.isOnline ?? false,
+              verified: c.isPremium ?? false,
+            } as unknown as FavoriteCreative;
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      const valid = profiles.filter(Boolean) as FavoriteCreative[];
+      setFavorites(valid);
+      // auto-select first
+      if (valid.length > 0) setSelectedId(String(valid[0].id));
+    } catch {
+      // fail silently
+    } finally {
+      setFavoritesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFavorites();
+  }, [fetchFavorites]);
+
+  const filtered = favorites.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     c.role.toLowerCase().includes(search.toLowerCase())
   );
 
+  const userName = profile?.clientProfile?.fullName || profile?.name || "Client";
+  const userAvatar =
+    profile?.clientProfile?.imageUrl ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
+
+  if (profileLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-white">
+        <Loader2 className="animate-spin text-[#E2554F]" size={40} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-white">
-
       <DashboardTopbar
-        userName="Charles Eden"
-        userAvatar="https://i.pravatar.cc/150?img=33"
+        userName={userName}
+        userAvatar={userAvatar}
         sidebarOpen={sidebarOpen}
         onMenuClick={() => setSidebarOpen(!sidebarOpen)}
       />
-
       <div className="flex flex-1 relative">
-
-        {/* Dark overlay — mobile only, shows when sidebar is open */}
         {sidebarOpen && (
           <div
             className="fixed inset-0 bg-black/40 z-30 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
-
-        {/* Sidebar — slides in on mobile, always visible on desktop */}
         <div
           className={`
             fixed top-0 left-0 h-full z-40
@@ -48,36 +162,27 @@ const Favorites: React.FC = () => {
             lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:z-10
           `}
         >
-          {/* Close button inside sidebar on mobile */}
           <button
             className="absolute top-4 right-4 z-50 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           >
             <X size={22} />
           </button>
-
           <Sidebar activeItem="Dashboard" />
         </div>
 
-        {/* Main content — full width, no margin offset needed */}
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-
           <Breadcrumb crumbs={[
             { label: "Dashboard", path: "/client/dashboard" },
             { label: "My Favorites" },
           ]} />
-
           <h1 className="text-[26px] font-extrabold text-[#1a1a2e] m-0 mb-6">
             My Favorites
           </h1>
 
-          {/* Two Panel Layout */}
           <div className="flex gap-6" style={{ height: "calc(100vh - 200px)" }}>
-
             {/* Left — Creatives List */}
             <div className="w-[320px] flex-shrink-0 bg-[#fafafa] px-2 py-4 flex flex-col gap-0">
-
-              {/* Search */}
               <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2.5 bg-white mb-3.5">
                 <Search size={15} stroke="#9CA3AF" />
                 <input
@@ -88,16 +193,25 @@ const Favorites: React.FC = () => {
                 />
               </div>
 
-              {/* List */}
               <div className="overflow-y-auto flex-1">
-                {filtered.map((creative) => (
-                  <FavoriteCreativeCard
-                    key={creative.id}
-                    creative={creative}
-                    isSelected={selectedId === creative.id}
-                    onSelect={setSelectedId}
-                  />
-                ))}
+                {favoritesLoading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <Loader2 className="animate-spin text-[#E2554F]" size={28} />
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <p className="text-center text-sm text-black py-10">
+                    No favorites yet.
+                  </p>
+                ) : (
+                  filtered.map((creative) => (
+                    <FavoriteCreativeCard
+                      key={creative.id}
+                      creative={creative}
+                      isSelected={selectedId === String(creative.id)}
+                      onSelect={(id) => setSelectedId(String(id))}
+                    />
+                  ))
+                )}
               </div>
             </div>
 
@@ -105,7 +219,6 @@ const Favorites: React.FC = () => {
             <div className="flex-1 bg-[#fafafa] border border-gray-200 rounded-[10px] p-6 overflow-y-auto flex flex-col">
               <SendBriefForm />
             </div>
-
           </div>
         </main>
       </div>

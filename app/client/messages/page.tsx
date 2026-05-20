@@ -1,26 +1,71 @@
 "use client";
-import { useState } from "react";
-import { MessageCircle, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, MessageCircle, X } from "lucide-react";
 import Sidebar from "@/app/components/client/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/client/dashboard/dashboardTopbar";
 import MessagesContent from "@/app/components/client/messages/messagesContent";
 import ConversationList from "@/app/components/client/messages/conversationList";
 
+type ClientProfile = {
+  name: string;
+  clientProfile: {
+    fullName: string;
+    imageUrl: string | null;
+  };
+};
+
 const MessagesPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [profile, setProfile] = useState<ClientProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const tokenRes = await fetch("/api/auth/session/token");
+        const { token } = await tokenRes.json();
+        const res = await fetch("/api/v1/clients/me", {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
+        });
+        const json = await res.json();
+        setProfile(json.data);
+      } catch {
+        // fail silently
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+
+  const userName = profile?.clientProfile?.fullName || profile?.name || "Client";
+  const userAvatar =
+    profile?.clientProfile?.imageUrl ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
+
+  if (profileLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-white">
+        <Loader2 className="animate-spin text-[#E2554F]" size={40} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col overflow-hidden bg-white">
 
-       <div className="flex-shrink-0">
+      <div className="flex-shrink-0">
         <DashboardTopbar
-        userName="Charles Eden"
-        userAvatar="https://i.pravatar.cc/150?img=33"
-        sidebarOpen={sidebarOpen}
-        onMenuClick={() => setSidebarOpen(!sidebarOpen)}
-      />
-       </div>
+          userName={userName}
+          userAvatar={userAvatar}
+          sidebarOpen={sidebarOpen}
+          onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+        />
+      </div>
 
       <div className="flex flex-1 overflow-hidden min-h-0 relative">
 

@@ -6,8 +6,15 @@ import Sidebar from "@/app/components/client/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/client/dashboard/dashboardTopbar";
 import Breadcrumb from "@/app/components/client/my-desk/breadcrumb";
 import {
-  X, Loader2, Star, Clock, ChevronLeft,
-  BadgeCheck, CheckCircle, XCircle, Calendar,
+  X,
+  Loader2,
+  Star,
+  BadgeCheck,
+  CheckCircle,
+  XCircle,
+  ChevronDown,
+  Calendar,
+  Clock,
 } from "lucide-react";
 
 interface Milestone {
@@ -15,13 +22,13 @@ interface Milestone {
   title: string;
   amount: number;
   dueDate: string;
-  notes?: string;
-  description?: string;
+  notes: string;
 }
 
 interface Pitch {
   id: string;
   briefId: string;
+  briefTitle?: string;
   creativeId: string;
   coverNote: string;
   proposedAmount: number;
@@ -32,22 +39,12 @@ interface Pitch {
   isCollaborative: boolean;
   createdAt: string;
   milestones: Milestone[];
-  brief: {
-    id: string;
-    jobTitle: string;
-    description?: string;
-    budgetMin: number;
-    budgetMax: number;
-    currency: string;
-    deadline?: string;
-    status: string;
-  };
-  creative: {
-    id: string;
-    name: string;
-    avatarUrl: string | null;
-    averageRating: number;
-    completedProjects: number;
+  creativeProfile: {
+    fullName: string;
+    overallRating: number;
+    professionalRole: string;
+    isPremium: boolean;
+    avatarUrl?: string;
   };
 }
 
@@ -64,7 +61,10 @@ function formatDate(iso: string) {
 }
 
 function formatBudget(amount: number, currency: string) {
-  const symbol = currency === "NGN" ? "₦" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : "$";
+  const symbol =
+    currency === "NGN" ? "₦" :
+      currency === "EUR" ? "€" :
+        currency === "GBP" ? "£" : "$";
   return `${symbol}${amount?.toLocaleString() ?? "—"}`;
 }
 
@@ -79,17 +79,15 @@ const ConfirmModal: React.FC<{
       <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${type === "accept" ? "bg-green-100" : "bg-red-100"}`}>
         {type === "accept"
           ? <CheckCircle size={36} className="text-green-500" />
-          : <XCircle size={36} className="text-red-500" />
-        }
+          : <XCircle size={36} className="text-red-500" />}
       </div>
       <h2 className="text-lg font-bold text-black mb-2">
-        {type === "accept" ? "Accept this Pitch?" : "Reject this Pitch?"}
+        {type === "accept" ? "Hire this Creative?" : "Reject this Pitch?"}
       </h2>
       <p className="text-sm text-gray-500 mb-6">
         {type === "accept"
-          ? "Accepting this pitch will create a project and notify the creative to get started."
-          : "The creative will be notified that their pitch was not selected."
-        }
+          ? "Hiring this creative will create a project and notify them to get started."
+          : "The creative will be notified that their pitch was not selected."}
       </p>
       <div className="flex gap-3 w-full">
         <button
@@ -101,10 +99,10 @@ const ConfirmModal: React.FC<{
         <button
           onClick={onConfirm}
           disabled={loading}
-          className={`flex-1 text-white rounded-lg py-2.5 text-sm font-semibold transition-colors disabled:opacity-60 ${type === "accept" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"
+          className={`flex-1 text-white rounded-lg py-2.5 text-sm font-semibold transition-colors disabled:opacity-60 ${type === "accept" ? "bg-[#E05C5C] hover:bg-[#c94c4c]" : "bg-red-500 hover:bg-red-600"
             }`}
         >
-          {loading ? "Processing..." : type === "accept" ? "Yes, Accept" : "Yes, Reject"}
+          {loading ? "Processing..." : type === "accept" ? "Yes, Hire Now" : "Yes, Reject"}
         </button>
       </div>
     </div>
@@ -114,6 +112,9 @@ const ConfirmModal: React.FC<{
 const PitchDetailPage: React.FC = () => {
   const { id } = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const passedName = searchParams.get("name");
+  const passedAvatar = searchParams.get("avatar");
 
   const [pitch, setPitch] = useState<Pitch | null>(null);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
@@ -123,9 +124,7 @@ const PitchDetailPage: React.FC = () => {
   const [confirmModal, setConfirmModal] = useState<"accept" | "reject" | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-  const searchParams = useSearchParams();
-  const passedName = searchParams.get("name");
-  const passedAvatar = searchParams.get("avatar");
+  const [pricingOpen, setPricingOpen] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -172,17 +171,20 @@ const PitchDetailPage: React.FC = () => {
         credentials: "include",
       });
 
-      const responseData = await res.json();
-      console.log("Accept/Reject response:", JSON.stringify(responseData, null, 2));
-
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.message ?? `Failed to ${type} pitch.`);
       }
 
       setConfirmModal(null);
-      setActionSuccess(type === "accept" ? "Pitch accepted! A project has been created." : "Pitch rejected.");
-      setPitch((prev) => prev ? { ...prev, status: type === "accept" ? "ACCEPTED" : "REJECTED" } : prev);
+      setActionSuccess(
+        type === "accept"
+          ? "Pitch accepted! A project has been created."
+          : "Pitch rejected."
+      );
+      setPitch((prev) =>
+        prev ? { ...prev, status: type === "accept" ? "ACCEPTED" : "REJECTED" } : prev
+      );
     } catch (e: any) {
       setError(e.message ?? "Something went wrong.");
       setConfirmModal(null);
@@ -203,7 +205,10 @@ const PitchDetailPage: React.FC = () => {
     return (
       <div className="flex h-screen w-screen flex-col items-center justify-center bg-white">
         <p className="text-gray-500">Pitch not found.</p>
-        <button onClick={() => router.push("/client/pitches")} className="mt-4 text-[#E05C5C] text-sm font-semibold">
+        <button
+          onClick={() => router.push("/client/pitches")}
+          className="mt-4 text-[#E05C5C] text-sm font-semibold"
+        >
           ← Back to Pitches
         </button>
       </div>
@@ -215,12 +220,12 @@ const PitchDetailPage: React.FC = () => {
     profile?.clientProfile?.imageUrl ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
 
+  const cp = pitch.creativeProfile;
+  const creativeName = cp?.fullName ?? passedName ?? "Creative";
   const creativeAvatar =
     passedAvatar ||
-    pitch.creative?.avatarUrl ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(pitch.creative?.name ?? passedName ?? "C")}&background=1a1a2e&color=fff&size=128`;
-
-  const creativeName = pitch.creative?.name ?? passedName ?? "Creative";
+    cp?.avatarUrl ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(creativeName)}&background=1a1a2e&color=fff&size=128`;
 
   const isPending = pitch.status === "PENDING";
 
@@ -244,7 +249,10 @@ const PitchDetailPage: React.FC = () => {
 
       <div className="flex flex-1 relative">
         {sidebarOpen && (
-          <div className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />
+          <div
+            className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
         )}
         <div
           className={`
@@ -253,44 +261,27 @@ const PitchDetailPage: React.FC = () => {
             lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:z-10
           `}
         >
-          <button className="absolute top-4 right-4 z-50 lg:hidden" onClick={() => setSidebarOpen(false)}>
+          <button
+            className="absolute top-4 right-4 z-50 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          >
             <X size={22} />
           </button>
           <Sidebar activeItem="Pitches" />
         </div>
 
-        <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <Breadcrumb crumbs={[
-            { label: "Dashboard", path: "/client/dashboard" },
-            { label: "Incoming Pitches", path: "/client/pitches" },
-            { label: "Pitch Details" },
-          ]} />
+        <main className="flex-1 w-full px-4 lg:px-8 py-6 overflow-y-auto">
+          <Breadcrumb
+            crumbs={[
+              { label: "Dashboard", path: "/client/dashboard" },
+              { label: "Incoming Pitches", path: "/client/pitches" },
+              { label: "Creative Pitch" },
+            ]}
+          />
 
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => router.push("/client/pitches")}
-                className="p-2 rounded-lg text-black border border-black hover:bg-black hover:text-white transition-colors"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <div>
-                <h1 className="text-2xl font-heading font-extrabold text-black">Pitch Details</h1>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  For: <span className="font-semibold text-black">{pitch.brief?.jobTitle ?? "—"}</span>
-                </p>
-              </div>
-            </div>
-            <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${pitch.status === "ACCEPTED"
-              ? "bg-green-100 text-green-600"
-              : pitch.status === "REJECTED"
-                ? "bg-red-100 text-red-500"
-                : "bg-yellow-100 text-yellow-600"
-              }`}>
-              {pitch.status}
-            </span>
-          </div>
+          <h1 className="text-2xl font-extrabold text-black mt-4 mb-5">
+            Creative Pitch
+          </h1>
 
           {error && (
             <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg mb-4 flex items-center justify-between">
@@ -306,143 +297,247 @@ const PitchDetailPage: React.FC = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left — main content */}
-            <div className="lg:col-span-2 flex flex-col gap-5">
+          <div className="w-full flex flex-col gap-4">
 
-              {/* Creative card */}
-              <div className="bg-[#fafafa] rounded-xl p-5 flex items-center gap-4">
-                <img
-                  src={creativeAvatar}
-                  alt={creativeName}
-                  className="w-16 h-16 rounded-full object-cover shrink-0"
-                />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-black text-base">{pitch.creative?.name ?? "Creative"}</span>
-                    <BadgeCheck fill="blue" stroke="white" size={16} />
-                  </div>
-                  <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
-                    <span className="flex items-center gap-1">
-                      <Star size={11} className="text-yellow-400 fill-yellow-400" />
-                      {pitch.creative?.averageRating?.toFixed(1) ?? "—"}
-                    </span>
-                    <span>{pitch.creative?.completedProjects ?? 0} completed projects</span>
-                  </div>
+            {/* ── Creative Card ── */}
+            <div className="bg-[#f5f5f5] rounded-2xl p-5 flex items-start gap-4 relative">
+              {cp?.isPremium && (
+                <span className="absolute top-4 right-4 bg-orange-400 text-white text-xs font-bold px-3 py-1 rounded-full">
+                  Premium
+                </span>
+              )}
+
+              <img
+                src={creativeAvatar}
+                alt={creativeName}
+                className="w-16 h-16 rounded-full object-cover shrink-0"
+              />
+
+              <div className="flex-1 min-w-0 pr-20">
+                <span className="font-bold text-black text-base">{creativeName}</span>
+
+                <div className="flex items-center gap-1.5 mt-0.5 mb-2">
+                  <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                  <span className="text-xs text-green-600 font-medium">Online</span>
                 </div>
-                <button className="text-xs text-[#E05C5C] font-semibold hover:underline">
-                  View Profile
-                </button>
-              </div>
 
-              {/* Cover Note */}
-              <div className="bg-[#fafafa] rounded-xl p-5">
-                <h2 className="font-bold text-black text-base mb-3">Cover Note</h2>
-                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                <div className="mb-3">
+                  <span className="text-xs text-gray-500 block mb-1">Verification Status:</span>
+                  <span className="inline-flex items-center gap-1 bg-green-500 text-white text-xs font-semibold px-2.5 py-0.5 rounded-md">
+                    <BadgeCheck size={11} />
+                    Verified
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-4 text-xs text-gray-600 flex-wrap">
+                  <span className="flex items-center gap-1">
+                    <Star size={12} className="text-yellow-400 fill-yellow-400" />
+                    <span className="font-semibold text-black">
+                      {cp?.overallRating?.toFixed(1) ?? "—"}
+                    </span>
+                    <span className="text-gray-400">Rating</span>
+                  </span>
+                  {cp?.professionalRole && (
+                    <>
+                      <span className="text-gray-300">|</span>
+                      <span className="text-gray-600">{cp.professionalRole}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Pitch Point ── */}
+            <div className="bg-[#f5f5f5] rounded-2xl p-5">
+              <h2 className="font-bold text-black text-base mb-3">Pitch Point</h2>
+              <div className="bg-white rounded-xl p-4 min-h-[100px]">
+                <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
                   {pitch.coverNote ?? "—"}
                 </p>
               </div>
+            </div>
 
-              {/* Milestones */}
-              {pitch.paymentMode === "MILESTONE" && pitch.milestones?.length > 0 && (
-                <div className="bg-[#fafafa] rounded-xl p-5">
-                  <h2 className="font-bold text-black text-base mb-4">
-                    Milestones ({pitch.milestones.length})
-                  </h2>
-                  <div className="flex flex-col gap-3">
-                    {pitch.milestones.map((m, i) => (
-                      <div key={m.id} className="bg-white border border-gray-100 rounded-xl p-4">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-semibold text-black">
-                            {i + 1}. {m.title}
-                          </span>
-                          <span className="text-sm font-bold text-[#E05C5C]">
-                            {formatBudget(m.amount, pitch.currency)}
-                          </span>
-                        </div>
-                        {m.description && (
-                          <p className="text-xs text-gray-500 mb-1">{m.description}</p>
-                        )}
-                        <div className="flex items-center gap-1 text-xs text-gray-400">
-                          <Calendar size={11} />
-                          Due: {formatDate(m.dueDate)}
-                        </div>
-                        {m.notes && (
-                          <p className="text-xs text-gray-400 mt-1 italic">{m.notes}</p>
-                        )}
-                      </div>
-                    ))}
+            {/* ── Milestones as Deliverables ── */}
+            {pitch.milestones?.length > 0 && (
+              <div className="bg-[#f5f5f5] rounded-2xl p-5">
+                <h2 className="font-bold text-black text-base mb-3">Deliverables</h2>
+                <div className="flex flex-wrap gap-2">
+                  {pitch.milestones.map((m) => (
+                    <span
+                      key={m.id}
+                      className="bg-white border border-gray-200 text-sm text-gray-700 font-medium px-4 py-1.5 rounded-full"
+                    >
+                      {m.title}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Pricing ── */}
+            <div className="bg-[#f5f5f5] rounded-2xl p-5">
+              <h2 className="font-bold text-black text-base mb-3">Pricing</h2>
+              <button
+                onClick={() => setPricingOpen((v) => !v)}
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between text-sm hover:bg-gray-50 transition-colors"
+              >
+                <span className="font-semibold text-black">
+                  {formatBudget(pitch.proposedAmount, pitch.currency)}
+                </span>
+                <ChevronDown
+                  size={16}
+                  className={`text-gray-400 transition-transform ${pricingOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {pricingOpen && (
+                <div className="mt-2 bg-white border border-gray-100 rounded-xl px-4 py-3 flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Payment Mode</span>
+                  <span className="font-semibold text-black">
+                    {pitch.paymentMode === "MILESTONE" ? "Milestone" : "Flat Payment"}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* ── Delivery Schedule ── */}
+            <div className="bg-[#f5f5f5] rounded-2xl p-5">
+              <h2 className="font-bold text-black text-base mb-4">Delivery Schedule</h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Payment Mode / Timeline */}
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1.5">Timeline</label>
+                  <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between text-sm text-gray-700">
+                    <span>
+                      {pitch.paymentMode === "MILESTONE" ? "Milestone-based" : "One-time"}
+                    </span>
+                    <Clock size={15} className="text-gray-400" />
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Right — pitch meta */}
-            <div className="flex flex-col gap-4">
-              <div className="bg-[#fafafa] rounded-xl p-5 flex flex-col gap-4">
-                <h2 className="font-bold text-black text-base">Pitch Summary</h2>
+                {/* Delivery Date */}
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1.5">Delivery Date</label>
+                  <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between text-sm text-gray-700">
+                    <span>{formatDate(pitch.deliveryDate)}</span>
+                    <Calendar size={15} className="text-gray-400" />
+                  </div>
+                </div>
 
-                <MetaRow label="Proposed Amount" value={formatBudget(pitch.proposedAmount, pitch.currency)} />
-                <MetaRow
-                  label="Brief Budget"
-                  value={
-                    pitch.brief?.budgetMin
-                      ? `${formatBudget(pitch.brief.budgetMin, pitch.brief.currency)} - ${formatBudget(pitch.brief.budgetMax, pitch.brief.currency)}`
-                      : "—"
-                  }
-                />
-                <MetaRow label="Payment Mode" value={pitch.paymentMode === "MILESTONE" ? "Milestone" : "Flat Payment"} />
-                <MetaRow
-                  label="Delivery Date"
-                  value={formatDate(pitch.deliveryDate)}
-                  icon={<Clock size={13} className="text-gray-400" />}
-                />
-                <MetaRow label="Collaborative" value={pitch.isCollaborative ? "Yes" : "No"} />
-                <MetaRow label="Submitted" value={formatDate(pitch.createdAt)} />
+                {/* Milestones */}
+                {pitch.milestones?.slice(0, 2).map((m, i) => (
+                  <div key={m.id}>
+                    <label className="block text-sm text-gray-600 mb-1.5">
+                      Milestone {i + 1} <span className="text-gray-400">(Optional)</span>
+                    </label>
+                    <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between text-sm text-gray-700">
+                      <span className="truncate mr-2">{m.title}</span>
+                      <span className="text-xs text-gray-400 shrink-0">{formatDate(m.dueDate)}</span>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Fill empty milestone slots if fewer than 2 */}
+                {(pitch.milestones?.length ?? 0) === 0 && (
+                  <>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1.5">
+                        Milestone 1 <span className="text-gray-400">(Optional)</span>
+                      </label>
+                      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between text-sm text-gray-400">
+                        <span>—</span>
+                        <ChevronDown size={15} className="text-gray-400" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1.5">
+                        Milestone 2 <span className="text-gray-400">(Optional)</span>
+                      </label>
+                      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between text-sm text-gray-400">
+                        <span>—</span>
+                        <Calendar size={15} className="text-gray-400" />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {(pitch.milestones?.length ?? 0) === 1 && (
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1.5">
+                      Milestone 2 <span className="text-gray-400">(Optional)</span>
+                    </label>
+                    <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between text-sm text-gray-400">
+                      <span>—</span>
+                      <Calendar size={15} className="text-gray-400" />
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {/* Actions */}
-              {isPending && (
-                <div className="flex flex-col gap-3">
-                  <button
-                    onClick={() => setConfirmModal("accept")}
-                    className="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl transition-colors text-sm"
-                  >
-                    <CheckCircle size={16} />
-                    Accept Pitch
-                  </button>
-                  <button
-                    onClick={() => setConfirmModal("reject")}
-                    className="w-full flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-xl transition-colors text-sm"
-                  >
-                    <XCircle size={16} />
-                    Reject Pitch
-                  </button>
-                </div>
-              )}
-
-              {!isPending && (
-                <div className={`rounded-xl p-4 text-center text-sm font-semibold ${pitch.status === "ACCEPTED" ? "bg-green-50 text-green-600" : "bg-red-50 text-red-500"
-                  }`}>
-                  {pitch.status === "ACCEPTED"
-                    ? "✓ You accepted this pitch"
-                    : "✗ You rejected this pitch"
-                  }
-                </div>
-              )}
             </div>
+
+            {/* ── CTA Buttons ── */}
+            {isPending && (
+              <div className="flex items-center justify-end gap-3 pt-2 pb-6">
+                <button
+                  onClick={() => router.push("/client/pitches")}
+                  className="flex items-center gap-2 bg-[#1a1a2e] text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#121220] transition-colors"
+                >
+                  <X size={15} />
+                  Cancel
+                </button>
+                <button
+                  onClick={() =>
+                    router.push(
+                      `/client/pitches/${pitch.id}/review?name=${encodeURIComponent(creativeName)}&avatar=${encodeURIComponent(creativeAvatar)}`
+                    )
+                  }
+                  className="bg-[#E05C5C] hover:bg-[#c94c4c] text-white font-semibold px-8 py-3 rounded-xl text-sm transition-colors"
+                >
+                  Hire Now
+                </button>
+              </div>
+            )}
+
+            {!isPending && (
+              <div className="flex flex-col gap-3 pt-2 pb-6">
+                <div className={`rounded-xl p-4 text-center text-sm font-semibold ${pitch.status === "APPROVED"
+                    ? "bg-green-50 text-green-600"
+                    : "bg-red-50 text-red-500"
+                  }`}>
+                  {pitch.status === "APPROVED"
+                    ? "✓ You accepted this pitch"
+                    : "✗ You rejected this pitch"}
+                </div>
+
+                {pitch.status === "APPROVED" && (
+                  <div className="flex items-center justify-end gap-3">
+                    <button
+                      onClick={() => router.push("/client/pitches")}
+                      className="flex items-center gap-2 bg-[#1a1a2e] text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#121220] transition-colors"
+                    >
+                      <X size={15} />
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() =>
+                        router.push(
+                          `/client/pitches/${pitch.id}/review?name=${encodeURIComponent(creativeName)}&avatar=${encodeURIComponent(creativeAvatar)}`
+                        )
+                      }
+                      className="bg-[#E05C5C] hover:bg-[#c94c4c] text-white font-semibold px-8 py-3 rounded-xl text-sm transition-colors"
+                    >
+                      View Order Review
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </main>
       </div>
     </div>
   );
 };
-
-const MetaRow: React.FC<{ label: string; value: string; icon?: React.ReactNode }> = ({ label, value, icon }) => (
-  <div className="flex items-center justify-between gap-2">
-    <span className="text-xs text-gray-500 flex items-center gap-1">{icon}{label}</span>
-    <span className="text-xs font-semibold text-black text-right">{value}</span>
-  </div>
-);
 
 export default PitchDetailPage;

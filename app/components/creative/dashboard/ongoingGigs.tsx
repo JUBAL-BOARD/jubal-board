@@ -50,85 +50,119 @@ const getProgress = (status: string): number => {
   return map[status] ?? 0;
 };
 
+const getAvatarFallback = (name: string) =>
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a2e&color=fff&size=128`;
+
 export default function OngoingGigs() {
   const [gigs, setGigs] = useState<MappedGig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-  const fetchGigs = async () => {
-    try {
-      const tokenRes = await fetch("/api/auth/session/token");
-      const { token } = await tokenRes.json();
+    const fetchGigs = async () => {
+      try {
+        const tokenRes = await fetch("/api/auth/session/token");
+        const { token } = await tokenRes.json();
 
-      const res = await fetch("/api/v1/projects/creative?filter=Active", {
-        credentials: "include",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+        const headers = {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        };
 
-      const json = await res.json();
-      const list: OngoingGig[] = Array.isArray(json.data) ? json.data : [];
+        // Fetch gigs and approved pitches in parallel
+        const [gigsRes, pitchRes] = await Promise.all([
+          fetch("/api/v1/projects/creative?filter=Active", { credentials: "include", headers }),
+          fetch("/api/v1/pitches/me?status=APPROVED", { credentials: "include", headers }),
+        ]);
 
-      const mapped: MappedGig[] = (
-        await Promise.all(
-          list.slice(0, 2).map(async (g) => {
-            try {
-              const detailRes = await fetch(`/api/v1/projects/${g.id}`, {
-                credentials: "include",
-                headers: { Authorization: `Bearer ${token}` },
-              });
+        const gigsJson = await gigsRes.json();
+        const list: OngoingGig[] = Array.isArray(gigsJson.data) ? gigsJson.data : [];
 
-              if (!detailRes.ok) throw new Error("Detail fetch failed");
-              const detailJson = await detailRes.json();
-              const detail = detailJson.data;
+        // Build clientName → avatar map from approved pitches
+        const clientAvatarMap: Record<string, string> = {};
+        if (pitchRes.ok) {
+          const pitchJson = await pitchRes.json();
+          const pitchList = Array.isArray(pitchJson.data) ? pitchJson.data : [];
 
-              return {
-                id: detail.id,
-                title: detail.title,
-                thumbnail:
-                  "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
-                client: {
-                  name: g.clientName,
-                  avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(g.clientName)}&background=1a1a2e&color=fff&size=128`,
-                },
-                dueIn: detail.dueDate
-                  ? getDueIn(detail.dueDate)
-                  : g.collabDeadline
-                    ? getDueIn(g.collabDeadline)
-                    : "—",
-                progress: getProgress(detail.status),
-                status: detail.status,
-              };
-            } catch {
-              // Fall back to list-level data if detail fetch fails
-              return {
-                id: g.id,
-                title: g.title,
-                thumbnail:
-                  "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
-                client: {
-                  name: g.clientName,
-                  avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(g.clientName)}&background=1a1a2e&color=fff&size=128`,
-                },
-                dueIn: g.collabDeadline ? getDueIn(g.collabDeadline) : "—",
-                progress: getProgress(g.status),
-                status: g.status,
-              };
-            }
-          })
-        )
-      ).filter((gig): gig is MappedGig => !!gig?.id && !!gig?.title);
+          await Promise.all(
+            pitchList.map(async (p: any) => {
+              try {
+                const r = await fetch(`/api/v1/briefs/${p.briefId}`, {
+                  credentials: "include",
+                  headers,
+                });
+                if (r.ok) {
+                  const json = await r.json();
+                  const client = json.data?.client;
+                  if (client?.name) {
+                    clientAvatarMap[client.name] =
+                      client.imageUrl ??
+                      client.avatarUrl ??
+                      getAvatarFallback(client.name);
+                  }
+                }
+              } catch {}
+            })
+          );
+        }
 
-      setGigs(mapped);
-    } catch {
-      setError("Failed to load gigs.");
-    } finally {
-      setLoading(false);
-    }
-  };
+        const mapped: MappedGig[] = (
+          await Promise.all(
+            list.slice(0, 2).map(async (g) => {
+              try {
+                const detailRes = await fetch(`/api/v1/projects/${g.id}`, {
+                  credentials: "include",
+                  headers,
+                });
 
-  fetchGigs();
-}, []);
+                if (!detailRes.ok) throw new Error("Detail fetch failed");
+                const detailJson = await detailRes.json();
+                const detail = detailJson.data;
+
+                return {
+                  id: detail.id,
+                  title: detail.title,
+                  thumbnail: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
+                  client: {
+                    name: g.clientName,
+                    avatar: clientAvatarMap[g.clientName] ?? getAvatarFallback(g.clientName),
+                  },
+                  dueIn: detail.dueDate
+                    ? getDueIn(detail.dueDate)
+                    : g.collabDeadline
+                      ? getDueIn(g.collabDeadline)
+                      : "—",
+                  progress: getProgress(detail.status),
+                  status: detail.status,
+                };
+              } catch {
+                return {
+                  id: g.id,
+                  title: g.title,
+                  thumbnail: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
+                  client: {
+                    name: g.clientName,
+                    avatar: clientAvatarMap[g.clientName] ?? getAvatarFallback(g.clientName),
+                  },
+                  dueIn: g.collabDeadline ? getDueIn(g.collabDeadline) : "—",
+                  progress: getProgress(g.status),
+                  status: g.status,
+                };
+              }
+            })
+          )
+        ).filter((gig): gig is MappedGig => !!gig?.id && !!gig?.title);
+
+        setGigs(mapped);
+      } catch {
+        setError("Failed to load gigs.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGigs();
+  }, []);
 
   return (
     <section className="mb-8 bg-[#fafafa] p-4 lg:p-6">

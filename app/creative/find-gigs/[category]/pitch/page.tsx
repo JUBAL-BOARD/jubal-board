@@ -30,7 +30,7 @@ const CalendarIcon = () => (
 );
 
 const timelineOptions = ["Less than 24 hours", "1–2 days", "3–5 days", "1 week", "2 weeks"];
-const COVER_NOTE_MAX = 500;
+// const COVER_NOTE_MAX = 500;
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -361,15 +361,13 @@ export default function MyPitchPage() {
           <Section title="Cover Note">
             <textarea
               value={coverNote}
-              onChange={(e) => {
-                if (e.target.value.length <= COVER_NOTE_MAX) setCoverNote(e.target.value);
-              }}
+              onChange={(e) => setCoverNote(e.target.value)}
               placeholder="Give the client your take: the idea, the vibe, and how you'll execute it"
-              className="w-full h-32 px-4 py-3 text-sm bg-white text-black placeholder-grey-800 border border-black rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 focus:border-[#e84545]/40 transition-all"
+              className="w-full h-32 px-4 py-3 text-sm bg-white text-black placeholder-grey-800 border border-black rounded-lg resize-none focus:outline-none focus:ring-2 focus:border-[#e84545]/40 transition-all"
             />
-            <div className={`text-right text-xs mt-1 ${coverNote.length >= COVER_NOTE_MAX ? "text-red-500" : "text-gray-400"}`}>
+            {/* <div className={`text-right text-xs mt-1 ${coverNote.length >= COVER_NOTE_MAX ? "text-red-500" : "text-gray-400"}`}>
               {coverNote.length}/{COVER_NOTE_MAX}
-            </div>
+            </div> */}
           </Section>
 
           {/* Deliverables */}

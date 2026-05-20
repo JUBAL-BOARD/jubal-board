@@ -52,11 +52,6 @@ const RevisionsModal: React.FC<{
 }> = ({ onClose, onSubmit, projectTitle, submitting }) => {
   const inputClass = "w-full border border-gray-200 rounded-lg px-3.5 py-[11px] text-[13px] text-black outline-none bg-white box-border";
   const [description, setDescription] = useState("");
-
-  const handleSubmit = async () => {
-    await onSubmit(description);
-  };
-
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center mt-10 justify-center z-50">
       <div className="bg-white rounded-2xl px-12 py-10 w-[80%] lg:w-[420px] flex flex-col items-center text-center shadow-2xl">
@@ -82,7 +77,7 @@ const RevisionsModal: React.FC<{
           />
         </div>
         <button
-          onClick={handleSubmit}
+          onClick={() => onSubmit(description)}
           disabled={submitting || !description.trim()}
           className="bg-[#E2554F] border-none rounded-lg px-8 py-2.5 cursor-pointer text-white font-semibold text-xs lg:text-[14px] hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
@@ -97,27 +92,44 @@ const RevisionsModal: React.FC<{
 const CongratulationsModal: React.FC<{
   onGoToDashboard: () => void;
   submitting: boolean;
-}> = ({ onGoToDashboard, submitting }) => (
-  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-    <div className="bg-white rounded-2xl px-12 py-10 w-[80%] lg:w-[420px] flex flex-col items-center text-center shadow-2xl">
-      <div className="w-[90px] h-[90px] rounded-full bg-[#fb923c] flex items-center justify-center mb-5">
-        <ThumbsUp size={52} fill="white" stroke="#fb923c" />
+  paymentMode?: string;
+}> = ({ onGoToDashboard, submitting, paymentMode }) => {
+  const isMilestone = paymentMode === "MILESTONE";
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl px-12 py-10 w-[80%] lg:w-[420px] flex flex-col items-center text-center shadow-2xl">
+        <div className="w-[90px] h-[90px] rounded-full bg-[#fb923c] flex items-center justify-center mb-5">
+          <ThumbsUp size={52} fill="white" stroke="#fb923c" />
+        </div>
+        <h2 className="text-[22px] font-bold text-orange-400 m-0 mb-1">All Done</h2>
+        <p className="text-[14px] text-gray-600 m-0 mb-7 leading-relaxed max-w-[260px]">
+          {isMilestone
+            ? "Milestone payments will be automatically released to your creative within 48 hours."
+            : "You have marked this project as completed. Tap below to release payment to your creative."}
+        </p>
+        {!isMilestone && (
+          <button
+            onClick={onGoToDashboard}
+            disabled={submitting}
+            className="bg-orange-400 border-none rounded-lg px-8 py-2.5 cursor-pointer text-white font-semibold text-xs lg:text-[14px] hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+          >
+            {submitting && <Loader2 size={14} className="animate-spin" />}
+            Authorize Pay Out
+          </button>
+        )}
+        {isMilestone && (
+          <button
+            onClick={onGoToDashboard}  // just close/go to dashboard
+            className="bg-orange-400 border-none rounded-lg px-8 py-2.5 cursor-pointer text-white font-semibold text-xs lg:text-[14px] hover:bg-orange-600 transition-colors"
+          >
+            Go to Dashboard
+          </button>
+        )}
       </div>
-      <h2 className="text-[22px] font-bold text-orange-400 m-0 mb-1">All Done</h2>
-      <p className="text-[14px] text-gray-600 m-0 mb-7 leading-relaxed max-w-[260px]">
-        You have marked this project as completed. Tap below to release payment to your creative.
-      </p>
-      <button
-        onClick={onGoToDashboard}
-        disabled={submitting}
-        className="bg-orange-400 border-none rounded-lg px-8 py-2.5 cursor-pointer text-white font-semibold text-xs lg:text-[14px] hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center gap-2"
-      >
-        {submitting && <Loader2 size={14} className="animate-spin" />}
-        Authorize Pay Out
-      </button>
     </div>
-  </div>
-);
+  );
+}; 
 
 const ReleasedModal: React.FC<{ onGoToDashboard: () => void }> = ({ onGoToDashboard }) => (
   <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
@@ -139,7 +151,13 @@ const ReleasedModal: React.FC<{ onGoToDashboard: () => void }> = ({ onGoToDashbo
   </div>
 );
 
-const RateAndReviewModal: React.FC<{ onClose: () => void; onSubmit: () => void; creativeAvatar: string; creativeName: string; creativeRole: string; }> = ({ onClose, onSubmit, creativeAvatar, creativeName, creativeRole }) => {
+const RateAndReviewModal: React.FC<{
+  onClose: () => void;
+  onSubmit: () => void;
+  creativeAvatar: string;
+  creativeName: string;
+  creativeRole: string;
+}> = ({ onClose, onSubmit, creativeAvatar, creativeName, creativeRole }) => {
   const [rating, setRating] = useState(0);
   const [hovered, setHovered] = useState(0);
   const [review, setReview] = useState("");
@@ -212,7 +230,6 @@ interface ProjectDetail {
   dueDate: string | null;
   progressPercentage: number;
   milestones: { id: string; title: string; isCompleted: boolean; completedAt: string | null }[];
-  deliverables: { id: string; fileUrl: string; note?: string }[];
   brief: {
     jobTitle: string;
     jobDescription: string;
@@ -222,6 +239,18 @@ interface ProjectDetail {
   } | null;
   pitchId: string | null;
   briefId: string | null;
+  paymentMode: "END_OF_PROJECT" | "MILESTONE" | "INSTALLMENTS" | "BOOKING_BALANCE";
+}
+
+interface Deliverable {
+  id: string;
+  projectId: string;
+  type: string;
+  fileName: string;
+  fileUrl: string;
+  fileSize: number;
+  mimeType: string;
+  uploadedAt: string;
 }
 
 interface CreativeProfile {
@@ -277,22 +306,47 @@ export default function ViewProjectPage() {
   const [showReleasedModal, setShowReleasedModal] = useState(false);
   const [showRateModal, setShowRateModal] = useState(false);
   const [project, setProject] = useState<ProjectDetail | null>(null);
+  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
+  const [deliverablesLoading, setDeliverablesLoading] = useState(false);
   const [creative, setCreative] = useState<CreativeProfile | null>(null);
   const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionSubmitting, setActionSubmitting] = useState(false);
-  const [authToken, setAuthToken] = useState<string>("");
+
+  const getAuthToken = async () => {
+    const tokenRes = await fetch("/api/auth/session/token");
+    const { token } = await tokenRes.json();
+    return token;
+  };
+
+  const fetchDeliverables = async (token: string) => {
+    setDeliverablesLoading(true);
+    try {
+      const types = ["INITIAL", "REVISION", "FINAL"];
+      const results = await Promise.all(
+        types.map((type) =>
+          fetch(`/api/v1/projects/${projectId}/deliverables?type=${type}`, {
+            headers: { Authorization: `Bearer ${token}` },
+            credentials: "include",
+          }).then((r) => (r.ok ? r.json() : { data: [] }))
+        )
+      );
+      const all: Deliverable[] = results.flatMap((r) => r.data ?? []);
+      setDeliverables(all);
+    } catch {
+      // fail silently
+    } finally {
+      setDeliverablesLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true);
       try {
-        const tokenRes = await fetch("/api/auth/session/token");
-        const { token } = await tokenRes.json();
-        setAuthToken(token);
+        const token = await getAuthToken();
         const headers = { Authorization: `Bearer ${token}` };
 
-        // Build image map from suggested creatives
         const imageMap: Record<string, string> = {};
         try {
           const suggestedRes = await fetch("/api/v1/creatives/suggested", { headers, credentials: "include" });
@@ -321,12 +375,13 @@ export default function ViewProjectPage() {
           const detail: ProjectDetail = projectJson.data;
           setProject(detail);
 
+          await fetchDeliverables(token);
+
           if (detail.pitchId && detail.briefId) {
             const pitchesRes = await fetch(`/api/v1/briefs/${detail.briefId}/pitches`, {
               headers,
               credentials: "include",
             });
-
             if (pitchesRes.ok) {
               const pitchesJson = await pitchesRes.json();
               const pitchesList = pitchesJson.data?.pitches ?? pitchesJson.data ?? [];
@@ -352,16 +407,11 @@ export default function ViewProjectPage() {
     fetchAll();
   }, [projectId]);
 
-  // Update project status
   const updateStatus = async (status: string) => {
-    const tokenRes = await fetch("/api/auth/session/token");
-    const { token } = await tokenRes.json();
+    const token = await getAuthToken();
     const res = await fetch(`/api/v1/projects/${projectId}/status`, {
       method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ status }),
     });
@@ -369,7 +419,6 @@ export default function ViewProjectPage() {
     setProject((prev) => prev ? { ...prev, status } : prev);
   };
 
-  // Handle partially completed
   const handlePartially = async () => {
     setActionSubmitting(true);
     try {
@@ -382,18 +431,13 @@ export default function ViewProjectPage() {
     }
   };
 
-  // Handle revision submit
   const handleRevisionSubmit = async (notes: string) => {
     setActionSubmitting(true);
     try {
-      const tokenRes = await fetch("/api/auth/session/token");
-      const { token } = await tokenRes.json();
+      const token = await getAuthToken();
       const res = await fetch(`/api/v1/projects/${projectId}/request-revision`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ requestNotes: notes }),
       });
@@ -408,7 +452,6 @@ export default function ViewProjectPage() {
     }
   };
 
-  // Handle completed — mark as completed first, then authorize payout
   const handleCompleted = async () => {
     setActionSubmitting(true);
     try {
@@ -421,28 +464,30 @@ export default function ViewProjectPage() {
     }
   };
 
-  // Handle authorize payout
   const handleAuthorizePayout = async () => {
-    setActionSubmitting(true);
-    try {
-      const tokenRes = await fetch("/api/auth/session/token");
-      const { token } = await tokenRes.json();
-      const res = await fetch(`/api/v1/projects/${projectId}/authorize-payout`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to authorize payout");
-      setShowCongratsModal(false);
-      setShowReleasedModal(true);
-    } catch {
-      // fail silently
-    } finally {
-      setActionSubmitting(false);
-    }
+  setActionSubmitting(true);
+  try {
+    const token = await getAuthToken();
+    const res = await fetch(`/api/v1/projects/${projectId}/authorize-payout`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      credentials: "include",
+    });
+    const json = await res.json();
+    console.log("payout response", res.status, json); // ← add this
+    if (!res.ok) throw new Error("Failed to authorize payout");
+    setShowCongratsModal(false);
+    setShowReleasedModal(true);
+  } catch (err) {
+    console.log("payout error", err); // ← and this
+  } finally {
+    setActionSubmitting(false);
+  }
+};
+
+  // Simply open the fileUrl directly — it's already a signed S3 URL
+  const handleDownload = (fileUrl: string) => {
+    window.open(fileUrl, "_blank");
   };
 
   const userName = clientProfile?.clientProfile?.fullName || clientProfile?.name || "Client";
@@ -483,10 +528,7 @@ export default function ViewProjectPage() {
         />
       )}
       {showCongratsModal && (
-        <CongratulationsModal
-          onGoToDashboard={handleAuthorizePayout}
-          submitting={actionSubmitting}
-        />
+        <CongratulationsModal onGoToDashboard={handleAuthorizePayout} submitting={actionSubmitting} paymentMode={project?.paymentMode} />
       )}
       {showReleasedModal && (
         <ReleasedModal onGoToDashboard={() => { setShowReleasedModal(false); setShowRateModal(true); }} />
@@ -526,7 +568,6 @@ export default function ViewProjectPage() {
             { label: "View Project" },
           ]} />
 
-          {/* Tab buttons */}
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-2">
               <button
@@ -560,7 +601,6 @@ export default function ViewProjectPage() {
 
           {activeTab === "view" ? (
             <>
-              {/* Project card */}
               <div className="bg-[#fafafa] p-6 mb-4 text-center">
                 <h2 className="text-xl font-bold text-black mb-2">{project?.title ?? "—"}</h2>
                 <span className={`inline-block px-4 py-1 text-xs font-semibold rounded-full mb-4 ${statusColorMap[project?.status ?? ""] ?? "bg-gray-100 text-gray-600"}`}>
@@ -581,7 +621,6 @@ export default function ViewProjectPage() {
                 </div>
               </div>
 
-              {/* Creative card */}
               <div className="bg-[#fafafa] p-6 mb-4">
                 <div className="flex items-start justify-between">
                   <h2 className="text-base font-bold text-black">Creative</h2>
@@ -612,7 +651,6 @@ export default function ViewProjectPage() {
                 </div>
               </div>
 
-              {/* Brief Summary */}
               <CollapsibleSection title="Brief Summary">
                 <table className="w-full text-sm">
                   <tbody>
@@ -626,7 +664,6 @@ export default function ViewProjectPage() {
                 </table>
               </CollapsibleSection>
 
-              {/* Milestones */}
               <CollapsibleSection title="Milestones">
                 {project?.milestones && project.milestones.length > 0 ? (
                   <div className="grid grid-cols-2 gap-3">
@@ -653,7 +690,6 @@ export default function ViewProjectPage() {
             </>
           ) : (
             <>
-              {/* Review Deliverables tab */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
                 <div className="bg-[#fafafa] p-6">
                   <h2 className="text-xl font-bold text-black mb-1">{project?.title ?? "—"}</h2>
@@ -699,7 +735,6 @@ export default function ViewProjectPage() {
                 </div>
               </div>
 
-              {/* Brief Summary + Uploaded Files */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
                 <CollapsibleSection title="Brief Summary">
                   <table className="w-full text-sm">
@@ -713,26 +748,50 @@ export default function ViewProjectPage() {
                     </tbody>
                   </table>
                 </CollapsibleSection>
-                <CollapsibleSection title={`Uploaded Files (${project?.deliverables?.length ?? 0})`}>
-                  {project?.deliverables && project.deliverables.length > 0 ? (
+
+                <CollapsibleSection title={`Uploaded Files (${deliverables.length})`}>
+                  {deliverablesLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 className="animate-spin text-[#E2554F]" size={24} />
+                    </div>
+                  ) : deliverables.length > 0 ? (
                     <>
                       <div className="grid grid-cols-3 gap-2 mb-3">
-                        {project.deliverables.map((d, i) => (
-                          <div key={d.id ?? i} className="h-20 rounded-lg overflow-hidden bg-gray-100 border border-gray-100">
-                            <img src={d.fileUrl} alt={`deliverable-${i}`} className="w-full h-full object-cover" />
-                          </div>
+                        {deliverables.map((d, i) => {
+                          const ext = d.fileName?.split(".").pop()?.toLowerCase() ?? "";
+                          const isImage = d.mimeType?.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp"].includes(ext);
+                          return (
+                            <div key={d.id ?? i} className="h-20 rounded-lg overflow-hidden bg-gray-100 border border-gray-100 flex items-center justify-center">
+                              {isImage ? (
+                                <img
+                                  src={d.fileUrl}
+                                  alt={d.fileName}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = "none";
+                                  }}
+                                />
+                              ) : (
+                                <span className="text-xs font-semibold text-gray-500 uppercase">{ext || "FILE"}</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {deliverables.map((d) => (
+                          <button
+                            key={d.id}
+                            onClick={() => handleDownload(d.fileUrl)}
+                            className="flex items-center gap-2 px-4 py-2 bg-[#e84545] hover:bg-[#d03535] text-white text-sm font-semibold rounded-lg transition-colors"
+                          >
+                            <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                            {d.fileName ?? "Download"}
+                          </button>
                         ))}
                       </div>
-                      <a
-                        href={project.deliverables[0]?.fileUrl}
-                        download
-                        className="flex items-center gap-2 px-4 py-2 bg-[#e84545] hover:bg-[#d03535] text-white text-sm font-semibold rounded-lg transition-colors w-fit"
-                      >
-                        <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                          <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                        Download
-                      </a>
                     </>
                   ) : (
                     <p className="text-sm text-gray-400">No deliverables uploaded yet.</p>
@@ -740,7 +799,6 @@ export default function ViewProjectPage() {
                 </CollapsibleSection>
               </div>
 
-              {/* Milestones */}
               <CollapsibleSection title="Milestones">
                 {project?.milestones && project.milestones.length > 0 ? (
                   <div className="grid grid-cols-2 gap-3">
@@ -765,14 +823,12 @@ export default function ViewProjectPage() {
                 )}
               </CollapsibleSection>
 
-              {/* Message */}
               <CollapsibleSection title="Message">
                 <div className="w-full px-4 py-3 bg-white border border-gray-100 rounded-lg text-sm text-black min-h-[80px]">
-                  {project?.deliverables?.[0]?.note ?? "No message from creative yet."}
+                  {deliverables[0] ? `Delivery type: ${deliverables[0].type}` : "No message from creative yet."}
                 </div>
               </CollapsibleSection>
 
-              {/* Status update */}
               <div className="bg-white border border-gray-100 rounded-xl p-6 mb-10 text-center">
                 <p className="text-sm text-black mb-4 font-medium">
                   Done reviewing? Pick an option below to update the project status.

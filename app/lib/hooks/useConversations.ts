@@ -11,12 +11,17 @@ export function useConversations() {
       setLoading(true);
       setError(null);
       const res = await fetchConversations({ limit: 50 });
-      // Handle both { data: [...] } and plain array responses
       const list = Array.isArray(res) ? res : res.data ?? [];
       setConversations(list);
     } catch (err: any) {
       console.error("useConversations error:", err);
-      setError(err.message || "Failed to fetch conversations");
+      // If 500, backend has no conversations for this user yet — treat as empty
+      if (err?.status === 500 || err?.statusCode === 500) {
+        setConversations([]);
+        setError(null); // don't show error to user
+      } else {
+        setError(err.message || "Failed to fetch conversations");
+      }
     } finally {
       setLoading(false);
     }
