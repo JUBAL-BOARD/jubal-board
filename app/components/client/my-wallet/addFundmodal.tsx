@@ -11,8 +11,6 @@ import {
 } from "@stripe/react-stripe-js";
 import { showFundAddedToast } from "@/app/components/ui/toasts";
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-
 interface Props {
   onClose: () => void;
   onSuccess?: () => void;
@@ -35,14 +33,12 @@ const CheckoutForm: React.FC<{ onClose: () => void; onSuccess?: () => void }> = 
     setLoading(true);
     setError(null);
 
-    const { error: stripeError } = await stripe.confirmPayment({
+    const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        // Stripe requires a return_url but since this is a wallet top-up
-        // we redirect back to the same page
         return_url: window.location.href,
       },
-      redirect: "if_required", // only redirects for methods that need it (e.g. 3DS)
+      redirect: "if_required",
     });
 
     if (stripeError) {
@@ -51,10 +47,18 @@ const CheckoutForm: React.FC<{ onClose: () => void; onSuccess?: () => void }> = 
       return;
     }
 
-    // Payment succeeded
-    onClose();
-    showFundAddedToast();
-    onSuccess?.();
+    if (
+      paymentIntent?.status === "succeeded" ||
+      paymentIntent?.status === "processing"
+    ) {
+      onClose();
+      showFundAddedToast();
+      onSuccess?.();
+    } else {
+      setError("Payment was not completed. Please try again.");
+    }
+
+    setLoading(false);
   };
 
   return (
@@ -77,6 +81,7 @@ const CheckoutForm: React.FC<{ onClose: () => void; onSuccess?: () => void }> = 
 const AddFundModal: React.FC<Props> = ({ onClose, onSuccess }) => {
   const [amount, setAmount] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [stripePromise, setStripePromise] = useState<ReturnType<typeof loadStripe> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,13 +108,15 @@ const AddFundModal: React.FC<Props> = ({ onClose, onSuccess }) => {
         }),
       });
 
-      if (!res.ok) {
-        const errJson = await res.json();
-        throw new Error(errJson.message ?? "Failed to create payment intent");
-      }
-
       const json = await res.json();
-      setClientSecret(json.data.clientSecret);
+
+      if (!res.ok) throw new Error(json.message ?? "Failed to create payment intent");
+
+      const { clientSecret, publishableKey } = json.data;
+
+      // ✅ FIX: don't await loadStripe — pass the Promise directly to <Elements>
+      setStripePromise(loadStripe(publishableKey));
+      setClientSecret(clientSecret);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -119,9 +126,10 @@ const AddFundModal: React.FC<Props> = ({ onClose, onSuccess }) => {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center mt-20 z-50 px-4">
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+
+        {/* Header — always visible, never scrolls away */}
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-xl font-bold text-black">Add Fund</h2>
           <button onClick={onClose} className="text-black hover:text-gray-600">
             <X size={20} />
@@ -130,7 +138,8 @@ const AddFundModal: React.FC<Props> = ({ onClose, onSuccess }) => {
 
         {/* Step 1 — pick amount */}
         {!clientSecret && (
-          <div className="px-6 py-5 max-h-[70vh] overflow-y-auto">
+          // ✅ FIX: scrollable content area
+          <div className="overflow-y-auto px-6 py-5">
             <div className="mb-5">
               <label className="block text-sm font-semibold text-black mb-2">
                 Enter Amount
@@ -177,23 +186,27 @@ const AddFundModal: React.FC<Props> = ({ onClose, onSuccess }) => {
         )}
 
         {/* Step 2 — Stripe payment form */}
-        {clientSecret && (
-          <Elements
-            stripe={stripePromise}
-            options={{
-              clientSecret,
-              appearance: {
-                theme: "stripe",
-                variables: {
-                  colorPrimary: "#e84545",
-                  borderRadius: "8px",
+        {/* ✅ FIX: removed duplicate <Elements> block; this is the only one */}
+        {clientSecret && stripePromise && (
+          <div className="overflow-y-auto">
+            <Elements
+              stripe={stripePromise}
+              options={{
+                clientSecret,
+                appearance: {
+                  theme: "stripe",
+                  variables: {
+                    colorPrimary: "#e84545",
+                    borderRadius: "8px",
+                  },
                 },
-              },
-            }}
-          >
-            <CheckoutForm onClose={onClose} onSuccess={onSuccess} />
-          </Elements>
+              }}
+            >
+              <CheckoutForm onClose={onClose} onSuccess={onSuccess} />
+            </Elements>
+          </div>
         )}
+
       </div>
     </div>
   );

@@ -129,7 +129,7 @@ const CongratulationsModal: React.FC<{
       </div>
     </div>
   );
-}; 
+};
 
 const ReleasedModal: React.FC<{ onGoToDashboard: () => void }> = ({ onGoToDashboard }) => (
   <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
@@ -153,7 +153,7 @@ const ReleasedModal: React.FC<{ onGoToDashboard: () => void }> = ({ onGoToDashbo
 
 const RateAndReviewModal: React.FC<{
   onClose: () => void;
-  onSubmit: () => void;
+  onSubmit: (rating: number, review: string, favourite: boolean) => void;
   creativeAvatar: string;
   creativeName: string;
   creativeRole: string;
@@ -162,6 +162,7 @@ const RateAndReviewModal: React.FC<{
   const [hovered, setHovered] = useState(0);
   const [review, setReview] = useState("");
   const [favourite, setFavourite] = useState<"yes" | "no" | null>(null);
+
   return (
     <div className="fixed inset-0 bg-black/40 mt-20 flex items-center justify-center z-50 p-6">
       <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
@@ -214,7 +215,11 @@ const RateAndReviewModal: React.FC<{
           </div>
         </div>
         <div className="text-center px-6 pb-6">
-          <button onClick={onSubmit} className="w-[40%] py-3 bg-[#e84545] hover:bg-[#d03535] text-white font-bold rounded-xl transition-colors">
+          <button
+            onClick={() => onSubmit(rating, review, favourite === "yes")}
+            disabled={rating === 0}  // at minimum a rating is required
+            className="w-[40%] py-3 bg-[#e84545] hover:bg-[#d03535] text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             Submit
           </button>
         </div>
@@ -254,6 +259,7 @@ interface Deliverable {
 }
 
 interface CreativeProfile {
+  creativeId?: string;
   fullName?: string;
   name?: string;
   professionalRole?: string;
@@ -431,6 +437,56 @@ export default function ViewProjectPage() {
     }
   };
 
+  // 2. Replace handleRateSubmit in ViewProjectPage
+  const handleRateSubmit = async (rating: number, review: string, addToFavorites: boolean) => {
+    setActionSubmitting(true);
+    try {
+      const token = await getAuthToken();
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
+
+      // Submit review
+      const reviewRes = await fetch(`/api/v1/reviews`, {
+        method: "POST",
+        headers,
+        credentials: "include",
+        body: JSON.stringify({
+          projectId,
+          rating,
+          reviewMessage: review,
+          props: [],          // optional: pass tags/props if you add that UI later
+          addToFavorites,     // backend handles favorites via this flag too
+        }),
+      });
+
+      if (!reviewRes.ok) {
+        const err = await reviewRes.json().catch(() => ({}));
+        throw new Error(err?.message ?? "Failed to submit review");
+      }
+
+      // Also call /favorites separately if they said yes, as a belt-and-suspenders measure
+      if (addToFavorites && creative?.creativeId) {
+        await fetch(`/api/v1/favorites`, {
+          method: "POST",
+          headers,
+          credentials: "include",
+          body: JSON.stringify({ creativeId: creative.creativeId }),
+        }).catch(() => { }); // fail silently — review already succeeded
+      }
+
+      showReviewCreativeToast();
+      setShowRateModal(false);
+      router.push("/client/my-desk");
+    } catch (err: any) {
+      console.error("Review submit error:", err);
+      // optionally show an error toast here
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
+
   const handleRevisionSubmit = async (notes: string) => {
     setActionSubmitting(true);
     try {
@@ -465,25 +521,25 @@ export default function ViewProjectPage() {
   };
 
   const handleAuthorizePayout = async () => {
-  setActionSubmitting(true);
-  try {
-    const token = await getAuthToken();
-    const res = await fetch(`/api/v1/projects/${projectId}/authorize-payout`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      credentials: "include",
-    });
-    const json = await res.json();
-    console.log("payout response", res.status, json); // ← add this
-    if (!res.ok) throw new Error("Failed to authorize payout");
-    setShowCongratsModal(false);
-    setShowReleasedModal(true);
-  } catch (err) {
-    console.log("payout error", err); // ← and this
-  } finally {
-    setActionSubmitting(false);
-  }
-};
+    setActionSubmitting(true);
+    try {
+      const token = await getAuthToken();
+      const res = await fetch(`/api/v1/projects/${projectId}/authorize-payout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const json = await res.json();
+      console.log("payout response", res.status, json); // ← add this
+      if (!res.ok) throw new Error("Failed to authorize payout");
+      setShowCongratsModal(false);
+      setShowReleasedModal(true);
+    } catch (err) {
+      console.log("payout error", err); // ← and this
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
 
   // Simply open the fileUrl directly — it's already a signed S3 URL
   const handleDownload = (fileUrl: string) => {
@@ -536,7 +592,7 @@ export default function ViewProjectPage() {
       {showRateModal && (
         <RateAndReviewModal
           onClose={() => setShowRateModal(false)}
-          onSubmit={() => { showReviewCreativeToast(); setShowRateModal(false); router.push("/client/my-desk"); }}
+          onSubmit={handleRateSubmit}   // now passes (rating, review, favourite)
           creativeAvatar={creativeAvatar}
           creativeName={creativeName}
           creativeRole={creativeRole}

@@ -163,7 +163,7 @@ export default function UploadDeliverablesPage() {
       const { token } = await tokenRes.json();
 
       const formData = new FormData();
-      files.forEach((file) => formData.append("file", file));
+      files.forEach((file) => formData.append("files", file));
       formData.append("type", activeDelivery.value);
       formData.append("note", note);
       if (selectedMilestone) {

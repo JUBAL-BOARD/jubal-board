@@ -192,74 +192,76 @@ const OrderReviewPage: React.FC = () => {
     // ── FIX: No longer calls /accept here.
     // The pitch is only marked APPROVED after payment succeeds on the payment page.
     const handleConfirmHire = async () => {
-        setActionLoading(true);
-        try {
-            const tokenRes = await fetch("/api/auth/session/token");
-            const { token } = await tokenRes.json();
-            const headers = {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-            };
+    setActionLoading(true);
+    try {
+        const tokenRes = await fetch("/api/auth/session/token");
+        const { token } = await tokenRes.json();
+        const headers = {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        };
 
-            const res = await fetch(`/api/v1/pitches/${id}/accept`, {
-                method: "POST",
-                headers,
-                credentials: "include",
-            });
+        const res = await fetch(`/api/v1/pitches/${id}/accept`, {
+            method: "POST",
+            headers,
+            credentials: "include",
+        });
 
-            const json = await res.json();
-            console.log("ACCEPT FULL RESPONSE:", JSON.stringify(json, null, 2));
+        const json = await res.json();
+        console.log("ACCEPT FULL RESPONSE:", JSON.stringify(json, null, 2));
 
-            // If pitch is already accepted, fetch the existing project instead
-            if (!res.ok && json.message?.toLowerCase().includes("no longer pending")) {
-                console.log("Pitch already accepted — fetching all projects...");
-                const projectsRes = await fetch(`/api/v1/projects`, {
-                    headers,
-                    credentials: "include",
-                });
-                const projectsJson = await projectsRes.json();
-                console.log("PROJECTS RESPONSE:", JSON.stringify(projectsJson, null, 2));
-
-                const list = Array.isArray(projectsJson.data)
-                    ? projectsJson.data
-                    : Array.isArray(projectsJson)
-                        ? projectsJson
-                        : [];
-
-                const project = list.find((p: any) => p.pitchId === id) ?? list[0];
-                console.log("Matched project:", JSON.stringify(project, null, 2));
-
-                const projectId = project?.id;
-                console.log("Existing projectId:", projectId);
-
-                if (!projectId) throw new Error("Could not find existing project.");
-
-                setShowConfirm(false);
-                router.push(
-                    `/client/pitches/${id}/payment?pitchId=${id}&projectId=${projectId}&name=${passedName ?? ""}&avatar=${passedAvatar ?? ""}`
-                );
-                return;
-            }
-
-            if (!res.ok) throw new Error(json.message ?? "Failed to create project.");
-
-            const projectId = json.data?.projectId ?? json.data?.id ?? json.projectId ?? json.id;
-            console.log("EXTRACTED projectId:", projectId);
-
-            if (!projectId) throw new Error("No project ID returned.");
-
+        // Handle "already accepted" case
+        if (!res.ok && json.message?.toLowerCase().includes("no longer pending")) {
+            const projectsRes = await fetch(`/api/v1/projects`, { headers, credentials: "include" });
+            const projectsJson = await projectsRes.json();
+            const list = Array.isArray(projectsJson.data) ? projectsJson.data
+                : Array.isArray(projectsJson) ? projectsJson : [];
+            const project = list.find((p: any) => p.pitchId === id) ?? list[0];
+            const projectId = project?.id;
+            if (!projectId) throw new Error("Could not find existing project.");
             setShowConfirm(false);
-            router.push(
-                `/client/pitches/${id}/payment?pitchId=${id}&projectId=${projectId}&name=${passedName ?? ""}&avatar=${passedAvatar ?? ""}`
-            );
-        } catch (e: any) {
-            console.error("handleConfirmHire error:", e);
-            setError(e.message ?? "Something went wrong.");
-            setShowConfirm(false);
-        } finally {
-            setActionLoading(false);
+            router.push(`/client/pitches/${id}/payment?pitchId=${id}&projectId=${projectId}&name=${passedName ?? ""}&avatar=${passedAvatar ?? ""}`);
+            return;
         }
-    };
+
+        if (!res.ok) throw new Error(json.message ?? "Failed to create project.");
+
+        // ── Robustly extract projectId from any nesting level ──
+        const projectId =
+            json?.data?.projectId ??
+            json?.data?.id ??
+            json?.data?.project?.id ??   // <-- common extra nesting
+            json?.projectId ??
+            json?.id ??
+            json?.project?.id;           // <-- another common shape
+
+        console.log("EXTRACTED projectId:", projectId);
+
+        // ── Fallback: if still missing, fetch from /projects ──
+        if (!projectId) {
+            console.warn("No projectId in accept response — fetching from /projects");
+            const projectsRes = await fetch(`/api/v1/projects`, { headers, credentials: "include" });
+            const projectsJson = await projectsRes.json();
+            const list = Array.isArray(projectsJson.data) ? projectsJson.data
+                : Array.isArray(projectsJson) ? projectsJson : [];
+            const project = list.find((p: any) => p.pitchId === id) ?? list[0];
+            const fallbackId = project?.id;
+            if (!fallbackId) throw new Error("Could not find project after accept.");
+            setShowConfirm(false);
+            router.push(`/client/pitches/${id}/payment?pitchId=${id}&projectId=${fallbackId}&name=${passedName ?? ""}&avatar=${passedAvatar ?? ""}`);
+            return;
+        }
+
+        setShowConfirm(false);
+        router.push(`/client/pitches/${id}/payment?pitchId=${id}&projectId=${projectId}&name=${passedName ?? ""}&avatar=${passedAvatar ?? ""}`);
+    } catch (e: any) {
+        console.error("handleConfirmHire error:", e);
+        setError(e.message ?? "Something went wrong.");
+        setShowConfirm(false);
+    } finally {
+        setActionLoading(false);
+    }
+};
 
     if (loading) {
         return (
