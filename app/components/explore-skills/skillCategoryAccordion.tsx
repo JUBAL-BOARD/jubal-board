@@ -44,7 +44,7 @@ const SkillCategoryAccordion: React.FC<Props> = ({
 
                 const results = await Promise.all(
                     (category.services ?? []).map((service) =>
-                        fetch(`${BASE_URL}/api/v1/platform-services/${service.id}/skills`).then((res) => {
+                        fetch(`/api/platform-services/${service.id}/skills`).then((res) => {
                             if (!res.ok) throw new Error(`Failed for service ${service.id}`);
                             return res.json();
                         })
