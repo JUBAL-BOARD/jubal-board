@@ -11,11 +11,11 @@ export async function POST() {
 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://16.171.168.144";
 
-  const res = await fetch('/api/v1/auth/refresh-token', {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshToken }),
-  });
+  const res = await fetch(`${baseUrl}/api/v1/auth/refresh-token`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ refreshToken }),
+});
 
   if (!res.ok) {
     cookieStore.delete("jb_token");
