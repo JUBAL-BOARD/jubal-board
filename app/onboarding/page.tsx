@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import logo from "../assets/logo.png";
+import logo from "../assets/icononly.png";
 import { ArrowRight, Play } from "lucide-react";
 import Footer from "../components/home/footer";
 import onboardingimg from "../assets/onboarding/onboarding.jpg"
+import Link from "next/link";
 
 const slides = [
   { image: onboardingimg },
@@ -29,15 +30,18 @@ const Onboarding: React.FC = () => {
     <div className="font-sans bg-white min-h-screen w-screen">
 
       {/* Logo */}
-      <div className="flex items-center h-[70px] lg:h-[100px] bg-[#fafafa] px-5 lg:px-10">
-        <Image
-          src={logo}
-          alt="Jubal Board logo"
-          width={150}
-          height={150}
-          className="object-contain w-[110px] lg:w-[150px]"
-        />
-      </div>
+      <Link href="/">
+        <div className="flex items-center gap-2">
+          <Image
+            src={logo}
+            alt="Jubal Board logo"
+            width={120}
+            height={120}
+            className="object-contain w-[80px] lg:w-[100px]"
+          />
+          <h1 className="hidden lg:block font-heading font-bold text-black text-2xl">JUBALBOARD</h1>
+        </div>
+      </Link>
 
       {/* Hero Section */}
       <div className="flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-[60px] px-5 lg:px-0 py-8 lg:py-[60px] min-h-[calc(100vh-140px)] lg:min-h-[calc(100vh-180px)]">
