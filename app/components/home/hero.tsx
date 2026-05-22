@@ -22,7 +22,7 @@ const Hero: React.FC = () => {
           Find the Right Creatives for Your Project
         </h1>
         <p className="text-white/90 text-sm sm:text-[24px] font-body leading-relaxed">
-          Hire skilled professionals across digital, creative, <br/> and local services - all in one place.
+          Hire skilled professionals across digital, creative, and<br/> local services all in one place.
         </p>
         {/* Search Bar */}
         <div className="flex flex-col sm:flex-row bg-white mt-8 sm:mt-[120px] overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.2)] w-full sm:w-[1000px]">
