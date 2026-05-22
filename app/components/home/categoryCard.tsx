@@ -16,7 +16,6 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ icon, label, path = "/explo
 
   return (
     <div
-      onClick={() => router.push(path)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={`flex flex-col items-center justify-center px-4 py-6 rounded-[10px] cursor-pointer text-center gap-3 transition-all duration-200

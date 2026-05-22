@@ -35,17 +35,23 @@ const MyEarningsContent: React.FC = () => {
       const earningsJson = await earningsRes.json();
       const txJson = await txRes.json();
 
-      fetch(`/api/v1/earnings/transactions?limit=${10}&page=${1}`, { credentials: "include", headers }),
+      // Map earnings
+      setEarningsData({
+        totalEarned: earningsJson.data.totalEarned,
+        pendingEarnings: earningsJson.data.pendingBalance,
+        availableBalance: earningsJson.data.availableBalance,
+      });
 
-        // Map earnings
-        setEarningsData({
-          totalEarned: earningsJson.data.totalEarned,
-          pendingEarnings: earningsJson.data.pendingBalance,
-          availableBalance: earningsJson.data.availableBalance,
-        });
+      const rawList = Array.isArray(txJson.data)
+        ? txJson.data
+        : Array.isArray(txJson.data?.items)
+          ? txJson.data.items
+          : Array.isArray(txJson)
+            ? txJson
+            : [];
 
       // Map transactions
-      const mapped: Transaction[] = (txJson.data ?? []).map((tx: any) => {
+      const mapped: Transaction[] = rawList.map((tx: any) => {
         const date = new Date(tx.createdAt);
         return {
           id: tx.id,
