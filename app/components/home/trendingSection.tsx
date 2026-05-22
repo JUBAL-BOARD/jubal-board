@@ -8,6 +8,7 @@ interface PlatformService {
   id: string;
   name: string;
   imageUrl: string;
+  categoryId: string;
 }
 
 const PAGE_SIZE = 5; // items per page (matches your 5-col grid)
@@ -72,6 +73,7 @@ const TrendingSection: React.FC = () => {
               key={service.id}
               label={service.name}
               bg={service.imageUrl}
+              categoryId={service.categoryId}
             />
           ))}
         </div>

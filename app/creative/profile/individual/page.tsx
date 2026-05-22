@@ -421,6 +421,48 @@ const TellUsAboutYou: React.FC = () => {
             </div>
           </div>
 
+          <div>
+              <label className={labelClass}>Country{reqStar}</label>
+              <div className="relative">
+                <select
+                  value={form.country}
+                  onChange={(e) => handleCountryChange(e.target.value)}
+                  className={`${inputClass} appearance-none pr-9 cursor-pointer`}
+                >
+                  <option value="" disabled>Select country</option>
+                  {countries.map((c) => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <ChevronDown size={14} stroke="#6B7280" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {selectedCountry && selectedCountry.states.length > 0 && (
+            <div>
+              <label className={labelClass}>State{reqStar}</label>
+              <div className="relative">
+                <select
+                  value={selectedState}
+                  onChange={(e) => setSelectedState(e.target.value)}
+                  className={`${inputClass} appearance-none pr-9 cursor-pointer`}
+                >
+                  <option value="" disabled>Select state</option>
+                  {selectedCountry.states.map((s) => (
+                    <option key={s.id} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <ChevronDown size={14} stroke="#6B7280" />
+                </div>
+              </div>
+            </div>
+          )}
+
+
           <div className="grid grid-cols-2 gap-4">
             {/* Contact Number with live formatting + validation */}
             <div>
@@ -465,47 +507,6 @@ const TellUsAboutYou: React.FC = () => {
                 </p>
               )}
             </div>
-
-            <div>
-              <label className={labelClass}>Country{reqStar}</label>
-              <div className="relative">
-                <select
-                  value={form.country}
-                  onChange={(e) => handleCountryChange(e.target.value)}
-                  className={`${inputClass} appearance-none pr-9 cursor-pointer`}
-                >
-                  <option value="" disabled>Select country</option>
-                  {countries.map((c) => (
-                    <option key={c.id} value={c.name}>{c.name}</option>
-                  ))}
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <ChevronDown size={14} stroke="#6B7280" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {selectedCountry && selectedCountry.states.length > 0 && (
-            <div>
-              <label className={labelClass}>State{reqStar}</label>
-              <div className="relative">
-                <select
-                  value={selectedState}
-                  onChange={(e) => setSelectedState(e.target.value)}
-                  className={`${inputClass} appearance-none pr-9 cursor-pointer`}
-                >
-                  <option value="" disabled>Select state</option>
-                  {selectedCountry.states.map((s) => (
-                    <option key={s.id} value={s.name}>{s.name}</option>
-                  ))}
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <ChevronDown size={14} stroke="#6B7280" />
-                </div>
-              </div>
-            </div>
-          )}
 
           <div>
             <label className={labelClass}>Street Address{reqStar}</label>

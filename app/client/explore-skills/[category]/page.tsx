@@ -111,12 +111,14 @@ const CreativeCard: React.FC<CreativeCardProps> = ({ id, name, role, rating, ava
 
 const CategoryGigsPage: React.FC = () => {
   const params = useParams();
-  const categoryName = decodeURIComponent(params.category as string);
+  // ✅ FIX: Read the param as an ID, not a name
+  const categoryId = params.category as string;
 
   const [activeChip, setActiveChip] = useState("All");
   const [search, setSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
+  const [categoryName, setCategoryName] = useState(""); // ✅ FIX: Fetch name from API
   const [services, setServices] = useState<Service[]>([]);
   const [categoryCreatives, setCategoryCreatives] = useState<CategoryCreatives>({
     recommended: [],
@@ -133,10 +135,14 @@ const CategoryGigsPage: React.FC = () => {
         const { token } = await tokenRes.json();
         const headers = { Authorization: `Bearer ${token}` };
 
-        const [profileRes, categoriesRes, suggestedRes] = await Promise.all([
+        // ✅ FIX: Use categoryId directly — no need to fetch all categories and name-match
+        const [profileRes, suggestedRes, detailRes, recommendedRes, topRatedRes, verifiedRes] = await Promise.all([
           fetch("/api/v1/clients/me", { headers, credentials: "include" }),
-          fetch("/api/v1/categories", { headers, credentials: "include" }),
           fetch("/api/v1/creatives/suggested", { headers, credentials: "include" }),
+          fetch(`/api/v1/categories/${categoryId}`, { headers, credentials: "include" }),
+          fetch(`/api/v1/creatives?categoryId=${categoryId}&recommended=true&sort=recommended`, { headers, credentials: "include" }),
+          fetch(`/api/v1/creatives?categoryId=${categoryId}&sort=rating`, { headers, credentials: "include" }),
+          fetch(`/api/v1/creatives?categoryId=${categoryId}&verified=true`, { headers, credentials: "include" }),
         ]);
 
         // Profile
@@ -154,50 +160,31 @@ const CategoryGigsPage: React.FC = () => {
           });
         }
 
-        // Categories
-        if (categoriesRes.ok) {
-          const categoriesJson = await categoriesRes.json();
-          const allCategories = Array.isArray(categoriesJson.data)
-            ? categoriesJson.data
-            : categoriesJson.data ?? [];
-
-          const matched = allCategories.find(
-            (c: any) => c.name.toLowerCase() === categoryName.toLowerCase()
-          );
-
-          if (matched) {
-            const [detailRes, recommendedRes, topRatedRes, verifiedRes] = await Promise.all([
-              fetch(`/api/v1/categories/${matched.id}`, { headers, credentials: "include" }),
-              fetch(`/api/v1/creatives?categoryId=${matched.id}&recommended=true&sort=recommended`, { headers, credentials: "include" }),
-              fetch(`/api/v1/creatives?categoryId=${matched.id}&sort=rating`, { headers, credentials: "include" }),
-              fetch(`/api/v1/creatives?categoryId=${matched.id}&verified=true`, { headers, credentials: "include" }),
-            ]);
-
-            if (detailRes.ok) {
-  const detailJson = await detailRes.json();
-  const detail = detailJson.data ?? detailJson;
-  console.log("Category detail:", JSON.stringify(detail, null, 2)); // 👈
-  setServices(Array.isArray(detail.services) ? detail.services : []);
-}
-
-            const parseCreatives = async (res: Response): Promise<SuggestedCreative[]> => {
-              if (!res.ok) return [];
-              const json = await res.json();
-              return (Array.isArray(json.data) ? json.data : []).map((c: any) => ({
-                ...c,
-                imageUrl: imageMap[c.id] ?? c.photo ?? null,
-              }));
-            };
-
-            const [recommended, topRated, verified] = await Promise.all([
-              parseCreatives(recommendedRes),
-              parseCreatives(topRatedRes),
-              parseCreatives(verifiedRes),
-            ]);
-
-            setCategoryCreatives({ recommended, topRated, verified });
-          }
+        // ✅ FIX: Get category name and services from the detail response
+        if (detailRes.ok) {
+          const detailJson = await detailRes.json();
+          const detail = detailJson.data ?? detailJson;
+          setCategoryName(detail.name ?? ""); // ✅ Set name for breadcrumb
+          setServices(Array.isArray(detail.services) ? detail.services : []);
         }
+
+        const parseCreatives = async (res: Response): Promise<SuggestedCreative[]> => {
+          if (!res.ok) return [];
+          const json = await res.json();
+          return (Array.isArray(json.data) ? json.data : []).map((c: any) => ({
+            ...c,
+            imageUrl: imageMap[c.id] ?? c.photo ?? null,
+          }));
+        };
+
+        const [recommended, topRated, verified] = await Promise.all([
+          parseCreatives(recommendedRes),
+          parseCreatives(topRatedRes),
+          parseCreatives(verifiedRes),
+        ]);
+
+        setCategoryCreatives({ recommended, topRated, verified });
+
       } catch {
         // fail silently
       } finally {
@@ -206,7 +193,7 @@ const CategoryGigsPage: React.FC = () => {
     };
 
     fetchAll();
-  }, [categoryName]);
+  }, [categoryId]); // ✅ FIX: depend on categoryId, not categoryName
 
   const userName = profile?.clientProfile?.fullName || profile?.name || "Client";
   const userAvatar =
@@ -259,6 +246,7 @@ const CategoryGigsPage: React.FC = () => {
         </div>
 
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
+          {/* ✅ FIX: breadcrumb now uses fetched categoryName */}
           <Breadcrumb
             crumbs={[
               { label: "Dashboard", path: "/client/dashboard" },
