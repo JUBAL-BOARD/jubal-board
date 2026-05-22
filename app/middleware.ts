@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Routes that require authentication
-const PROTECTED_ROUTES = ["/tell-us", "/brand-profile", "/dashboard", "/board"];
+const PROTECTED_ROUTES = ["/tell-us", "/brand-profile", "/dashboard", "/board", "/creative", "/client"];
 
 // Routes only for unauthenticated users (redirect logged-in users away)
 const AUTH_ROUTES = ["/signin", "/login", "/onboarding"];
@@ -34,6 +34,8 @@ export const config = {
     "/brand-profile/:path*",
     "/dashboard/:path*",
     "/board/:path*",
+    "/creative/:path*",
+    "/client/:path*",
     "/signin/:path*",
   ],
 };
