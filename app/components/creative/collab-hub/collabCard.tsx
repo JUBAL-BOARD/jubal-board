@@ -1,5 +1,6 @@
 import { Star, MessageCircle } from "lucide-react";
 import { CollabCreative } from "@/app/types";
+import Link from "next/link";
 
 interface Props {
   creative: CollabCreative;
@@ -38,13 +39,13 @@ const CollabCard: React.FC<Props> = ({ creative }) => {
 
           {/* Name + role + rating */}
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-black text-sm truncate">{creative.name}</p>
-            <p className="text-xs text-black mb-1">{creative.role}</p>
+            <p className="font-semibold font-heading text-black text-md truncate">{creative.name}</p>
+            <p className="text-sm font-body text-black mb-1">{creative.role}</p>
             <div className="flex items-center gap-1 mb-1">
               <Star size={11} className="text-yellow-400 fill-yellow-400" />
-              <span className="text-xs font-medium text-gray-700">{creative.rating.toFixed(1)}</span>
+              <span className="text-xs font-medium text-black">{creative.rating.toFixed(1)}</span>
             </div>
-            <button className="text-xs text-[#E2554F] font-medium hover:underline">
+            <button className="text-xs text-[#E2554F] font-body font-medium hover:underline">
               View Profile
             </button>
           </div>
@@ -56,9 +57,13 @@ const CollabCard: React.FC<Props> = ({ creative }) => {
         </div>
 
         {/* Invite button */}
-        <button className="w-full mt-3 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-semibold py-2 lg:py-2.5 rounded-lg transition-colors">
-          Invite
-        </button>
+        <div className="w-[50%] mx-auto">
+          <Link href={`/creative/collab-hub/invite/${encodeURIComponent(creative.name)}`}>
+            <button className="w-full mt-3 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold py-2 lg:py-2.5 rounded-lg transition-colors">
+              Invite
+            </button>
+          </Link>
+        </div>
       </div>
     </div>
   );

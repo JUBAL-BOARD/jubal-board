@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X, Loader2 } from "lucide-react";
 import Sidebar from "@/app/components/creative/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/creative/dashboard/dashboardTopbar";
 import UpdateBanner from "@/app/components/creative/dashboard/updateBanner";
@@ -11,25 +11,56 @@ import TodoList from "@/app/components/creative/dashboard/todoList";
 import OngoingGigs from "@/app/components/creative/dashboard/ongoingGigs";
 import YourPitches from "@/app/components/creative/dashboard/yourPitches";
 import LearningHub from "@/app/components/creative/dashboard/learningHub";
-import { freshGigs, todoItems, ongoingGigs, creativePitches, courses } from "../../data";
 import QuickActions from "@/app/components/creative/dashboard/quickActions";
+import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
+import { useMyPitches } from "@/app/lib/hooks/useMyPitches";
+import { freshGigs, todoItems, ongoingGigs, creativePitches, courses } from "../../data";
+import { useKycStatus } from "../../lib/hooks/useKycStatus";
+import KycModal from "../../components/verification/kycModal";
 
 const CreativeDashboard: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { profile, loading: profileLoading, error } = useCreativeProfile();
+  const { pitches } = useMyPitches();
+  const { kycStatus, loading: kycLoading } = useKycStatus();
+  const [showKycModal, setShowKycModal] = useState(false);
+
+  useEffect(() => {
+  if (!kycLoading && kycStatus !== null && kycStatus !== "PROVIDER_APPROVED") {
+    setShowKycModal(true);
+  }
+}, [kycStatus, kycLoading]);
+console.log("kycStatus:", kycStatus, "kycLoading:", kycLoading);
+
+  if (profileLoading || kycLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-white">
+        <Loader2 className="animate-spin text-[#E2554F]" size={40} />
+      </div>
+    );
+  }
+
+  const userName = profile?.fullName || "Creative";
+  const userAvatar =
+    profile?.avatar ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
-      {/* Topbar */}
       <DashboardTopbar
-        userName="Natasha John"
-        userAvatar="https://i.pravatar.cc/150?img=47"
+        userName={userName}
+        userAvatar={userAvatar}
         sidebarOpen={sidebarOpen}
         onMenuClick={() => setSidebarOpen(!sidebarOpen)}
       />
-
       <div className="flex flex-1 relative">
+        {showKycModal && (
+          <KycModal
+            status={kycStatus}
+            onClose={() => setShowKycModal(false)}
+          />
+        )}
 
-        {/* Dark overlay — mobile only, shows when sidebar is open */}
         {sidebarOpen && (
           <div
             className="fixed inset-0 bg-black/40 z-30 lg:hidden"
@@ -37,7 +68,6 @@ const CreativeDashboard: React.FC = () => {
           />
         )}
 
-        {/* Sidebar — slides in on mobile, always visible on desktop */}
         <div
           className={`
             fixed top-0 left-0 h-full z-40
@@ -46,30 +76,31 @@ const CreativeDashboard: React.FC = () => {
             lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:z-10
           `}
         >
-          {/* Close button inside sidebar on mobile */}
           <button
             className="absolute top-4 right-4 z-50 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           >
             <X size={22} />
           </button>
-
           <Sidebar activeItem="Dashboard" />
         </div>
 
-        {/* Main content — full width, no margin offset needed */}
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
+          {error && (
+            <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
+              Note: Could not sync latest profile data.
+            </div>
+          )}
           <UpdateBanner />
-          <WelcomeBar userName="Natasha John" />
+          <WelcomeBar userName={userName} />
           <SearchBar />
           <QuickActions />
-          <FreshGigs gigs={freshGigs} />
-          <TodoList todos={todoItems} />
-          <OngoingGigs gigs={ongoingGigs} />
-          <YourPitches pitches={creativePitches} />
-          <LearningHub courses={courses} />
+          <FreshGigs />
+          <TodoList />
+          <OngoingGigs />
+          <YourPitches />
+          <LearningHub />
         </main>
-
       </div>
     </div>
   );

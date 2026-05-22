@@ -2,6 +2,7 @@
 
 import { Search, ChevronDown, Play } from "lucide-react";
 import Image from "next/image";
+import herobg from "../../assets/home/herobg.jpg";
 
 const Hero: React.FC = () => {
   return (
@@ -9,7 +10,7 @@ const Hero: React.FC = () => {
       
       {/* Background Image */}
       <Image
-        src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1200&q=80"
+        src={herobg}
         alt="hero background"
         fill
         className="object-cover"
@@ -22,10 +23,10 @@ const Hero: React.FC = () => {
       {/* Content */}
       <div className="absolute top-40 left-10">
         <h1 className="text-white text-5xl font-extrabold mb-2 leading-relaxed">
-          Why work should work
+          Find the Right Creatives for Your Project
         </h1>
         <p className="text-white/90 text-xl max-w-[420px] leading-relaxed">
-          Forget the old rules. You can have the best people. Right Now. Right Here.
+          Hire skilled professionals across digital, creative, and local services - all in one place.
         </p>
 
         {/* Search Bar */}

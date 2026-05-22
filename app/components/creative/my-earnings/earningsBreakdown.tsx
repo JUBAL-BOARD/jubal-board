@@ -1,32 +1,66 @@
 "use client";
-
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ChevronDown } from "lucide-react";
+
+interface Breakdown {
+  gross: number;
+  fees: number;
+  netPay: number;
+}
 
 const periods = ["This month", "Last month", "Last 3 months", "This year"];
 
-const platformFees = [
-  { label: "Jubal Board Service Fee", amount: "-$50.00" },
-  { label: "Processing Fee", amount: "-$50.00" },
-  { label: "Payout Fee", amount: "-$50.00" },
-];
+const periodToDateRange: Record<string, string> = {
+  "This month": "thisMonth",
+  "Last month": "lastMonth",
+  "Last 3 months": "last3Months",
+  "This year": "thisYear",
+};
 
-const withheldAmounts = [
-  { label: "Disputes", amount: "-$50.00" },
-  { label: "Refund issued", amount: "-$50.00" },
-  { label: "Payment holds", amount: "-$50.00" },
-];
+const fmt = (n: number) =>
+  `₦${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 const EarningsBreakdown: React.FC = () => {
   const [period, setPeriod] = useState("This month");
   const [open, setOpen] = useState(false);
+  const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchBreakdown = useCallback(async (selectedPeriod: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const tokenRes = await fetch("/api/auth/session/token");
+      const { token } = await tokenRes.json();
+
+      const dateRange = periodToDateRange[selectedPeriod] ?? "thisMonth";
+      const res = await fetch(`/api/v1/earnings/breakdown?dateRange=${dateRange}`, {
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!res.ok) throw new Error(`Breakdown fetch failed (${res.status})`);
+      const json = await res.json();
+      setBreakdown(json.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBreakdown(period);
+  }, [period, fetchBreakdown]);
 
   return (
     <div className="bg-[#fafafa] p-6 mb-6">
       <div className="flex items-center justify-between mb-5">
-        <h2 className="text-lg lg:text-2xl font-bold text-gray-900">Earnings Breakdown</h2>
-
-        {/* Period dropdown */}
+        <h2 className="text-lg lg:text-2xl font-heading font-bold text-gray-900">Earnings Breakdown</h2>
         <div className="relative">
           <button
             onClick={() => setOpen(!open)}
@@ -53,40 +87,42 @@ const EarningsBreakdown: React.FC = () => {
         </div>
       </div>
 
-      {/* Two column breakdown */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Platform Fees */}
-        <div>
-          <p className="font-semibold text-black text-sm lg:text-xl mb-4">Platform Fees</p>
-          <div className="space-y-3">
-            {platformFees.map((fee) => (
-              <div key={fee.label} className="flex items-center justify-between">
-                <span className="text-sm lg:text-lg text-black">{fee.label}</span>
-                <span className="text-sm lg:text-md text-black font-medium">{fee.amount}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {loading && <p className="text-sm text-gray-400 text-center py-6">Loading breakdown…</p>}
+      {error && <p className="text-sm text-red-500 text-center py-6">{error}</p>}
 
-        {/* Withheld Amounts */}
-        <div>
-          <p className="font-semibold text-black text-sm lg:text-xl mb-4">Withheld Amounts</p>
-          <div className="space-y-3">
-            {withheldAmounts.map((item) => (
-              <div key={item.label} className="flex items-center justify-between">
-                <span className="text-sm lg:text-lg text-black">{item.label}</span>
-                <span className="text-sm lg:text-md text-black font-medium">{item.amount}</span>
+      {!loading && !error && breakdown && (
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Platform Fees */}
+          <div>
+            <p className="font-semibold font-heading text-black text-sm lg:text-xl mb-4">Platform Fees</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-body lg:text-lg text-black">Total Fees</span>
+                <span className="text-sm font-body text-black font-medium">-{fmt(breakdown.fees)}</span>
               </div>
-            ))}
+            </div>
           </div>
 
-          {/* Net Earnings */}
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
-            <span className="font-bold text-black text-sm lg:text-md">Net Earnings</span>
-            <span className="font-bold text-black text-sm lg:text-md">$420.00</span>
+          {/* Summary */}
+          <div>
+            <p className="font-semibold font-heading text-black text-sm lg:text-xl mb-4">Summary</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-body lg:text-lg text-black">Gross Earnings</span>
+                <span className="text-sm font-body text-black font-medium">{fmt(breakdown.gross)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-body lg:text-lg text-black">Total Fees</span>
+                <span className="text-sm font-body text-black font-medium">-{fmt(breakdown.fees)}</span>
+              </div>
+              <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                <span className="font-bold font-body text-black text-sm lg:text-md">Net Earnings</span>
+                <span className="font-bold font-body text-black text-sm lg:text-md">{fmt(breakdown.netPay)}</span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

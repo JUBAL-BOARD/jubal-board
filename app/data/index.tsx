@@ -1,4 +1,14 @@
 import type { Service, Feature, Project, Pitch, Creative, FreshGig, TodoItem, OngoingGig, CreativePitch, Course, MyGig, Conversation, Transaction, EarningsData, ClientFamMember, CollabCreative, Review, CreativeProfile, NotificationGroup } from "../types";
+import img1 from "../assets/home/img1.jpg";
+import img2 from "../assets/home/img2.jpg";
+import img3 from "../assets/home/img3.jpg";
+import img4 from "../assets/home/img4.jpg";
+import img5 from "../assets/home/img5.jpg";
+import img6 from "../assets/home/img6.jpg";
+import img7 from "../assets/home/img7.jpg";
+import img8 from "../assets/home/img8.jpg";
+import img9 from "../assets/home/img9.jpg";
+import { BadgeCheck, Briefcase, ClipboardCheck, GitMerge, Network, Users } from "lucide-react";
 
 export const categories: { iconKey: string; label: string }[] = [
   { iconKey: "image", label: "Digital &\nVisual Arts" },
@@ -20,42 +30,48 @@ export const contactItems: { iconKey: string; lines: string[] }[] = [
 ];
 
 export const trendingServices: Service[] = [
-  { label: "Logo Design", bg: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=400&q=80" },
+  { label: "Logo Design", bg: img1 },
   { label: "App & Website Design", bg: "https://images.unsplash.com/photo-1555421689-3f034debb7a6?w=400&q=80" },
-  { label: "Sound Design", bg: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=400&q=80" },
-  { label: "Music Production", bg: "https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=400&q=80" },
-  { label: "Bridal Makeup", bg: "https://images.unsplash.com/photo-1487412947147-5cebf100d4d6?w=400&q=80" },
-  { label: "Braids", bg: "https://images.unsplash.com/photo-1605980776566-0486c3ac7617?w=400&q=80" },
-  { label: "Content Creation", bg: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=400&q=80" },
-  { label: "Pastries", bg: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80" },
-  { label: "Plumbing", bg: "https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=400&q=80" },
-  { label: "Wall Art", bg: "https://images.unsplash.com/photo-1493246507139-91e8fad9978e?w=400&q=80" },
+  { label: "Sound Design", bg: img2 },
+  { label: "Music Production", bg: img3 },
+  { label: "Bridal Makeup", bg: img4 },
+  { label: "Braids", bg: img5 },
+  { label: "Content Creation", bg: img6 },
+  { label: "Pastries", bg: img7 },
+  { label: "Plumbing", bg: img8 },
+  { label: "Wall Art", bg: img9 },
 ];
 
 export const features: Feature[] = [
   {
     title: "All-in-One Creative Network",
     desc: "Find professionals across trades — digital or physical. Everything in one place",
+    icon: <Network size={40} stroke="#E2554F" strokeWidth={1.5} />,
   },
   {
     title: "Smart Matching",
     desc: "Our platform helps you connect with the right person for your project — fast.",
+    icon: <GitMerge size={40} stroke="#E2554F" strokeWidth={1.5} />,
   },
   {
     title: "Verified & Trusted",
     desc: "Our platform helps you connect with the right person for your project — fast.",
+    icon: <BadgeCheck size={40} stroke="#E2554F" strokeWidth={1.5} />,
   },
   {
-    title: "All-in-One Creative Network",
-    desc: "Find professionals across trades — digital or physical. Everything in one place",
+    title: "Post A Project & Get Offers",
+    desc: "Describe your project and receive proposals from qualified creatives ready to help.",
+    icon: <ClipboardCheck size={40} stroke="#E2554F" strokeWidth={1.5} />,
   },
   {
-    title: "Smart Matching",
-    desc: "Our platform helps you connect with the right person for your project — fast.",
+    title: "Secure Collaboration",
+    desc: "Message, share details, and manage project discussions safely within the platform.",
+    icon: <Users size={40} stroke="#E2554F" strokeWidth={1.5} />,
   },
   {
-    title: "Verified & Trusted",
-    desc: "Our platform helps you connect with the right person for your project — fast.",
+    title: "Wide Range of Creative Services",
+    desc: "From design, media to crafts, fashion, and tech - discover talents across industries.",
+    icon: <Briefcase size={40} stroke="#E2554F" strokeWidth={1.5} />,
   },
 ];
 
@@ -265,8 +281,8 @@ export const freshGigs: FreshGig[] = [
 ];
 
 export const todoItems: TodoItem[] = [
-  { id: "1", title: "Continue your pitch for Alien Job", progress: 70 },
-  { id: "2", title: "Upload Milestone 1 for Charles Eden", progress: 70 },
+  { id: "1", title: "Continue your pitch for Alien Job", progress: 70, type: "task", actionLabel: "Continue", isCompleted: false },
+  { id: "2", title: "Upload Milestone 1 for Charles Eden", progress: 70, type: "task", actionLabel: "Upload", isCompleted: false },
 ];
 
 export const ongoingGigs: OngoingGig[] = [
@@ -308,6 +324,7 @@ export const creativePitches: CreativePitch[] = [
     sentAt: "18th Nov, 2025, 10:00am",
     status: "approved",
     client: {
+      id: "1712581200034",
       name: "Charles John",
       avatar: "https://i.pravatar.cc/150?img=33",
       verified: true,
@@ -324,6 +341,7 @@ export const creativePitches: CreativePitch[] = [
     sentAt: "18th Nov, 2025, 10:00am",
     status: "pending",
     client: {
+      id: "1712581200047",
       name: "Davies Mark",
       avatar: "https://i.pravatar.cc/150?img=12",
       verified: true,
@@ -340,6 +358,7 @@ export const creativePitches: CreativePitch[] = [
     sentAt: "18th Nov, 2025, 10:00am",
     status: "approved",
     client: {
+      id: "1712581200034",
       name: "Charles John",
       avatar: "https://i.pravatar.cc/150?img=33",
       verified: true,
@@ -356,6 +375,7 @@ export const creativePitches: CreativePitch[] = [
     sentAt: "18th Nov, 2025, 10:00am",
     status: "approved",
     client: {
+      id: "1712581200034",
       name: "Charles John",
       avatar: "https://i.pravatar.cc/150?img=33",
       verified: true,
@@ -673,7 +693,8 @@ export const myGigs: MyGig[] = [
 
 export const conversations: Conversation[] = [
   {
-    id: "1",
+    id: "dm_1712581200000_k3j9xqp",
+    type: "dm",
     name: "Charles Eden",
     avatar: "https://i.pravatar.cc/150?img=11",
     lastMessage: "Hi, How are you?",
@@ -692,7 +713,8 @@ export const conversations: Conversation[] = [
     ],
   },
   {
-    id: "2",
+    id: "group_1712581200001_m8w2yzr",
+    type: "group",
     name: "Creative Campaign Group",
     avatar: "https://i.pravatar.cc/150?img=32",
     lastMessage: "Hi, How are you?",
@@ -706,7 +728,8 @@ export const conversations: Conversation[] = [
     ],
   },
   {
-    id: "3",
+    id: "dm_1712581200002_p9x4tnm",
+    type: "dm",
     name: "Natasha Eden",
     avatar: "https://i.pravatar.cc/150?img=47",
     lastMessage: "Hi, How are you?",
@@ -719,7 +742,8 @@ export const conversations: Conversation[] = [
     ],
   },
   {
-    id: "4",
+    id: "dm_1712581200002_p9x4tnm",
+    type: "dm",
     name: "Natasha Eden",
     avatar: "https://i.pravatar.cc/150?img=20",
     lastMessage: "Hi, How are you?",
@@ -731,7 +755,8 @@ export const conversations: Conversation[] = [
     ],
   },
   {
-    id: "5",
+    id: "dm_1712581200002_p9x4tnm",
+    type: "dm",
     name: "Natasha Eden",
     avatar: "https://i.pravatar.cc/150?img=15",
     lastMessage: "Hi, How are you?",
@@ -743,7 +768,8 @@ export const conversations: Conversation[] = [
     ],
   },
   {
-    id: "6",
+    id: "dm_1712581200002_p9x4tnm",
+    type: "dm",
     name: "Natasha Eden",
     avatar: "https://i.pravatar.cc/150?img=25",
     lastMessage: "Hi, How are you?",
@@ -755,7 +781,8 @@ export const conversations: Conversation[] = [
     ],
   },
   {
-    id: "7",
+    id: "dm_1712581200002_p9x4tnm",
+    type: "dm",
     name: "Natasha Eden",
     avatar: "https://i.pravatar.cc/150?img=44",
     lastMessage: "Hi, How are you?",
@@ -767,7 +794,8 @@ export const conversations: Conversation[] = [
     ],
   },
   {
-    id: "8",
+    id: "dm_1712581200002_p9x4tnm",
+    type: "dm",
     name: "Natasha Eden",
     avatar: "https://i.pravatar.cc/150?img=38",
     lastMessage: "Hi, How are you?",
@@ -787,40 +815,40 @@ export const earningsData: EarningsData = {
 };
 
 export const recentTransactions: Transaction[] = [
-  { details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
-  { details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
-  { details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
-  { details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Reversed" },
-  { details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Pending" },
-  { details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
+  { id: "1", details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
+  { id: "2", details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
+  { id: "3", details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
+  { id: "4", details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Reversed" },
+  { id: "5", details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Pending" },
+  { id: "6", details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
 ];
 
 export const allTransactions: Transaction[] = [
-  { details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
-  { details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
-  { details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
-  { details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Reversed" },
-  { details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Pending" },
-  { details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
-  { details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
-  { details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
-  { details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
-  { details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
-  { details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
-  { details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
-  { details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Pending" },
-  { details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
-  { details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Reversed" },
-  { details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
-  { details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
-  { details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
-  { details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
-  { details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Pending" },
-  { details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
-  { details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
-  { details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
-  { details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Reversed" },
-  { details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
+  {id: "1", details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
+  { id: "2", details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
+  { id: "3", details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
+  { id: "4", details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Reversed" },
+  { id: "5", details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Pending" },
+  { id: "6", details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
+  { id: "7", details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
+  { id: "8", details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
+  { id: "9", details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
+  { id: "10", details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
+  { id: "11", details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
+  { id: "12", details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
+  { id: "13", details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Pending" },
+  { id: "1", details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
+  { id: "14", details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Reversed" },
+  { id: "15", details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
+  { id: "16", details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
+  { id: "17", details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
+  { id: "18", details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
+  { id: "19", details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Pending" },
+  { id: "20", details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
+  { id: "21", details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Debit" },
+  { id: "22", details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
+  { id: "23", details: "Logo Design for Luxury Boutique", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "-$100", status: "Reversed" },
+  { id: "24", details: "Transaction Process (Fund Wallet)", paymentMethod: "Paypal", date: "20 Nov, 2025", time: "10:00am", amount: "+$1000", status: "Credit" },
 ];
 
 export const clientFamList: ClientFamMember[] = [

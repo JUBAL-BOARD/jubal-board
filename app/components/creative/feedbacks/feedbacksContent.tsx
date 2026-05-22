@@ -12,7 +12,7 @@ const FeedbacksContent: React.FC = () => {
         { label: "Feedbacks" },
       ]} />
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Feedback/Ratings</h1>
+      <h1 className="text-2xl font-bold font-heading text-gray-900 mb-6">Feedback/Ratings</h1>
 
       <FeedbackProfile />
       <FeedbackStats />

@@ -9,10 +9,10 @@ const FeedbackProfile: React.FC = () => {
         className="w-24 h-24 rounded-full object-cover mb-3"
       />
       <div className="flex items-center gap-1">
-        <p className="font-semibold text-gray-900 text-sm">Natasha John</p>
+        <p className="font-semibold font-heading text-gray-900 text-sm">Natasha John</p>
         <BadgeCheck size={15} fill="blue" stroke="white" />
       </div>
-      <p className="text-xs text-gray-500 mt-0.5">Graphic Designer</p>
+      <p className="text-xs text-black font-body mt-0.5">Graphic Designer</p>
     </div>
   );
 };

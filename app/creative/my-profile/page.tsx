@@ -4,14 +4,21 @@ import DashboardTopbar from "@/app/components/creative/dashboard/dashboardTopbar
 import MyProfileContent from "@/app/components/creative/my-profile/myProfileContent";
 import { useState } from "react";
 import { X } from "lucide-react";
+import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
 
 const MyProfilePage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { profile, loading, error } = useCreativeProfile();
+
+  // Fallback values if profile is not loaded
+  const userName = profile?.fullName || "User";
+  const userAvatar = profile?.avatar || "https://i.pravatar.cc/150?img=47";
+
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <DashboardTopbar
-        userName="Natasha John"
-        userAvatar="https://i.pravatar.cc/150?img=47"
+        userName={userName}
+        userAvatar={userAvatar}
         sidebarOpen={sidebarOpen}
         onMenuClick={() => setSidebarOpen(!sidebarOpen)}
       />
@@ -43,7 +50,7 @@ const MyProfilePage: React.FC = () => {
           <Sidebar activeItem="My Profile" />
         </div>
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <MyProfileContent />
+          <MyProfileContent profile={profile} loading={loading} error={error} />
         </main>
       </div>
     </div>

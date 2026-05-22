@@ -1,12 +1,18 @@
 "use client";
-
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Search, SlidersHorizontal, ChevronDown } from "lucide-react";
 import Breadcrumb from "@/app/components/creative/dashboard/breadcrumb";
 import PitchCard from "./pitchCard";
-import { creativePitches } from "@/app/data";
+import { CreativePitch } from "@/app/types";
+import { useMyPitches } from "@/app/lib/hooks/useMyPitches";
 
-const filterChips = ["All Pitches", "Approved", "Pending", "Ongoing"];
+const filterChips = ["All Pitches", "PENDING", "APPROVED", "REJECTED"];
+const chipLabels: Record<string, string> = {
+  "All Pitches": "All Pitches",
+  PENDING: "Pending",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+};
 const PAGE_SIZE = 6;
 
 const MyPitchesContent: React.FC = () => {
@@ -14,11 +20,13 @@ const MyPitchesContent: React.FC = () => {
   const [search, setSearch] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  const filtered = creativePitches.filter((pitch) => {
-    const matchesSearch = pitch.gigTitle.toLowerCase().includes(search.toLowerCase());
+  const { pitches, loading, error } = useMyPitches();
+
+  const filtered = pitches.filter((pitch) => {
+    const matchesSearch = (pitch.gigTitle ?? "").toLowerCase().includes(search.toLowerCase());
     const matchesChip =
       activeChip === "All Pitches" ||
-      pitch.status.toLowerCase() === activeChip.toLowerCase();
+      pitch.status.toUpperCase() === activeChip;
     return matchesSearch && matchesChip;
   });
 
@@ -27,12 +35,15 @@ const MyPitchesContent: React.FC = () => {
 
   return (
     <div>
-      <Breadcrumb crumbs={[
-        { label: "Dashboard", path: "/creative/dashboard" },
-        { label: "My Pitches" },
-      ]} />
-
-      <h1 className="text-2xl font-bold text-gray-900 mb-5">My Pitches</h1>
+      <Breadcrumb
+        crumbs={[
+          { label: "Dashboard", path: "/creative/dashboard" },
+          { label: "My Pitches" },
+        ]}
+      />
+      <h1 className="text-2xl font-heading font-bold text-gray-900 mb-5">
+        My Pitches
+      </h1>
 
       {/* Search + Filter */}
       <div className="flex items-center gap-3 mb-4">
@@ -42,7 +53,10 @@ const MyPitchesContent: React.FC = () => {
             type="text"
             placeholder="Search"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setVisibleCount(PAGE_SIZE); }}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setVisibleCount(PAGE_SIZE);
+            }}
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-300 transition-all"
           />
         </div>
@@ -58,38 +72,55 @@ const MyPitchesContent: React.FC = () => {
         {filterChips.map((chip) => (
           <button
             key={chip}
-            onClick={() => { setActiveChip(chip); setVisibleCount(PAGE_SIZE); }}
+            onClick={() => {
+              setActiveChip(chip);
+              setVisibleCount(PAGE_SIZE);
+            }}
             className={`px-2 lg:px-5 py-1.5 rounded-full text-xs lg:text-sm font-medium transition-colors ${
               activeChip === chip
-                ? "bg-red-500 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                ? "bg-red-500 font-body text-white"
+                : "bg-gray-100 font-body text-gray-600 hover:bg-gray-200"
             }`}
           >
-            {chip}
+            {chipLabels[chip]}
           </button>
         ))}
       </div>
 
-      {/* Count */}
-      <h2 className="text-lg font-bold text-gray-900 mb-4">All ({filtered.length})</h2>
+      {loading && (
+        <p className="text-sm text-gray-400 text-center py-12">Loading pitches…</p>
+      )}
+      {error && (
+        <p className="text-sm text-red-500 text-center py-12">{error}</p>
+      )}
 
-      {/* Grid */}
-      <div className="bg-[#fafafa] p-2 lg:p-6 grid grid-cols-2 lg:grid-cols-3 gap-4">
-        {visible.map((pitch) => (
-          <PitchCard key={pitch.id} pitch={pitch} />
-        ))}
-      </div>
+      {!loading && !error && (
+        <>
+          <h2 className="text-lg font-bold text-gray-900 mb-4">
+            All ({filtered.length})
+          </h2>
 
-      {/* Load More */}
-      {hasMore && (
-        <div className="flex justify-center mt-8">
-          <button
-            onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
-            className="bg-red-500 hover:bg-red-600 text-white font-semibold px-12 py-3 rounded-lg transition-colors text-sm"
-          >
-            Load More
-          </button>
-        </div>
+          <div className="bg-[#fafafa] p-2 lg:p-6 grid grid-cols-2 lg:grid-cols-3 gap-4">
+            {visible.map((pitch) => (
+              <PitchCard key={pitch.id} pitch={pitch} />
+            ))}
+          </div>
+
+          {filtered.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-12">No pitches found.</p>
+          )}
+
+          {hasMore && (
+            <div className="flex justify-center mt-8">
+              <button
+                onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
+                className="bg-red-500 hover:bg-red-600 text-white font-heading font-semibold px-12 py-3 rounded-lg transition-colors text-sm"
+              >
+                Load More
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

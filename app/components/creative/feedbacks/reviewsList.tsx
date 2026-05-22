@@ -26,13 +26,13 @@ const ReviewsList: React.FC = () => {
     <div>
       {/* Props header + chips */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <h2 className="text-lg font-bold text-gray-900">Props</h2>
+        <h2 className="text-lg font-bold font-heading text-gray-900">Props</h2>
         <div className="flex items-center gap-2 flex-wrap">
           {filterChips.map((chip) => (
             <button
               key={chip}
               onClick={() => { setActiveChip(chip); setVisibleCount(PAGE_SIZE); }}
-              className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium font-body transition-colors ${
                 activeChip === chip
                   ? "bg-[#E2554F] text-white"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -59,7 +59,7 @@ const ReviewsList: React.FC = () => {
               />
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-semibold text-black text-md">{review.name}</p>
+                  <p className="font-semibold font-heading text-black text-md">{review.name}</p>
                   <div className="flex items-center gap-0.5">
                     {[1, 2, 3, 4, 5].map((i) => (
                       <Star
@@ -69,12 +69,12 @@ const ReviewsList: React.FC = () => {
                       />
                     ))}
                   </div>
-                  <span className="text-sm font-medium text-black">{review.rating.toFixed(1)}</span>
+                  <span className="text-sm font-medium font-body text-black">{review.rating.toFixed(1)}</span>
                   <span className="text-sm text-gray-400">{review.timeAgo}</span>
                 </div>
               </div>
             </div>
-            <p className="text-md text-black leading-relaxed">{review.comment}</p>
+            <p className="text-md text-black font-body leading-relaxed">{review.comment}</p>
           </div>
         ))}
       </div>
@@ -84,7 +84,7 @@ const ReviewsList: React.FC = () => {
         <div className="flex justify-center mt-6">
           <button
             onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
-            className="flex items-center gap-2 bg-[#E2554F] hover:bg-red-600 text-white font-semibold px-10 py-2.5 rounded-lg transition-colors text-sm"
+            className="flex items-center gap-2 bg-[#E2554F] hover:bg-red-600 text-white font-body font-semibold px-10 py-2.5 rounded-lg transition-colors text-sm"
           >
             <span className="text-lg"></span>
             See More

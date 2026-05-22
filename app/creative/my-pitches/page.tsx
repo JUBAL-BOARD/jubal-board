@@ -2,16 +2,31 @@
 import Sidebar from "@/app/components/creative/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/creative/dashboard/dashboardTopbar";
 import MyPitchesContent from "@/app/components/creative/my-pitches/myPitchesContent";
-import { X } from "lucide-react";
+import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
+import { Loader2, X } from "lucide-react";
 import { useState } from "react";
 
 const MyPitchesPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { profile, loading: profileLoading, error } = useCreativeProfile();
+
+  if (profileLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-white">
+        <Loader2 className="animate-spin text-[#E2554F]" size={40} />
+      </div>
+    );
+  }
+  const userName = profile?.fullName || "Creative";
+  const userAvatar =
+    profile?.avatar ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
+
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <DashboardTopbar
-        userName="Natasha John"
-        userAvatar="https://i.pravatar.cc/150?img=47"
+        userName={userName}
+        userAvatar={userAvatar}
         sidebarOpen={sidebarOpen}
         onMenuClick={() => setSidebarOpen(!sidebarOpen)}
       />

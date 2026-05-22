@@ -25,7 +25,7 @@ const Breadcrumb: React.FC<Props> = ({ crumbs }) => {
               onClick={() => crumb.path && router.push(crumb.path)}
               className={`
                 ${crumb.path ? "cursor-pointer" : "cursor-default"}
-                ${isLast ? "text-[#1a1a2e] font-semibold" : "text-gray-500 font-normal"}
+                ${isLast ? "text-[#1a1a2e] font-heading font-semibold" : "text-gray-500 font-heading font-normal"}
               `}
             >
               {crumb.label}

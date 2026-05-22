@@ -6,11 +6,12 @@ import Image from "next/image";
 import logo from "../assets/logo.png";
 import { ArrowRight, Play } from "lucide-react";
 import Footer from "../components/home/footer";
+import onboardingimg from "../assets/onboarding/onboarding.jpg"
 
 const slides = [
-  { image: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=600&q=80" },
-  { image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600&q=80" },
-  { image: "https://images.unsplash.com/photo-1551836022-deb4988cc6c0?w=600&q=80" },
+  { image: onboardingimg },
+  { image: onboardingimg },
+  { image: onboardingimg },
 ];
 
 const Onboarding: React.FC = () => {
@@ -77,7 +78,7 @@ const Onboarding: React.FC = () => {
         {/* CTA */}
         <div className="w-full lg:max-w-[480px]">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#1a1a2e] leading-tight mb-3 lg:mb-4">
-            Welcome to<br />JUBAL BOARD
+            Welcome to<br />JUBALBOARD
           </h1>
           <p className="text-base lg:text-[22px] text-gray-700 mb-6 lg:mb-8 leading-snug">
             Select your role to personalize your experience and get started.

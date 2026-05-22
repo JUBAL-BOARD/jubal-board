@@ -1,9 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Search, SlidersHorizontal, ChevronDown } from "lucide-react";
 import Breadcrumb from "@/app/components/creative/dashboard/breadcrumb";
 import GigsPagination from "@/app/components/creative/my-gigs/gigsPagination";
-import { allTransactions } from "@/app/data";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Transaction } from "@/app/types";
 
 const statusStyles: Record<string, string> = {
   Debit: "text-red-500 bg-red-50",
@@ -12,12 +14,62 @@ const statusStyles: Record<string, string> = {
   Pending: "text-yellow-500 bg-yellow-50",
 };
 
+const capitalizeFirst = (str: string) =>
+  str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+
 const TransactionsContent: React.FC = () => {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filtered = allTransactions.filter((tx) =>
+  const fetchTransactions = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const tokenRes = await fetch("/api/auth/session/token");
+      const { token } = await tokenRes.json();
+
+      const res = await fetch(`/api/v1/earnings/transactions`, {
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!res.ok) throw new Error(`Transactions fetch failed (${res.status})`);
+      const json = await res.json();
+
+      const mapped: Transaction[] = (json.data ?? []).map((tx: any) => {
+        const date = new Date(tx.createdAt);
+        return {
+          id: tx.id,
+          details: tx.reference,
+          paymentMethod: "Wallet",
+          date: date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+          time: date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+          amount: `₦${tx.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+          status: capitalizeFirst(tx.type) as Transaction["status"],
+        };
+      });
+
+      setTransactions(mapped);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
+
+  const filtered = transactions.filter((tx) =>
     tx.details.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -30,8 +82,7 @@ const TransactionsContent: React.FC = () => {
         { label: "Dashboard", path: "/creative/dashboard" },
         { label: "My Transactions" },
       ]} />
-
-      <h1 className="text-xl lg:text-2xl font-bold text-gray-900 mb-6">Transactions History</h1>
+      <h1 className="text-xl lg:text-2xl font-bold font-heading text-gray-900 mb-6">Transactions History</h1>
 
       {/* Search + Filter */}
       <div className="flex items-center gap-3 mb-6">
@@ -52,76 +103,90 @@ const TransactionsContent: React.FC = () => {
         </button>
       </div>
 
-      {/* Desktop — table */}
-      <div className="hidden lg:block bg-[#fafafa] p-6 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b">
-              {["Details", "Payment Method", "Date", "Time", "Amount", "Status"].map((col) => (
-                <th key={col} className="text-left text-sm font-semibold text-gray-900 px-5 py-4">
-                  {col}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
+      {loading && <p className="text-sm text-gray-400 text-center py-12">Loading transactions…</p>}
+      {error && <p className="text-sm text-red-500 text-center py-12">{error}</p>}
+
+      {!loading && !error && (
+        <>
+          {/* Desktop — table */}
+          <div className="hidden lg:block bg-[#fafafa] p-6 overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  {["Details", "Payment Method", "Date", "Time", "Amount", "Status"].map((col) => (
+                    <th key={col} className="text-left text-sm font-semibold font-heading text-gray-900 px-5 py-4">
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {paginated.map((tx, i) => (
+                  <tr
+                    key={i}
+                    onClick={() => router.push(`/creative/transactions/${tx.id}`)}
+                    className="border-b border-gray-100 hover:bg-gray-50 transition-colors last:border-none cursor-pointer"
+                  >
+                    <td className="px-5 py-4 text-sm font-body text-gray-800 max-w-[200px]">{tx.details}</td>
+                    <td className="px-5 py-4 text-sm font-body text-gray-600">{tx.paymentMethod}</td>
+                    <td className="px-5 py-4 text-sm font-body text-gray-600">{tx.date}</td>
+                    <td className="px-5 py-4 text-sm font-body text-gray-600">{tx.time}</td>
+                    <td className="px-5 py-4 text-sm font-body text-gray-700 font-medium">{tx.amount}</td>
+                    <td className="px-5 py-4">
+                      <span className={`text-xs font-semibold font-body px-2 py-0.5 rounded-full ${statusStyles[tx.status]}`}>
+                        {tx.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {paginated.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center text-sm text-gray-400 py-12">No transactions found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile — cards */}
+          <div className="flex flex-col gap-3 lg:hidden">
             {paginated.map((tx, i) => (
-              <tr
+              <div
                 key={i}
-                className="border-b border-gray-100 hover:bg-gray-50 transition-colors last:border-none"
+                onClick={() => router.push(`/creative/transactions/${tx.id}`)}
+                className="bg-[#fafafa] border border-gray-100 rounded-xl p-4 cursor-pointer"
               >
-                <td className="px-5 py-4 text-sm text-gray-800 max-w-[200px]">{tx.details}</td>
-                <td className="px-5 py-4 text-sm text-gray-600">{tx.paymentMethod}</td>
-                <td className="px-5 py-4 text-sm text-gray-600">{tx.date}</td>
-                <td className="px-5 py-4 text-sm text-gray-600">{tx.time}</td>
-                <td className="px-5 py-4 text-sm text-gray-700 font-medium">{tx.amount}</td>
-                <td className="px-5 py-4">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusStyles[tx.status]}`}>
+                <div className="flex items-start justify-between mb-2">
+                  <p className="text-sm font-semibold font-body text-gray-800 flex-1 pr-2">{tx.details}</p>
+                  <p className="text-sm font-bold font-body text-gray-900 flex-shrink-0">{tx.amount}</p>
+                </div>
+                <p className="text-xs font-body text-gray-500 mb-3">{tx.paymentMethod}</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-body text-gray-400">{tx.date}</span>
+                    <span className="text-gray-300">•</span>
+                    <span className="text-xs font-body text-gray-400">{tx.time}</span>
+                  </div>
+                  <span className={`text-[11px] font-semibold font-body px-2.5 py-0.5 rounded-full ${statusStyles[tx.status]}`}>
                     {tx.status}
                   </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile — cards */}
-      <div className="flex flex-col gap-3 lg:hidden">
-        {paginated.map((tx, i) => (
-          <div key={i} className="bg-[#fafafa] border border-gray-100 rounded-xl p-4">
-            {/* Top — details + amount */}
-            <div className="flex items-start justify-between mb-2">
-              <p className="text-sm font-semibold text-gray-800 flex-1 pr-2">{tx.details}</p>
-              <p className="text-sm font-bold text-gray-900 flex-shrink-0">{tx.amount}</p>
-            </div>
-
-            {/* Middle — payment method */}
-            <p className="text-xs text-gray-500 mb-3">{tx.paymentMethod}</p>
-
-            {/* Bottom — date, time, status */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400">{tx.date}</span>
-                <span className="text-gray-300">•</span>
-                <span className="text-xs text-gray-400">{tx.time}</span>
+                </div>
               </div>
-              <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${statusStyles[tx.status]}`}>
-                {tx.status}
-              </span>
-            </div>
+            ))}
+            {paginated.length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-12">No transactions found.</p>
+            )}
           </div>
-        ))}
-      </div>
 
-      {/* Pagination */}
-      <GigsPagination
-        currentPage={page}
-        totalPages={totalPages}
-        perPage={perPage}
-        onPageChange={setPage}
-        onPerPageChange={(val) => { setPerPage(val); setPage(1); }}
-      />
+          <GigsPagination
+            currentPage={page}
+            totalPages={totalPages}
+            perPage={perPage}
+            onPageChange={setPage}
+            onPerPageChange={(val) => { setPerPage(val); setPage(1); }}
+          />
+        </>
+      )}
     </div>
   );
 };

@@ -1,16 +1,14 @@
 "use client";
-
 import { useState } from "react";
 import { ChevronDown, Check } from "lucide-react";
 import type { SkillCategory } from "../../../data/exploreSkillsData";
-
+import Link from "next/link";
 interface Props {
   category: SkillCategory;
   selectedSkills: string[];
   onToggleSkill: (skill: string) => void;
   defaultOpen?: boolean;
 }
-
 const SkillCategoryAccordion: React.FC<Props> = ({
   category,
   selectedSkills,
@@ -18,27 +16,33 @@ const SkillCategoryAccordion: React.FC<Props> = ({
   defaultOpen = false,
 }) => {
   const [open, setOpen] = useState<boolean>(defaultOpen);
-
   return (
     <div className="border border-gray-200 rounded-[10px] overflow-hidden mb-3">
-
       {/* Header */}
-      <div
-        onClick={() => setOpen(!open)}
-        className="flex items-center justify-between px-5 py-4 bg-white rounded-[20px] cursor-pointer select-none"
-      >
-        <div>
-          <p className="m-0 font-bold text-xl text-[#1a1a2e]">{category.name}</p>
+      <div className="flex items-center justify-between px-5 py-4 bg-white rounded-[20px] select-none">
+        {/* Title — navigates to explore page */}
+        <Link
+          href={`/client/explore-skills/${encodeURIComponent(category.name)}`}
+          className="flex-1"
+        >
+          <p className="m-0 font-bold text-xl text-[#1a1a2e] hover:text-[#e2554f] transition-colors">
+            {category.name}
+          </p>
           <p className="m-0 mt-0.5 text-[14px] text-gray-500">{category.skills.length} Skills</p>
-        </div>
-        <ChevronDown
-          size={18}
-          stroke="#374151"
-          className="flex-shrink-0 transition-transform duration-200"
-          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
-        />
+        </Link>
+        {/* Chevron — toggles accordion */}
+        <button
+          onClick={() => setOpen(!open)}
+          className="p-1 cursor-pointer"
+        >
+          <ChevronDown
+            size={18}
+            stroke="#374151"
+            className="flex-shrink-0 transition-transform duration-200"
+            style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+          />
+        </button>
       </div>
-
       {/* Skills */}
       {open && (
         <div className="px-5 pt-2.5 pb-[18px] w-[90%] mx-auto flex flex-wrap gap-2.5 bg-[#fafafa]">
@@ -49,7 +53,7 @@ const SkillCategoryAccordion: React.FC<Props> = ({
                 key={skill}
                 onClick={() => onToggleSkill(skill)}
                 className={`flex items-center gap-1.5 px-3.5 py-[7px] rounded-md text-[13px] cursor-pointer transition-all duration-150
-                  ${isSelected
+                ${isSelected
                     ? "bg-[#1a1a2e] text-white font-semibold border-none"
                     : "bg-white text-gray-700 font-normal border border-gray-200"
                   }`}
@@ -61,9 +65,7 @@ const SkillCategoryAccordion: React.FC<Props> = ({
           })}
         </div>
       )}
-
     </div>
   );
 };
-
 export default SkillCategoryAccordion;

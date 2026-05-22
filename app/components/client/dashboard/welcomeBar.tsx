@@ -15,8 +15,8 @@ const WelcomeBar: React.FC<Props> = ({ userName }) => {
 
       {/* Left — Welcome text */}
       <div className="flex lg:block gap-3">
-        <p className="m-0 text-lg lg:text-lg text-black">Welcome Back</p>
-        <h2 className="m-0 lg:mt-1 text-lg lg:text-[28px] font-extrabold text-black">
+        <p className="m-0 text-lg lg:text-lg font-body text-black">Welcome Back</p>
+        <h2 className="m-0 lg:mt-1 text-lg lg:text-2xl font-heading font-extrabold text-black">
           {userName}
         </h2>
       </div>

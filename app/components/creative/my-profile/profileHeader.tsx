@@ -24,7 +24,7 @@ const ProfileHeader: React.FC<Props> = ({ profile }) => {
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-black text-base lg:text-md mb-1 pr-16">{profile.name}</p>
+          <p className="font-bold font-heading text-black text-base lg:text-md mb-1 pr-16">{profile.name}</p>
           <div className="flex items-center gap-1.5 mb-2">
             <span className="w-2 h-2 bg-green-500 rounded-full" />
             <span className="text-sm text-green-600 font-medium">Online</span>
@@ -40,18 +40,18 @@ const ProfileHeader: React.FC<Props> = ({ profile }) => {
       <div className="flex flex-wrap items-center gap-3 lg:gap-6 lg:absolute lg:bottom-5 lg:right-4">
         <div className="flex items-center gap-1">
           <Star size={14} className="text-yellow-400 fill-yellow-400" />
-          <span className="text-sm font-semibold text-black">{profile.rating}</span>
-          <span className="text-xs text-black">({profile.totalReviews} Reviews)</span>
+          <span className="text-sm font-body font-semibold text-black">{profile.rating}</span>
+          <span className="text-xs font-body text-black">({profile.totalReviews} Reviews)</span>
         </div>
 
         <div className="text-sm text-black">
-          <span className="font-semibold">{profile.completedProjects}</span>
-          <span className="text-black ml-1">Completed Projects</span>
+          <span className="font-semibold font-body">{profile.completedProjects}</span>
+          <span className="text-black font-body ml-1">Completed Projects</span>
         </div>
 
         <div className="text-sm text-black">
-          <span className="font-semibold">{profile.jobSuccess}%</span>
-          <span className="text-black ml-1">Job Success</span>
+          <span className="font-semibold font-body">{profile.jobSuccess}%</span>
+          <span className="text-black font-body ml-1">Job Success</span>
         </div>
       </div>
 

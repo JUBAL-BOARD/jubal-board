@@ -2,7 +2,8 @@ import { Conversation } from "@/app/types";
 
 export const conversations: Conversation[] = [
   {
-    id: "1",
+    id: "dm_1712581200002_p9x4tnm",
+    type: "dm",
     name: "Natasha Eden",
     avatar: "https://i.pravatar.cc/150?img=47",
     lastMessage: "Hi, How are you?",
@@ -13,7 +14,8 @@ export const conversations: Conversation[] = [
     messages: [],
   },
   {
-    id: "2",
+    id: "dm_1712581200002_p9x4tnm",
+    type: "dm",
     name: "Natasha Eden",
     avatar: "https://i.pravatar.cc/150?img=47",
     lastMessage: "Hi, How are you?",
@@ -24,7 +26,8 @@ export const conversations: Conversation[] = [
     messages: [],
   },
   {
-    id: "3",
+    id: "dm_1712581200002_p9x4tnm",
+    type: "dm",
     name: "Natasha Eden",
     avatar: "https://i.pravatar.cc/150?img=47",
     lastMessage: "Hi, How are you?",
@@ -35,7 +38,8 @@ export const conversations: Conversation[] = [
     messages: [],
   },
   {
-    id: "4",
+    id: "dm_1712581200002_p9x4tnm",
+    type: "dm",
     name: "Natasha Eden",
     avatar: "https://i.pravatar.cc/150?img=47",
     lastMessage: "Hi, How are you?",
@@ -46,7 +50,8 @@ export const conversations: Conversation[] = [
     messages: [],
   },
   {
-    id: "5",
+    id: "dm_1712581200002_p9x4tnm",
+    type: "dm",
     name: "Natasha Eden",
     avatar: "https://i.pravatar.cc/150?img=47",
     lastMessage: "Hi, How are you?",
@@ -57,7 +62,8 @@ export const conversations: Conversation[] = [
     messages: [],
   },
   {
-    id: "6",
+    id: "dm_1712581200002_p9x4tnm",
+    type: "dm",
     name: "Natasha Eden",
     avatar: "https://i.pravatar.cc/150?img=47",
     lastMessage: "Hi, How are you?",
@@ -68,7 +74,8 @@ export const conversations: Conversation[] = [
     messages: [],
   },
   {
-    id: "7",
+    id: "dm_1712581200002_p9x4tnm",
+    type: "dm",
     name: "Natasha Eden",
     avatar: "https://i.pravatar.cc/150?img=47",
     lastMessage: "Hi, How are you?",
@@ -79,7 +86,8 @@ export const conversations: Conversation[] = [
     messages: [],
   },
   {
-    id: "8",
+    id: "dm_1712581200002_p9x4tnm",
+    type: "dm",
     name: "Natasha Eden",
     avatar: "https://i.pravatar.cc/150?img=47",
     lastMessage: "Hi, How are you?",
@@ -90,7 +98,8 @@ export const conversations: Conversation[] = [
     messages: [],
   },
   {
-    id: "9",
+    id: "dm_1712581200002_p9x4tnm",
+    type: "dm",
     name: "Natasha Eden",
     avatar: "https://i.pravatar.cc/150?img=47",
     lastMessage: "Hi, How are you?",
@@ -110,7 +119,8 @@ export const conversations: Conversation[] = [
     ],
   },
   {
-    id: "10",
+    id: "dm_1712581200002_p9x4tnm",
+    type: "dm",
     name: "Natasha Eden",
     avatar: "https://i.pravatar.cc/150?img=47",
     lastMessage: "Hi, How are you?",

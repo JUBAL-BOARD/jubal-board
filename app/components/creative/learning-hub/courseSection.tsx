@@ -1,5 +1,9 @@
+"use client";
+
 import { Star } from "lucide-react";
 import { Course } from "@/app/types";
+import { useRouter } from "next/navigation";
+import { useCourseStore } from "../../../lib/stores/courseStore";
 
 interface Props {
   title: string;
@@ -16,6 +20,9 @@ const levelColors: Record<string, string> = {
 };
 
 const CourseSection: React.FC<Props> = ({ title, courses, search, activeChip }) => {
+  const router = useRouter();
+  const setSelectedCourse = useCourseStore((s) => s.setSelectedCourse);
+
   const filtered = courses.filter((c) => {
     const matchesSearch = c.title.toLowerCase().includes(search.toLowerCase());
     const matchesChip =
@@ -27,11 +34,15 @@ const CourseSection: React.FC<Props> = ({ title, courses, search, activeChip }) 
 
   if (filtered.length === 0) return null;
 
+  const handleStartCourse = (course: Course) => {
+    setSelectedCourse(course);
+    router.push(`/creative/learning-hub/${course.id}`);
+  };
+
   return (
     <section className="mb-8">
-      <h2 className="text-xl lg:text-2xl font-bold text-black mb-4">{title}</h2>
+      <h2 className="text-xl lg:text-2xl font-bold font-heading text-black mb-4">{title}</h2>
 
-      {/* Horizontal scroll on mobile, grid on desktop */}
       <div className="flex gap-4 overflow-x-auto lg:overflow-x-visible lg:grid lg:grid-cols-3 pb-2 lg:pb-0 snap-x snap-mandatory scroll-smooth scrollbar-hide">
         {filtered.map((course) => (
           <div
@@ -58,31 +69,35 @@ const CourseSection: React.FC<Props> = ({ title, courses, search, activeChip }) 
 
             {/* Content */}
             <div className="p-3">
-              <h4 className="font-semibold text-gray-900 text-sm text-center mb-2">{course.title}</h4>
+              <h4 className="font-semibold font-heading text-black text-sm text-center mb-2">{course.title}</h4>
 
               <div className="flex justify-center mb-2">
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${levelColors[course.level] ?? "bg-gray-100 text-gray-700"}`}>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${levelColors[course.level] ?? "bg-gray-100 text-black"}`}>
                   {course.level}
                 </span>
               </div>
 
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-gray-500">Format: {course.format}</span>
+                <span className="text-xs text-black">Format: {course.format}</span>
                 <div className="flex items-center gap-0.5">
                   <Star size={11} className="text-yellow-400 fill-yellow-400" />
-                  <span className="text-xs font-medium text-gray-700">{course.rating}</span>
+                  <span className="text-xs font-medium text-black">{course.rating}</span>
                 </div>
               </div>
 
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-gray-500">Duration: {course.duration}</span>
+                <span className="text-xs text-black">Duration: {course.duration}</span>
                 <span className="text-xs font-medium text-green-600">${course.price}</span>
               </div>
 
-              <p className="text-xs text-gray-400 mb-3 line-clamp-2">{course.description}</p>
+              <p className="text-xs text-black font-body mb-3 line-clamp-2">{course.description}</p>
 
+              {/* 👇 replaced Link+button with handler */}
               <div className="text-center">
-                <button className="w-[60%] mx-auto bg-[#E2554F] hover:bg-red-600 text-white text-xs font-semibold py-2 rounded-lg transition-colors">
+                <button
+                  onClick={() => handleStartCourse(course)}
+                  className="w-[60%] mx-auto bg-[#E2554F] hover:bg-red-600 text-white text-xs font-semibold py-2 rounded-lg transition-colors"
+                >
                   Start Course
                 </button>
               </div>

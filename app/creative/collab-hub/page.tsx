@@ -3,15 +3,39 @@ import Sidebar from "@/app/components/creative/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/creative/dashboard/dashboardTopbar";
 import CollabHubContent from "@/app/components/creative/collab-hub/collabHubContent";
 import { useState } from "react";
-import { X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
+import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
 
 const CollabHubPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { profile: creativeProfile, loading: profileLoading, error } = useCreativeProfile();
+
+  if (profileLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 size={48} className="animate-spin text-gray-500" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-red-500">Error loading profile: {error}</p>
+      </div>
+    );
+  }
+
+  const userName = creativeProfile?.fullName || "Creative";
+  const userAvatar =
+    creativeProfile?.avatar ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
+
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <DashboardTopbar
-        userName="Natasha John"
-        userAvatar="https://i.pravatar.cc/150?img=47"
+        userName={userName}
+        userAvatar={userAvatar}
         sidebarOpen={sidebarOpen}
         onMenuClick={() => setSidebarOpen(!sidebarOpen)}
       />

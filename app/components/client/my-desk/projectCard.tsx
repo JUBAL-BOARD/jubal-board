@@ -1,6 +1,8 @@
 import Image from "next/image";
 import { Clock, MessageSquare, Eye } from "lucide-react";
 import type { DeskProject, ProjectStatus } from "../../../data/myDeskData";
+import { useRouter } from "next/navigation";
+import { useOpenClientChat } from "../../../lib/hooks/useOpenClientChat";
 
 interface Props {
   project: DeskProject;
@@ -8,13 +10,29 @@ interface Props {
 
 const statusConfig: Record<ProjectStatus, { color: string; bar: string }> = {
   "In Progress": { color: "#e2554f", bar: "#e2554f" },
-  "Completed":   { color: "#22C55E", bar: "#22C55E" },
-  "Revision":    { color: "#F59E0B", bar: "#F59E0B" },
-  "On Collabs":  { color: "#3B82F6", bar: "#3B82F6" },
+  "Completed": { color: "#22C55E", bar: "#22C55E" },
+  "Revision": { color: "#F59E0B", bar: "#F59E0B" },
+  "On Collabs": { color: "#3B82F6", bar: "#3B82F6" },
 };
 
 const ProjectCard: React.FC<Props> = ({ project }) => {
   const { color, bar } = statusConfig[project.status];
+  const router = useRouter();
+
+  const { openDM } = useOpenClientChat();
+
+  const handleChat = () => {
+    const person = project.chatLabel === "Chat Creative"
+      ? project.assignee
+      : project.client;
+
+    openDM({
+      id: person.id,
+      name: person.name,
+      avatar: person.avatar,
+      isOnline: person.isOnline,
+    });
+  };
 
   return (
     <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-[18px] bg-[#fafafa] border border-gray-200 rounded-[10px] px-4 lg:px-5 py-4 lg:py-[18px] mb-3">
@@ -43,17 +61,17 @@ const ProjectCard: React.FC<Props> = ({ project }) => {
             <div className="flex items-center gap-1.5 lg:gap-2">
               <div className="relative">
                 <Image
-                  src={project.assigneeAvatar}
-                  alt={project.assignee}
+                  src={project.assignee.avatar}
+                  alt={project.assignee.name}
                   width={32}
                   height={32}
                   className="rounded-full object-cover lg:w-[50px] lg:h-[50px]"
                 />
-                {project.assigneeOnline && (
+                {project.assignee.isOnline && (
                   <div className="absolute bottom-px right-px w-2 h-2 lg:w-[9px] lg:h-[9px] rounded-full bg-green-500 border-2 border-white" />
                 )}
               </div>
-              <span className="text-sm lg:text-lg font-semibold text-[#1a1a2e]">{project.assignee}</span>
+              <span className="text-sm lg:text-lg font-semibold text-[#1a1a2e]">{project.assignee.name}</span>
             </div>
 
             {/* Collab Extra */}
@@ -100,10 +118,10 @@ const ProjectCard: React.FC<Props> = ({ project }) => {
 
       {/* Action Buttons — row on mobile, column on desktop */}
       <div className="flex flex-row lg:flex-col gap-2 flex-shrink-0">
-        <button className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 lg:gap-2 bg-[#1a1a2e] border-none rounded-lg px-3 lg:px-4 py-2 lg:py-2.5 cursor-pointer text-white text-xs lg:text-[13px] font-semibold whitespace-nowrap hover:opacity-90 transition-opacity">
+        <button onClick={handleChat} className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 lg:gap-2 bg-[#1a1a2e] border-none rounded-lg px-3 lg:px-4 py-2 lg:py-2.5 cursor-pointer text-white text-xs lg:text-[13px] font-semibold whitespace-nowrap hover:opacity-90 transition-opacity">
           <MessageSquare size={13} stroke="white" /> {project.chatLabel}
         </button>
-        <button className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 lg:gap-2 bg-[#E2554F] border-none rounded-lg px-3 lg:px-4 py-2 lg:py-2.5 cursor-pointer text-white text-xs lg:text-[13px] font-semibold whitespace-nowrap hover:bg-[#d44a44] transition-colors">
+        <button onClick={() => router.push(`/client/my-desk/${project.id}`)} className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 lg:gap-2 bg-[#E2554F] border-none rounded-lg px-3 lg:px-4 py-2 lg:py-2.5 cursor-pointer text-white text-xs lg:text-[13px] font-semibold whitespace-nowrap hover:bg-[#d44a44] transition-colors">
           <Eye size={13} stroke="white" /> View Project
         </button>
       </div>

@@ -16,10 +16,10 @@ const ProfileStats: React.FC<Props> = ({ yearsOfExperience, totalClients, totalR
       <div className="grid grid-cols-3 divide-x divide-gray-200">
         {stats.map((s) => (
           <div key={s.label} className="flex flex-col items-center px-4 py-2">
-            <p className="text-3xl font-bold text-black mb-1">
+            <p className="text-3xl font-bold font-heading text-black mb-1">
               {s.value}{s.suffix}
             </p>
-            <p className="text-lg text-black text-center">{s.label}</p>
+            <p className="text-lg font-body text-black text-center">{s.label}</p>
           </div>
         ))}
       </div>

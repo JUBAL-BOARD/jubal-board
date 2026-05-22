@@ -28,10 +28,10 @@ const SkillCategoryAccordion: React.FC<Props> = ({
           href={`/creative/find-gigs/${encodeURIComponent(category.name)}`}
           className="flex-1"
         >
-          <p className="m-0 font-bold text-md lg:text-xl text-[#1a1a2e] hover:text-[#e2554f] transition-colors">
+          <p className="m-0 font-heading font-bold text-md lg:text-xl text-[#1a1a2e] hover:text-[#e2554f] transition-colors">
             {category.name}
           </p>
-          <p className="m-0 mt-0.5 text-[14px] text-gray-500">{category.skills.length} Skills</p>
+          <p className="m-0 mt-0.5 text-[14px] font-body text-gray-500">{category.skills.length} Skills</p>
         </Link>
 
         {/* Chevron — toggles accordion */}
@@ -59,8 +59,8 @@ const SkillCategoryAccordion: React.FC<Props> = ({
                 onClick={() => onToggleSkill(skill)}
                 className={`flex items-center gap-1.5 px-3.5 py-[7px] rounded-md text-[13px] cursor-pointer transition-all duration-150
                   ${isSelected
-                    ? "bg-[#1a1a2e] text-white font-semibold border-none"
-                    : "bg-white text-gray-700 font-normal border border-gray-200"
+                    ? "bg-[#1a1a2e] text-white font-body font-semibold border-none"
+                    : "bg-white text-gray-700 font-body font-normal border border-gray-200"
                   }`}
               >
                 {isSelected && <Check size={12} stroke="white" strokeWidth={3} />}

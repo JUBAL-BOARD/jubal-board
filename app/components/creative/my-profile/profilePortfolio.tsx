@@ -15,7 +15,7 @@ const ProfilePortfolio: React.FC<Props> = ({ images }) => {
 
   return (
     <div className="bg-[#fafafa] p-5">
-      <h3 className="font-bold text-black text-2xl mb-4">Portfolio & Certification</h3>
+      <h3 className="font-bold font-heading text-black text-2xl mb-4">Portfolio & Certification</h3>
 
       <div className="flex gap-3 overflow-x-auto pb-1">
         {visible.map((img, i) => (

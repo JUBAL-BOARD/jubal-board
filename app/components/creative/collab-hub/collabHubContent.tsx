@@ -30,8 +30,8 @@ const CollabHubContent: React.FC = () => {
         { label: "Collab Hub" },
       ]} />
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Collaborate</h1>
-      <p className="text-sm text-gray-500 mb-5">Invite to Collab on a Project</p>
+      <h1 className="text-2xl font-bold font-heading text-gray-900 mb-1">Collaborate</h1>
+      <p className="text-md text-black font-body mb-5">Invite to Collab on a Project</p>
 
       {/* Search + Filter */}
       <div className="flex items-center gap-3 mb-4">
@@ -58,7 +58,7 @@ const CollabHubContent: React.FC = () => {
           <button
             key={chip}
             onClick={() => { setActiveChip(chip); setPage(1); }}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+            className={`px-4 py-1.5 rounded-full text-sm font-heading font-medium transition-colors ${
               activeChip === chip
                 ? "bg-[#E2554F] text-white"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"

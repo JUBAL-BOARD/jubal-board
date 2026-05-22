@@ -1,3 +1,4 @@
+import { useRouter } from "next/navigation";
 import type { Transaction, TransactionStatus } from "../../../data/walletData";
 
 interface Props {
@@ -13,7 +14,9 @@ const statusStyles: Record<TransactionStatus, { color: string; background: strin
 
 const headers = ["Details", "Payment Method", "Date", "Time", "Amount", "Status"];
 
+
 const TransactionTable: React.FC<Props> = ({ transactions }) => {
+  const router = useRouter();
   return (
     <div>
       <h3 className="text-lg font-extrabold text-[#1a1a2e] m-0 mb-4">
@@ -39,7 +42,7 @@ const TransactionTable: React.FC<Props> = ({ transactions }) => {
             {transactions.map((tx) => {
               const style = statusStyles[tx.status];
               return (
-                <tr key={tx.id} className="border-b border-gray-100">
+                <tr key={tx.id} onClick={() => router.push(`/client/transactions/${tx.id}`)} className="border-b border-gray-100">
                   <td className="px-3 py-3.5 text-[13px] text-[#1a1a2e]">{tx.details}</td>
                   <td className="px-3 py-3.5 text-[13px] text-gray-700">{tx.paymentMethod}</td>
                   <td className="px-3 py-3.5 text-[13px] text-gray-700">{tx.date}</td>

@@ -13,10 +13,10 @@ const WelcomeBar: React.FC<Props> = ({ userName }) => {
     <div className="lg:flex items-end justify-between mb-5">
       {/* Left — Welcome text */}
       <div className="flex lg:block gap-3">
-        <p className="m-0 text-lg lg:text-lg text-black">Welcome Back</p>
-        <h2 className="m-0 lg:mt-1 text-lg lg:text-[28px] font-extrabold text-black">
-          {userName}
+        <h2 className="font-heading m-0 lg:mt-1 text-lg lg:text-[28px] font-extrabold text-black">
+          Hey, {userName} 👋
         </h2>
+        <p className="font-body m-0 text-lg lg:text-lg text-black">Ready to create today?</p>
       </div>
 
       {/* Right — Toggles */}

@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { ChevronDown, Upload, Calendar, MapPin } from "lucide-react";
 import { budgetRanges, timelines, projectModes } from "../../../data/favoritesData";
+import { showSendBriefToast } from "@/app/components/ui/toasts";
+
+interface Props {
+    onClose: () => void;
+}
 
 interface FormData {
   jobTitle: string;
@@ -43,8 +48,7 @@ const SendBriefForm: React.FC = () => {
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const handleSubmit = () => {
-    console.log("Brief sent:", form);
-    alert("Brief sent successfully!");
+    showSendBriefToast();
   };
 
   return (

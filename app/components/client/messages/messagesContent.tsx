@@ -2,7 +2,7 @@
 import { useState } from "react";
 import ConversationList from "./conversationList";
 import ChatWindow from "./chatWindow";
-import { conversations } from "@/app/data/messagesData";
+import { conversations } from "@/app/data";
 
 interface Props {
   showChat: boolean;
@@ -21,14 +21,10 @@ const MessagesContent: React.FC<Props> = ({ showChat, onSelectConversation, onBa
   };
 
   return (
-    <div className="flex flex-1 h-full overflow-hidden bg-[#fafafa] p-6">
-
+    <div className="flex flex-1 h-screen overflow-hidden bg-[#fafafa] p-6">
       {/* Conversation list — full screen on mobile when no chat open */}
       <div className={`${showChat ? "hidden" : "flex"} lg:flex w-full lg:w-[280px] flex-shrink-0 flex-col border-r border-gray-200`}>
         <ConversationList
-          conversations={conversations}
-          activeId={activeId}
-          onSelect={handleSelect}
         />
       </div>
 

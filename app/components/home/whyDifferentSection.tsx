@@ -9,7 +9,7 @@ const WhyDifferentSection: React.FC = () => {
       </h2>
       <div className="grid grid-cols-3 gap-[18px]">
         {features.map((feature, i) => (
-          <FeatureCard key={i} title={feature.title} desc={feature.desc} />
+          <FeatureCard key={i} icon={feature.icon} title={feature.title} desc={feature.desc} />
         ))}
       </div>
     </div>

@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import Image, { StaticImageData } from "next/image";
 
 interface ServiceCardProps {
   label: string;
-  bg: string;
+  bg: string | StaticImageData;
 }
 
 const ServiceCard: React.FC<ServiceCardProps> = ({ label, bg }) => {

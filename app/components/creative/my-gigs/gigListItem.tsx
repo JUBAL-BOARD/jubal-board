@@ -1,5 +1,8 @@
 import { Clock, MessageCircle, Eye, Upload, Users } from "lucide-react";
 import { MyGig } from "@/app/types";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCollabStore } from "@/app/lib/stores/collabStore";
 
 interface Props {
   gig: MyGig;
@@ -17,6 +20,14 @@ const progressColor: Record<string, string> = {
 const GigListItem: React.FC<Props> = ({ gig }) => {
   const isCollab = gig.status === "Collaborating";
 
+  const router = useRouter();
+  const setActiveProjectTitle = useCollabStore((s) => s.setActiveProjectTitle);
+
+  const handleUploadDeliverables = () => {
+    setActiveProjectTitle(gig.title);
+    router.push(`/creative/my-gigs/${encodeURIComponent(gig.title)}/upload-deliverables?id=${gig.id}`);
+};
+
   return (
     <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4 bg-[#fafafa] border border-gray-100 rounded-xl px-4 py-4 hover:shadow-sm transition-shadow">
 
@@ -29,21 +40,21 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <h4 className="font-semibold text-gray-900 text-sm lg:text-md mb-1.5">{gig.title}</h4>
+          <h4 className="font-semibold font-heading text-gray-900 text-sm lg:text-md mb-1.5">{gig.title}</h4>
 
           <div className="flex items-center gap-2 mb-1.5">
             <img src={gig.client.avatar} alt={gig.client.name} className="w-5 h-5 lg:w-6 lg:h-6 rounded-full object-cover" />
-            <span className="text-xs lg:text-sm text-black font-medium">{gig.client.name}</span>
+            <span className="text-xs lg:text-sm text-black font-body font-medium">{gig.client.name}</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-1 mb-1.5">
             <Clock size={12} className="text-black" />
-            <span className="text-xs text-black">Due in {gig.dueIn}</span>
+            <span className="text-xs font-body text-black">Due in {gig.dueIn}</span>
 
             {/* Collab mates */}
             {isCollab && gig.collabMates && (
               <div className="flex items-center gap-1.5 ml-1">
-                <span className="text-xs text-black">Collab mate:</span>
+                <span className="text-xs font-body text-black">Collab mate:</span>
                 <div className="flex -space-x-1.5">
                   {gig.collabMates.avatars.map((av, i) => (
                     <img key={i} src={av} alt="" className="w-5 h-5 rounded-full border border-white object-cover" />
@@ -56,7 +67,7 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
 
           {/* Progress */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-black">Status: {gig.status}</span>
+            <span className="text-xs font-body text-black">Status: {gig.status}</span>
             <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden max-w-[120px] lg:max-w-[160px]">
               <div
                 className={`h-full rounded-full ${progressColor[gig.status] ?? "bg-gray-400"}`}
@@ -72,24 +83,24 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
       <div className="flex flex-row lg:flex-col flex-wrap gap-2 flex-shrink-0">
         {isCollab ? (
           <>
-            <button className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+            <button className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
               <Users size={12} /> Group Chat
             </button>
-            <button className="flex items-center justify-center gap-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+            <button className="flex items-center justify-center gap-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
               <Eye size={12} /> View Progress
             </button>
           </>
         ) : (
           <>
-            <button className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+            <button className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
               <MessageCircle size={12} /> Chat Client
             </button>
-            <button className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+            <button className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
               <Eye size={12} /> View Pitch
             </button>
           </>
         )}
-        <button className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+        <button onClick={handleUploadDeliverables} className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
           <Upload size={12} /> Upload Deliverables
         </button>
       </div>

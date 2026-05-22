@@ -4,6 +4,8 @@ import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import ToggleRow from "./toggleRow";
 import SettingsSection from "./settingsSection";
+import DeactivateModal from "./deactivateModal";
+import DeleteModal from "./deleteModal";
 
 const inputClass = "w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-[13px] text-gray-700 outline-none box-border bg-transparent";
 
@@ -34,6 +36,8 @@ const AccountSettingsTab: React.FC = () => {
   const [mfa, setMfa] = useState(true);
   const [loginAlerts, setLoginAlerts] = useState(true);
   const [sessionTimeout, setSessionTimeout] = useState(true);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   return (
     <div className="bg-white flex flex-col gap-6">
@@ -138,10 +142,15 @@ const AccountSettingsTab: React.FC = () => {
       <div className="bg-white mb-6">
         <h3 className="text-2xl font-extrabold text-[#1a1a2e] m-0 mb-3">Account Actions</h3>
         <div className="flex justify-between">
-          <button className="bg-[#E2554F] border-none rounded-lg px-6 py-3 cursor-pointer text-white font-bold text-[14px] hover:bg-[#d44a44] transition-colors">
+          <button
+            onClick={() => setShowDeactivateModal(true)}
+            className="bg-[#E2554F] border-none rounded-lg px-6 py-3 cursor-pointer text-white font-bold text-[14px] hover:bg-[#d44a44] transition-colors"
+          >
             Deactivate Account
           </button>
-          <button className="bg-[#E2554F] border-none rounded-lg px-6 py-3 cursor-pointer text-white font-bold text-[14px] hover:bg-[#d44a44] transition-colors">
+          <button
+          onClick={() => setShowDeleteModal(true)}
+           className="bg-[#E2554F] border-none rounded-lg px-6 py-3 cursor-pointer text-white font-bold text-[14px] hover:bg-[#d44a44] transition-colors">
             Delete Account
           </button>
         </div>
@@ -170,6 +179,18 @@ const AccountSettingsTab: React.FC = () => {
           Sign Out from all Devices
         </button>
       </div>
+
+      {/* Deactivate Modal */}
+      {showDeactivateModal && (
+        <DeactivateModal onGoToDashboard={() => setShowDeactivateModal(false)} />
+      )}
+
+      {/* Delete Modal */}
+      {showDeleteModal && (
+        <DeleteModal onGoToDashboard={() => setShowDeleteModal(false)} />
+      )}
+
+
 
     </div>
   );

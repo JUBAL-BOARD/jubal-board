@@ -20,8 +20,8 @@ const LearningStats: React.FC<Props> = ({ certificationsEarned, coursesCompleted
           <div className={`${s.icon} w-10 h-10 rounded-full flex items-center justify-center mb-3`}>
             <GraduationCap size={18} className="text-white" />
           </div>
-          <p className="text-4xl font-bold text-gray-900 mb-1">{s.value}</p>
-          <p className="text-sm text-gray-600 text-center whitespace-pre-line leading-snug">{s.label}</p>
+          <p className="text-4xl font-bold font-body text-black mb-1">{s.value}</p>
+          <p className="text-sm text-black font-body text-center whitespace-pre-line leading-snug">{s.label}</p>
         </div>
       ))}
     </div>
