@@ -20,9 +20,9 @@ const categoryIconMap: Record<string, ReactNode> = {
 
 const CategoriesSection: React.FC = () => {
   return (
-    <div className="px-8 py-9 bg-[#fafafa] w-[95%] mx-auto mt-8 h-fit">
+    <div className="px-4 sm:px-8 py-9 bg-[#fafafa] w-[95%] mx-auto mt-8 h-fit">
       <SectionHeader title="Browse Creatives by Categories" />
-      <div className="grid grid-cols-5 gap-3.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
         {categories.map((cat, i) => (
           <CategoryCard key={i} icon={categoryIconMap[cat.iconKey]} label={cat.label} />
         ))}

@@ -1,5 +1,4 @@
 "use client";
-
 import Image from "next/image";
 import logo from "../../assets/logo.png";
 import { FacebookIcon, InstagramIcon, XIcon, YoutubeIcon } from "../../icons";
@@ -15,10 +14,8 @@ const contactIconMap: Record<string, React.ReactNode> = {
 const Footer: React.FC = () => {
   return (
     <footer className="bg-[#1a1a3e] text-white">
-
       {/* Main Footer Grid */}
-      <div className="px-8 py-12 grid grid-cols-4 gap-10">
-
+      <div className="px-4 sm:px-8 py-12 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-8 lg:gap-10">
         {/* Link Columns */}
         {Object.entries(footerColumns).map(([section, links]) => (
           <div key={section}>
@@ -41,7 +38,7 @@ const Footer: React.FC = () => {
         ))}
 
         {/* Contact Column */}
-        <div>
+        <div className="col-span-2 sm:col-span-3 lg:col-span-1">
           <h4 className="text-[#e2554f] text-[15px] font-bold mb-[18px] mt-0">
             Contact Us
           </h4>
@@ -62,12 +59,10 @@ const Footer: React.FC = () => {
             ))}
           </div>
         </div>
-
       </div>
 
       {/* Bottom Bar */}
-      <div className="border-t border-white/10 px-8 py-[18px] flex items-center justify-between">
-
+      <div className="border-t border-white/10 px-4 sm:px-8 py-[18px] flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-0">
         <div className="flex items-center gap-2.5">
           <Image
             src={logo}
@@ -77,18 +72,15 @@ const Footer: React.FC = () => {
             className="object-contain"
           />
         </div>
-
-        <span className="text-[#E2554F] text-[13px]">
+        <span className="text-[#E2554F] text-[13px] text-center">
           Copyright © Jubal Board 2025. All rights reserved.
         </span>
-
         <div className="flex gap-4 items-center text-white/80">
           <FacebookIcon />
           <InstagramIcon />
           <XIcon />
           <YoutubeIcon />
         </div>
-
       </div>
     </footer>
   );
