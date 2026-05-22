@@ -43,10 +43,8 @@ const SkillCategoryAccordion: React.FC<Props> = ({
                 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://16.171.168.144:3000";
 
                 const results = await Promise.all(
-                    category.services.map((service) =>
-                        fetch(`${BASE_URL}/api/v1/platform-services/${service.id}/skills`, {
-                            credentials: "include",
-                        }).then((res) => {
+                    (category.services ?? []).map((service) =>
+                        fetch(`${BASE_URL}/api/v1/platform-services/${service.id}/skills`).then((res) => {
                             if (!res.ok) throw new Error(`Failed for service ${service.id}`);
                             return res.json();
                         })
