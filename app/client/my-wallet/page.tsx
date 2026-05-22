@@ -203,10 +203,6 @@ const Wallet: React.FC = () => {
             <p className="text-sm text-red-500 text-center py-6">{walletError}</p>
           ) : (
             <WalletSummaryCards
-              availableBalance={availableBalance}
-              totalCredit={totalCredit}
-              totalSpent={totalSpent}
-              onAddFund={() => {}}
             />
           )}
 
