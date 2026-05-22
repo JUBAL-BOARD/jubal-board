@@ -18,11 +18,11 @@ const Hero: React.FC = () => {
       <div className="absolute inset-0 bg-gradient-to-r from-[rgba(15,15,40,0.82)] via-[rgba(15,15,40,0.6)] to-[rgba(15,15,40,0.4)]" />
       {/* Content */}
       <div className="absolute top-20 sm:top-40 left-4 sm:left-10 right-4 sm:right-10">
-        <h1 className="text-white text-2xl sm:text-5xl font-extrabold mb-2 leading-relaxed">
+        <h1 className="text-white text-2xl sm:text-5xl font-heading font-extrabold mb-2 leading-relaxed">
           Find the Right Creatives for Your Project
         </h1>
-        <p className="text-white/90 text-sm sm:text-xl max-w-[420px] leading-relaxed">
-          Hire skilled professionals across digital, creative, and local services - all in one place.
+        <p className="text-white/90 text-sm sm:text-[24px] font-body leading-relaxed">
+          Hire skilled professionals across digital, creative, <br/> and local services - all in one place.
         </p>
         {/* Search Bar */}
         <div className="flex flex-col sm:flex-row bg-white mt-8 sm:mt-[120px] overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.2)] w-full sm:w-[1000px]">

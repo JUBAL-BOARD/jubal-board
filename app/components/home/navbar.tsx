@@ -38,7 +38,7 @@ const Navbar: React.FC = () => {
             {navItems.map((item) => (
               <button
                 key={item}
-                className="flex items-center gap-1 bg-transparent border-none cursor-pointer text-sm text-gray-700 font-medium hover:text-gray-900 transition-colors"
+                className="flex items-center font-body gap-1 bg-transparent border-none cursor-pointer text-[16px] text-gray-700 font-medium hover:text-gray-900 transition-colors"
               >
                 {item} <ChevronDown size={16} />
               </button>
