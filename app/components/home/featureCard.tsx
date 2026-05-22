@@ -9,7 +9,7 @@ interface FeatureCardProps {
 const FeatureCard: React.FC<FeatureCardProps> = ({ title, desc, icon }) => {
   return (
     <div className="group bg-white hover:bg-[#E2554F] text-black hover:text-white border-[1.5px] border-gray-200 px-6 py-7 h-auto sm:h-[250px] flex flex-col items-center justify-center gap-3.5">
-      <div className="stroke-[#E2554F] group-hover:stroke-white">
+      <div className="text-[#E2554F] group-hover:text-white [&_svg]:stroke-current [&_svg]:fill-none">
         {icon}
       </div>
       <h3 className="m-0 text-lg sm:text-xl font-bold text-center">

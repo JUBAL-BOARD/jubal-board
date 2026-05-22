@@ -46,7 +46,7 @@ export const features: Feature[] = [
   {
     title: "All-in-One Creative Network",
     desc: "Find professionals across trades — digital or physical. Everything in one place",
-    icon: <Network size={40} stroke="#E2554F" strokeWidth={1.5} />,
+    icon: <Network size={40} stroke="#E2554F" fill="white" strokeWidth={1.5} />,
   },
   {
     title: "Smart Matching",
@@ -56,7 +56,7 @@ export const features: Feature[] = [
   {
     title: "Verified & Trusted",
     desc: "Our platform helps you connect with the right person for your project — fast.",
-    icon: <BadgeCheck size={40} stroke="#E2554F" strokeWidth={1.5} />,
+    icon: <BadgeCheck size={40} stroke="#E2554F" fill="white" strokeWidth={1.5} />,
   },
   {
     title: "Post A Project & Get Offers",

@@ -14,7 +14,7 @@ export default function Home() {
       <Hero />
       <CategoriesSection />
       <TrendingSection />
-      <TrustedCompanies />
+      {/* <TrustedCompanies /> */}
       <WhyDifferentSection />
       <Footer />
     </div>
