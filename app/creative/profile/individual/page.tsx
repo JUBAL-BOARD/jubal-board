@@ -5,9 +5,16 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import logo from "../../../assets/logo.png";
 import {
-  Camera, User, Calendar, MapPin, Upload, ChevronDown, Check, Loader2,
+  Camera, User, Calendar, Upload, ChevronDown, Check, Loader2,
 } from "lucide-react";
 import { ApiError } from "../../../lib/api";
+import {
+  parsePhoneNumberFromString,
+  getExampleNumber,
+  AsYouType,
+  CountryCode,
+} from "libphonenumber-js";
+import examples from "libphonenumber-js/mobile/examples";
 
 const languages = ["English", "French", "Spanish", "Arabic", "Yoruba"];
 const commOptions = ["Chat only", "Email only", "Chat & Email", "Phone & Chat"];
@@ -22,8 +29,6 @@ const languageApiMap: Record<string, string> = {
   "English": "en", "French": "fr", "Spanish": "es", "Arabic": "ar", "Yoruba": "yo",
 };
 
-const roles = ["Graphic Designer", "Photographer", "Videographer", "Illustrator", "3D Artist", "Content Creator"];
-const budgetRanges = ["$100-$200", "$200-$500", "$500-$1000", "$1000-$5000", "$5000+"];
 const rateTypes = ["Hourly", "Project-Based", "Retainer", "Per Deliverable"];
 
 interface StateOption {
@@ -43,20 +48,6 @@ interface CurrencyOption {
   symbol: string;
   isActive: boolean;
 }
-
-const parseBudgetRange = (range: string): { min: number; max: number } => {
-  const cleaned = range.replace(/\$/g, "");
-  if (cleaned.endsWith("+")) {
-    const min = parseInt(cleaned);
-    return { min: isNaN(min) ? 0 : min, max: 999999 };
-  }
-  const parts = cleaned.split("-");
-  if (parts.length !== 2) throw new Error(`Invalid budget range format: ${range}`);
-  const min = Number(parts[0]);
-  const max = Number(parts[1]);
-  if (isNaN(min) || isNaN(max)) throw new Error(`Invalid budget range values: ${range}`);
-  return { min, max };
-};
 
 const reqStar = <span className="text-[#E2554F]"> *</span>;
 const inputClass = "w-full border border-gray-200 rounded-lg px-3.5 py-[11px] text-[13px] text-black outline-none bg-white box-border";
@@ -96,21 +87,94 @@ const TellUsAboutYou: React.FC = () => {
   const [selectedState, setSelectedState] = useState<string>("");
   const [phoneCode, setPhoneCode] = useState<string>("");
   const [phoneNumber, setPhoneNumber] = useState<string>("");
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [phoneTouched, setPhoneTouched] = useState(false);
   const [descTouched, setDescTouched] = useState(false);
   const [projectFiles, setProjectFiles] = useState<File[]>([]);
 
   const [currencies, setCurrencies] = useState<CurrencyOption[]>([]);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("");
 
+  const selectedCurrencySymbol =
+    currencies.find((c) => c.code === selectedCurrency)?.symbol ?? selectedCurrency ?? "$";
+
+  const [minRate, setMinRate] = useState<string>("");
+  const [maxRate, setMaxRate] = useState<string>("");
+
   const [form, setForm] = useState({
     fullName: "", dob: "", country: "", streetAddress: "", socialLinks: "",
     description: "", postalCode: "", language: "English", communication: "Chat only",
-    professionalRole: "Graphic Designer", budgetRange: "$100-$200", rateType: "Hourly",
+    professionalRole: "", rateType: "Hourly",
   });
 
   const update = (key: string, value: string) => {
     setError(null);
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  // Get the placeholder for the current country's phone format
+  const getPhonePlaceholder = (countryCode: string): string => {
+    try {
+      const example = getExampleNumber(countryCode as CountryCode, examples);
+      if (!example) return "Enter phone number";
+      // Return national number without country code as placeholder
+      return example.formatNational().replace(/[^0-9\s\-()]/g, "").trim();
+    } catch {
+      return "Enter phone number";
+    }
+  };
+
+  // Validate phone number for the selected country
+  const validatePhone = (number: string, countryCode: string): boolean => {
+    if (!number || !countryCode) return false;
+    try {
+      const parsed = parsePhoneNumberFromString(number, countryCode as CountryCode);
+      return parsed?.isValid() ?? false;
+    } catch {
+      return false;
+    }
+  };
+
+  // Format as user types using AsYouType
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (!selectedCountry?.code) {
+      setPhoneNumber(raw.replace(/[^0-9]/g, ""));
+      return;
+    }
+    // Format using AsYouType for the selected country
+    const formatter = new AsYouType(selectedCountry.code as CountryCode);
+    const formatted = formatter.input(raw);
+    setPhoneNumber(formatted);
+
+    // Validate on change if already touched
+    if (phoneTouched) {
+      const isValid = validatePhone(formatted, selectedCountry.code);
+      setPhoneError(isValid ? null : `Enter a valid ${selectedCountry.name} phone number`);
+    }
+  };
+
+  const handlePhoneBlur = () => {
+    setPhoneTouched(true);
+    if (!phoneNumber) {
+      setPhoneError("Phone number is required.");
+      return;
+    }
+    if (selectedCountry?.code) {
+      const isValid = validatePhone(phoneNumber, selectedCountry.code);
+      setPhoneError(isValid ? null : `Enter a valid ${selectedCountry.name} phone number`);
+    }
+  };
+
+  // Get the full E.164 number for submission
+  const getE164Phone = (): string => {
+    if (!selectedCountry?.code || !phoneNumber) return "";
+    try {
+      const parsed = parsePhoneNumberFromString(phoneNumber, selectedCountry.code as CountryCode);
+      return parsed?.format("E.164") ?? `${phoneCode}${phoneNumber}`;
+    } catch {
+      return `${phoneCode}${phoneNumber}`;
+    }
   };
 
   useEffect(() => {
@@ -171,6 +235,10 @@ const TellUsAboutYou: React.FC = () => {
     setSelectedCountry(found);
     setSelectedState("");
     setPhoneCode(found ? `+${found.phoneCode}` : "");
+    // Reset phone when country changes
+    setPhoneNumber("");
+    setPhoneError(null);
+    setPhoneTouched(false);
     update("country", countryName);
   };
 
@@ -199,12 +267,25 @@ const TellUsAboutYou: React.FC = () => {
 
   const handleSave = async () => {
     if (!form.fullName.trim()) { setError("Full name is required."); return; }
-    if (!form.professionalRole) { setError("Professional role is required."); return; }
+    if (!form.professionalRole.trim()) { setError("Professional role is required."); return; }
     if (!form.rateType) { setError("Rate type is required."); return; }
+    if (!minRate || !maxRate) { setError("Please enter your minimum and maximum rate."); return; }
+    if (Number(minRate) >= Number(maxRate)) { setError("Maximum rate must be greater than minimum rate."); return; }
     if (form.description.trim().length < 50) {
       setDescTouched(true);
       setError("Your bio must be at least 50 characters.");
       return;
+    }
+
+    // Validate phone before submit
+    if (selectedCountry?.code && phoneNumber) {
+      const isValid = validatePhone(phoneNumber, selectedCountry.code);
+      if (!isValid) {
+        setPhoneTouched(true);
+        setPhoneError(`Enter a valid ${selectedCountry.name} phone number`);
+        setError("Please enter a valid phone number.");
+        return;
+      }
     }
 
     setLoading(true);
@@ -215,33 +296,29 @@ const TellUsAboutYou: React.FC = () => {
       const { token } = await tokenRes.json();
       if (!token) throw new Error("Unauthorized");
 
-      const { min, max } = parseBudgetRange(form.budgetRange);
-
       const formData = new FormData();
       formData.append("fullName", form.fullName.trim());
       formData.append("dateOfBirth", form.dob);
-      formData.append("contactNumber", phoneNumber ? `${phoneCode}${phoneNumber}` : "");
+      formData.append("contactNumber", getE164Phone()); // E.164 format e.g. +2348012345678
       formData.append("streetAddress", form.streetAddress.trim());
       formData.append("postalCode", form.postalCode.trim());
       formData.append("describeYourselfInOneLine", form.description.trim());
       formData.append("languagePreference", languageApiMap[form.language] || "en");
       formData.append("preferredCommunication", commApiMap[form.communication] || "CHAT_ONLY");
-      formData.append("professionalRole", form.professionalRole);
+      formData.append("professionalRole", form.professionalRole.trim());
       formData.append("currency", selectedCurrency);
       formData.append("rateType", rateTypeApiMap[form.rateType] || "HOURLY");
+      formData.append("minRate", minRate);
+      formData.append("maxRate", maxRate);
 
       selectedCategories.forEach((id) => {
         formData.append("categoriesOfInterest", id);
       });
-
       projectFiles.forEach((file) => {
         formData.append("projectFiles", file);
       });
-
       const avatarFile = fileInputRef.current?.files?.[0];
-      if (avatarFile) {
-        formData.append("image", avatarFile);
-      }
+      if (avatarFile) formData.append("image", avatarFile);
 
       const res = await fetch("/api/v1/creatives/me/personal-profile", {
         method: "PATCH",
@@ -262,7 +339,6 @@ const TellUsAboutYou: React.FC = () => {
         localStorage.setItem("userData", JSON.stringify(parsed));
       }
 
-      // Redirect to KYC instead of showing modal
       router.push("/creative/kyc");
     } catch (err) {
       console.error("Save error:", err);
@@ -346,25 +422,48 @@ const TellUsAboutYou: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
+            {/* Contact Number with live formatting + validation */}
             <div>
               <label className={labelClass}>Contact Number{reqStar}</label>
-              <div className={`${inputClass} flex items-center gap-0 p-0 overflow-hidden`}>
+              <div className={`${inputClass} flex items-center gap-0 p-0 overflow-hidden ${
+                phoneTouched
+                  ? phoneError
+                    ? "border-red-400"
+                    : phoneNumber
+                    ? "border-green-400"
+                    : ""
+                  : ""
+              }`}>
                 {phoneCode && (
-                  <span className="px-3 py-[1px] text-[13px] text-black border-r border-gray-200 flex-shrink-0 select-none">
+                  <span className="px-3 py-[11px] text-[13px] text-black border-r border-gray-200 flex-shrink-0 select-none bg-gray-50">
                     {phoneCode}
                   </span>
                 )}
                 <input
                   value={phoneNumber}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9]/g, "");
-                    setPhoneNumber(val);
-                  }}
-                  placeholder="8012345678"
-                  inputMode="numeric"
-                  className="flex-1 px-3 py-[1px] text-[13px] text-black outline-none bg-white border-none"
+                  onChange={handlePhoneChange}
+                  onBlur={handlePhoneBlur}
+                  placeholder={
+                    selectedCountry?.code
+                      ? getPhonePlaceholder(selectedCountry.code)
+                      : "Select a country first"
+                  }
+                  disabled={!selectedCountry}
+                  inputMode="tel"
+                  className="flex-1 px-3 py-[11px] text-[13px] text-black outline-none bg-white border-none disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
                 />
               </div>
+              {phoneTouched && phoneError && (
+                <p className="text-red-400 text-[11px] mt-1">{phoneError}</p>
+              )}
+              {phoneTouched && !phoneError && phoneNumber && (
+                <p className="text-green-500 text-[11px] mt-1">✓ Valid phone number</p>
+              )}
+              {selectedCountry?.code && (
+                <p className="text-gray-400 text-[11px] mt-1">
+                  Format: {getPhonePlaceholder(selectedCountry.code)}
+                </p>
+              )}
             </div>
 
             <div>
@@ -427,10 +526,11 @@ const TellUsAboutYou: React.FC = () => {
                 onBlur={() => setDescTouched(true)}
                 rows={4}
                 placeholder="Tell clients who you are, what you do, and what makes you unique..."
-                className={`${inputClass} resize-y leading-relaxed pr-2 ${descTouched && form.description.trim().length < 50
-                  ? "border-red-400 focus:border-red-400"
-                  : ""
-                  }`}
+                className={`${inputClass} resize-y leading-relaxed pr-2 ${
+                  descTouched && form.description.trim().length < 50
+                    ? "border-red-400"
+                    : ""
+                }`}
               />
               <div className={`text-right text-[11px] mt-1 ${form.description.trim().length < 50 ? "text-red-400" : "text-green-500"}`}>
                 {form.description.trim().length}/50 min
@@ -454,7 +554,15 @@ const TellUsAboutYou: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <SelectField label="Preferred Communication" value={form.communication} onChange={(v: string) => update("communication", v)} options={commOptions} />
-            <SelectField label="What's your professional role?" value={form.professionalRole} onChange={(v: string) => update("professionalRole", v)} options={roles} placeholder="Select role" />
+            <div>
+              <label className={labelClass}>What's your professional role?{reqStar}</label>
+              <input
+                value={form.professionalRole}
+                onChange={(e) => update("professionalRole", e.target.value)}
+                placeholder="e.g. Graphic Designer, Photographer..."
+                className={inputClass}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4 items-end">
@@ -475,7 +583,6 @@ const TellUsAboutYou: React.FC = () => {
                 onChange={handleProjectFilesChange}
                 className="hidden"
               />
-
               {projectFiles.length > 0 && (
                 <div className="mt-3 flex flex-col gap-2">
                   {projectFiles.map((file) => (
@@ -523,9 +630,39 @@ const TellUsAboutYou: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <SelectField label="Set your range" value={form.budgetRange} onChange={(v: string) => update("budgetRange", v)} options={budgetRanges} />
-            <SelectField label="Select your rate" value={form.rateType} onChange={(v: string) => update("rateType", v)} options={rateTypes} placeholder="Hourly, Project-Based..." />
+            <div>
+              <label className={labelClass}>Minimum Rate{reqStar}</label>
+              <div className={`${inputClass} flex items-center gap-0 p-0 overflow-hidden`}>
+                <span className="px-3 text-[13px] text-gray-500 border-r border-gray-200 flex-shrink-0 select-none">
+                  {selectedCurrencySymbol}
+                </span>
+                <input
+                  value={minRate}
+                  onChange={(e) => setMinRate(e.target.value.replace(/[^0-9.]/g, ""))}
+                  placeholder="0"
+                  inputMode="decimal"
+                  className="flex-1 px-3 py-[11px] text-[13px] text-black outline-none bg-white border-none"
+                />
+              </div>
+            </div>
+            <div>
+              <label className={labelClass}>Maximum Rate{reqStar}</label>
+              <div className={`${inputClass} flex items-center gap-0 p-0 overflow-hidden`}>
+                <span className="px-3 text-[13px] text-gray-500 border-r border-gray-200 flex-shrink-0 select-none">
+                  {selectedCurrencySymbol}
+                </span>
+                <input
+                  value={maxRate}
+                  onChange={(e) => setMaxRate(e.target.value.replace(/[^0-9.]/g, ""))}
+                  placeholder="0"
+                  inputMode="decimal"
+                  className="flex-1 px-3 py-[11px] text-[13px] text-black outline-none bg-white border-none"
+                />
+              </div>
+            </div>
           </div>
+
+          <SelectField label="Select your rate" value={form.rateType} onChange={(v: string) => update("rateType", v)} options={rateTypes} placeholder="Hourly, Project-Based..." />
 
           {availableCategories.length > 0 && (
             <div>
