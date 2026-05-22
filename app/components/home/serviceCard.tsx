@@ -1,5 +1,4 @@
 "use client";
-
 import { useState } from "react";
 import Image, { StaticImageData } from "next/image";
 
@@ -15,7 +14,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ label, bg }) => {
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="relative overflow-hidden w-[250px] h-[250px] cursor-pointer transition-transform duration-200"
+      className="relative overflow-hidden w-full aspect-square cursor-pointer transition-transform duration-200"
       style={{ transform: hovered ? "scale(1.02)" : "scale(1)" }}
     >
       <Image
@@ -24,10 +23,9 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ label, bg }) => {
         fill
         className="object-cover"
       />
-
       {/* Label Bar */}
       <div className="absolute bottom-0 left-0 right-0 h-[15%] flex items-center justify-center px-3.5 bg-[#1c1c3a]">
-        <span className="text-white font-semibold text-sm">{label}</span>
+        <span className="text-white font-semibold text-xs sm:text-sm">{label}</span>
       </div>
     </div>
   );
