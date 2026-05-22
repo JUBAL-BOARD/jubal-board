@@ -16,11 +16,11 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ icon, label, categoryId, pa
 
   const handleClick = () => {
     if (categoryId) {
-      router.push(`/client/explore-skills/${categoryId}`);
+      router.push('/explore-skills');
     } else if (path) {
       router.push(path);
     } else {
-      router.push("/client/explore-skills");
+      router.push("/explore-skills");
     }
   };
 

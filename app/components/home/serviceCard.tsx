@@ -14,7 +14,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ label, bg, categoryId }) => {
   const [hovered, setHovered] = useState<boolean>(false);
 
   return (
-    <Link href={categoryId ? `/client/explore-skills/${categoryId}` : "/client/explore-skills"}>
+    <Link href={categoryId ? `/explore-skills` : "/explore-skills"}>
       <div
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}

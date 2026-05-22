@@ -59,7 +59,7 @@ const CategoriesSection: React.FC = () => {
 
   return (
     <div className="px-4 sm:px-8 py-9 bg-[#fafafa] w-[95%] mx-auto mt-8 h-fit">
-      <SectionHeader title="Browse Creatives by Categories" viewAllPath="/client/explore-skills" />
+      <SectionHeader title="Browse Creatives by Categories" viewAllPath="/explore-skills" />
 
       {loading ? (
         <div className="flex justify-center py-10">
