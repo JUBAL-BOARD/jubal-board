@@ -2,9 +2,10 @@
 import { ChevronDown, Menu, X } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import logo from "../../assets/logo.png";
+import logo from "../../assets/icononly.png";
 import RoleSelectModal from "./roleSelectModal";
 import { useState } from "react";
+import Link from "next/link";
 
 const navItems: string[] = ["Find Creative", "Find Project", "Why Jubal Board"];
 
@@ -19,15 +20,18 @@ const Navbar: React.FC = () => {
         {/* Main Row */}
         <div className="flex items-center justify-between px-4 sm:px-8 h-[70px] sm:h-[90px]">
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <Image
-              src={logo}
-              alt="Jubal Board logo"
-              width={200}
-              height={200}
-              className="object-contain w-[130px] sm:w-[200px]"
-            />
-          </div>
+          <Link href="/">
+            <div className="flex items-center gap-2">
+              <Image
+                src={logo}
+                alt="Jubal Board logo"
+                width={120}
+                height={120}
+                className="object-contain w-[80px] lg:w-[100px]"
+              />
+              <h1 className="hidden lg:block font-heading font-bold text-black text-2xl">JUBALBOARD</h1>
+            </div>
+          </Link>
 
           {/* Nav Links — desktop only */}
           <div className="hidden lg:flex items-center gap-7">

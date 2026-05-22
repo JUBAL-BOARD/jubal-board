@@ -1,7 +1,7 @@
 "use client";
 import { useEffect } from "react";
 
-const REFRESH_INTERVAL = 8 * 60 * 1000; // every 8 minutes
+const REFRESH_INTERVAL = 4 * 60 * 1000; // every 8 minutes
 
 const TokenRefresher: React.FC = () => {
   useEffect(() => {

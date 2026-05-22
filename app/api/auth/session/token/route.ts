@@ -4,8 +4,8 @@ import { NextResponse } from "next/server";
 function isTokenExpired(token: string): boolean {
   try {
     const payload = JSON.parse(atob(token.split(".")[1]));
-    // ✅ FIX: refresh 60 seconds BEFORE expiry, not 30 seconds after
-    return payload.exp * 1000 < Date.now() + 60_000;
+    // Fire at 3 minutes before expiry — gives more time to retry
+    return payload.exp * 1000 < Date.now() + 3 * 60_000;
   } catch {
     return true;
   }
@@ -24,18 +24,23 @@ export async function GET() {
   const cookieStore = await cookies();
   const token = cookieStore.get("jb_token")?.value ?? null;
 
-  // No token at all
-  if (!token) return NextResponse.json({ token: null });
+  if (!token) {
+    return NextResponse.json({ token: null });
+  }
 
-  // Token still valid — return it
-  if (!isTokenExpired(token)) return NextResponse.json({ token });
+  if (!isTokenExpired(token)) {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return NextResponse.json({ token });
+  }
 
-  // Token expired — try to refresh
+
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://16.171.168.144";
     const refreshToken = cookieStore.get("jb_refresh_token")?.value;
 
-    if (!refreshToken) return NextResponse.json({ token: null });
+    if (!refreshToken) {
+      return NextResponse.json({ token: null });
+    }
 
     const res = await fetch(`${baseUrl}/api/v1/auth/refresh-token`, {
       method: "POST",
@@ -53,16 +58,26 @@ export async function GET() {
     const newToken = data.data?.accessToken;
     const newRefreshToken = data.data?.refreshToken;
 
-    if (!newToken) return NextResponse.json({ token: null });
+    if (!newToken) {
+      console.log("=== TOKEN DEBUG === Refresh response had no accessToken:", JSON.stringify(data));
+      return NextResponse.json({ token: null });
+    }
 
-    // ✅ FIX: use the token's actual expiry for the cookie maxAge
+    // Log new access token info
+    const accessPayload = JSON.parse(atob(newToken.split(".")[1]));
+
+    // Log new refresh token info
+    if (newRefreshToken) {
+      const refreshPayload = JSON.parse(atob(newRefreshToken.split(".")[1]));
+    } else {
+    }
+
     const expiresInSeconds = Math.floor((getTokenExpiry(newToken) - Date.now()) / 1000);
 
     cookieStore.set("jb_token", newToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      // ✅ FIX: at least 30 minutes, or whatever the token expiry is
       maxAge: Math.max(expiresInSeconds, 60 * 30),
       path: "/",
     });
@@ -78,7 +93,7 @@ export async function GET() {
     }
 
     return NextResponse.json({ token: newToken });
-  } catch {
+  } catch (err) {
     return NextResponse.json({ token: null });
   }
 }
