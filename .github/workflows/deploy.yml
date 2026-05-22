@@ -3,7 +3,7 @@ name: Deploy JubalBoard Web
 on:
   push:
     branches:
-      - staging
+      - main
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
