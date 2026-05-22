@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Image, { StaticImageData } from "next/image";
 import Link from "next/link";
+import logo from "../../assets/icononly.png";
 
 interface ServiceCardProps {
   label: string;
@@ -21,7 +22,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ label, bg, categoryId }) => {
         style={{ transform: hovered ? "scale(1.02)" : "scale(1)" }}
       >
         <Image
-          src={bg}
+          src={logo}
           alt={label}
           fill
           className="object-cover"
