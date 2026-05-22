@@ -20,7 +20,8 @@ interface Props {
     defaultOpen?: boolean;
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://16.171.168.144:3000";
+const toTitleCase = (str: string) =>
+    str.replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
 
 const SkillCategoryAccordion: React.FC<Props> = ({
     category,
@@ -103,20 +104,21 @@ const SkillCategoryAccordion: React.FC<Props> = ({
                     {!loading &&
                         !error &&
                         skills.map((skill) => {
-                            const isSelected = selectedSkills.includes(skill.name);
+                            const titleCasedName = toTitleCase(skill.name);
+                            const isSelected = selectedSkills.includes(titleCasedName);
                             return (
                                 <Link
                                     key={skill.id}
                                     href={"/onboarding"}
-                                    onClick={() => onToggleSkill(skill.name)}
+                                    onClick={() => onToggleSkill(titleCasedName)}
                                     className={`flex items-center gap-1.5 px-3.5 py-[7px] rounded-md text-[13px] cursor-pointer transition-all duration-150
-          ${isSelected
+                                        ${isSelected
                                             ? "bg-[#1a1a2e] text-white font-semibold border-none"
                                             : "bg-white text-gray-700 font-normal border border-gray-200"
                                         }`}
                                 >
                                     {isSelected && <Check size={12} stroke="white" strokeWidth={3} />}
-                                    {skill.name}
+                                    {titleCasedName}
                                 </Link>
                             );
                         })}
