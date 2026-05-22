@@ -1,14 +1,22 @@
-// /api/auth/session/token/route.ts
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 function isTokenExpired(token: string): boolean {
   try {
     const payload = JSON.parse(atob(token.split(".")[1]));
-    // refresh 30 seconds early to avoid edge cases
-    return payload.exp * 1000 < Date.now() - 30_000;
+    // ✅ FIX: refresh 60 seconds BEFORE expiry, not 30 seconds after
+    return payload.exp * 1000 < Date.now() + 60_000;
   } catch {
     return true;
+  }
+}
+
+function getTokenExpiry(token: string): number {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.exp * 1000;
+  } catch {
+    return 0;
   }
 }
 
@@ -22,7 +30,7 @@ export async function GET() {
   // Token still valid — return it
   if (!isTokenExpired(token)) return NextResponse.json({ token });
 
-  // Token expired — try to refresh proactively
+  // Token expired — try to refresh
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://16.171.168.144";
     const refreshToken = cookieStore.get("jb_refresh_token")?.value;
@@ -36,7 +44,6 @@ export async function GET() {
     });
 
     if (!res.ok) {
-      // Refresh failed — clear cookies
       cookieStore.delete("jb_token");
       cookieStore.delete("jb_refresh_token");
       return NextResponse.json({ token: null });
@@ -46,11 +53,17 @@ export async function GET() {
     const newToken = data.data?.accessToken;
     const newRefreshToken = data.data?.refreshToken;
 
+    if (!newToken) return NextResponse.json({ token: null });
+
+    // ✅ FIX: use the token's actual expiry for the cookie maxAge
+    const expiresInSeconds = Math.floor((getTokenExpiry(newToken) - Date.now()) / 1000);
+
     cookieStore.set("jb_token", newToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
+      // ✅ FIX: at least 30 minutes, or whatever the token expiry is
+      maxAge: Math.max(expiresInSeconds, 60 * 30),
       path: "/",
     });
 
