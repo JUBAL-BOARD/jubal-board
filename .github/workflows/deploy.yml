@@ -1,0 +1,77 @@
+name: Deploy JubalBoard Web
+
+on:
+  push:
+    branches:
+      - staging
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build NextJS App
+        run: npm run build
+
+      # The standalone build doesn't include static files by default. We must copy them over.
+      - name: Prepare Standalone Folder
+        run: |
+          cp -r public .next/standalone/
+          cp -r .next/static .next/standalone/.next/
+
+      # We compress the CONTENTS of the standalone folder
+      - name: Compress Standalone Build
+        run: tar -czf deploy.tar.gz -C .next/standalone .
+
+      - name: Temporarily Save Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-package
+          path: deploy.tar.gz
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-package
+
+      - name: SCP to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USERNAME }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          source: "deploy.tar.gz"
+          target: "/home/ubuntu/web/"
+
+      - name: SSH and Restart
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USERNAME }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/web
+            
+            # Unzip code and clean up archive
+            tar -xzf deploy.tar.gz
+            rm deploy.tar.gz
+
+            # NextJS needs specific environment variables to bind to the correct port
+            # We run server.js which was created by the standalone build
+            pm2 reload jubalboard-web || PORT=3000 HOSTNAME=127.0.0.1 pm2 start server.js --name "jubalboard-web"
