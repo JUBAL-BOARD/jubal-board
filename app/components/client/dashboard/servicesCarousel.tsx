@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
+import logo from "../../../assets/icononly.png";
 
 interface PlatformService {
   id: string;
@@ -92,7 +93,7 @@ const ServicesCarousel: React.FC = () => {
           >
             {service.imageUrl ? (
               <Image
-                src={service.imageUrl}
+                src={logo}
                 alt={service.name}
                 fill
                 className="object-cover"
