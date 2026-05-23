@@ -33,41 +33,41 @@ const Sidebar: React.FC<Props> = () => {
   const pathname = usePathname();
 
   const handleLogout = async () => {
-  localStorage.clear();
-  sessionStorage.clear();
-  await clearSession();
-  await fetch("/api/v1/auth/logout", { method: "POST" });
-  window.location.href = "/onboarding";
-};
+    localStorage.clear();
+    sessionStorage.clear();
+    await clearSession();
+    await fetch("/api/v1/auth/logout", { method: "POST" });
+    window.location.href = "/onboarding";
+  };
 
   return (
     <div className="w-[200px] lg:w-[300px] h-full h-screen bg-[#fafafa] border-r border-[#f0f0f0] pt-8 lg:pt-5 flex flex-col overflow-y-auto justify-center lg:justify-start lg:pt-10 lg:pl-10">
-      {navItems.map((item) => {
-        const isActive = pathname === item.path || pathname.startsWith(item.path + "/");
-        return (
-          <div
-            key={item.label}
-            onClick={() => router.push(item.path)}
-            className={`flex items-center gap-3 px-5 py-[3px] text-md lg:text-xl transition-all duration-150 cursor-pointer
-              ${isActive
-                ? "text-[#e2554f] font-heading font-semibold"
-                : "text-black font-heading font-normal hover:text-[#e2554f]"
-              }`}
-          >
-            {item.icon}
-            <span>{item.label}</span>
-          </div>
-        );
-      })}
-
-      {/* Log out — handled separately, not a nav route */}
-      <button
-        onClick={handleLogout}
-        className="flex items-center gap-3 px-5 py-[3px] text-md lg:text-xl transition-all duration-150 text-black font-heading font-normal hover:text-[#e2554f] w-full text-left"
-      >
-        <Logs size={20} />
-        <span>Log out</span>
-      </button>
+      <div className="flex flex-col gap-4">
+        {navItems.map((item) => {
+          const isActive = pathname === item.path || pathname.startsWith(item.path + "/");
+          return (
+            <div
+              key={item.label}
+              onClick={() => router.push(item.path)}
+              className={`flex items-center gap-3 px-5 py-[3px] text-md lg:text-xl transition-all duration-150 cursor-pointer
+                ${isActive
+                  ? "text-[#e2554f] font-heading font-semibold"
+                  : "text-black font-heading font-normal hover:text-[#e2554f]"
+                }`}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </div>
+          );
+        })}
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-5 py-[3px] text-md lg:text-xl transition-all duration-150 text-black font-heading font-normal hover:text-[#e2554f] w-full text-left"
+        >
+          <Logs size={20} />
+          <span>Log out</span>
+        </button>
+      </div>
     </div>
   );
 };

@@ -327,27 +327,7 @@ const BrandProfile: React.FC = () => {
             <input value={form.businessName} onChange={(e) => update("businessName", e.target.value)} placeholder="Type here" className={inputClass} />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Contact Number{reqStar}</label>
-              <div className={`${inputClass} flex items-center gap-0 p-0 overflow-hidden`}>
-                {phoneCode && (
-                  <span className="px-3 py-[1px] text-[13px] text-black border-r border-gray-200 flex-shrink-0 select-none">
-                    {phoneCode}
-                  </span>
-                )}
-                <input
-                  value={phoneNumber}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9]/g, "");
-                    setPhoneNumber(val);
-                  }}
-                  placeholder="8012345678"
-                  inputMode="numeric"
-                  className="flex-1 px-3 py-[1px] text-[13px] text-black outline-none bg-white border-none"
-                />
-              </div>
-            </div>
+          
             <div>
               <label className={labelClass}>Country{reqStar}</label>
               <div className="relative">
@@ -388,6 +368,28 @@ const BrandProfile: React.FC = () => {
               </div>
             </div>
           )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Contact Number{reqStar}</label>
+              <div className={`${inputClass} flex items-center gap-0 p-0 overflow-hidden`}>
+                {phoneCode && (
+                  <span className="px-3 py-[1px] text-[13px] text-black border-r border-gray-200 flex-shrink-0 select-none">
+                    {phoneCode}
+                  </span>
+                )}
+                <input
+                  value={phoneNumber}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, "");
+                    setPhoneNumber(val);
+                  }}
+                  placeholder="8012345678"
+                  inputMode="numeric"
+                  className="flex-1 px-3 py-[1px] text-[13px] text-black outline-none bg-white border-none"
+                />
+              </div>
+            </div>
 
           <div>
             <label className={labelClass}>Street Address{reqStar}</label>

@@ -287,41 +287,8 @@ const IndividualProfile: React.FC = () => {
               <label className={labelClass}>Full Name{reqStar}</label>
               <input value={form.fullName} onChange={(e) => update("fullName", e.target.value)} placeholder="Type here" className={inputClass} />
             </div>
-            <div>
-              <label className={labelClass}>Contact Number{reqStar}</label>
-              <div className={`${inputClass} flex items-center gap-0 p-0 overflow-hidden ${phoneError ? "border-red-400" : ""}`}>
-                {phoneCode && (
-                  <span className="px-3 py-[1px] text-[13px] text-black border-r border-gray-200 flex-shrink-0 select-none">
-                    {phoneCode}
-                  </span>
-                )}
-                <input
-                  value={phoneNumber}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9]/g, "");
-                    setPhoneNumber(val);
-                    if (phoneError) setPhoneError(null);
-                  }}
-                  onBlur={() => {
-                    if (!phoneNumber) return;
-                    if (phoneNumber.length < 7 || phoneNumber.length > 15) {
-                      setPhoneError("Enter a valid phone number (7–15 digits).");
-                    } else {
-                      setPhoneError(null);
-                    }
-                  }}
-                  placeholder="8012345678"
-                  inputMode="numeric"
-                  className="flex-1 px-3 py-[1px] text-[13px] text-black outline-none bg-white border-none"
-                />
-              </div>
-              {phoneError && (
-                <p className="text-xs text-red-500 mt-1">{phoneError}</p>
-              )}
-            </div>
-          </div>
 
-          <div>
+            <div>
             <label className={labelClass}>Country{reqStar}</label>
             <div className="relative">
               <select
@@ -360,6 +327,42 @@ const IndividualProfile: React.FC = () => {
               </div>
             </div>
           )}
+          
+            <div>
+              <label className={labelClass}>Contact Number{reqStar}</label>
+              <div className={`${inputClass} flex items-center gap-0 p-0 overflow-hidden ${phoneError ? "border-red-400" : ""}`}>
+                {phoneCode && (
+                  <span className="px-3 py-[1px] text-[13px] text-black border-r border-gray-200 flex-shrink-0 select-none">
+                    {phoneCode}
+                  </span>
+                )}
+                <input
+                  value={phoneNumber}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, "");
+                    setPhoneNumber(val);
+                    if (phoneError) setPhoneError(null);
+                  }}
+                  onBlur={() => {
+                    if (!phoneNumber) return;
+                    if (phoneNumber.length < 7 || phoneNumber.length > 15) {
+                      setPhoneError("Enter a valid phone number (7–15 digits).");
+                    } else {
+                      setPhoneError(null);
+                    }
+                  }}
+                  placeholder="8012345678"
+                  inputMode="numeric"
+                  className="flex-1 px-3 py-[1px] text-[13px] text-black outline-none bg-white border-none"
+                />
+              </div>
+              {phoneError && (
+                <p className="text-xs text-red-500 mt-1">{phoneError}</p>
+              )}
+            </div>
+          </div>
+
+          
 
           <div>
             <label className={labelClass}>Postal Code</label>

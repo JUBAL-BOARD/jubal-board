@@ -88,7 +88,7 @@ const UpdateBanner: React.FC = () => {
                   </div>
                 </div>
                 <div onClick={() => setVisible(false)} className="cursor-pointer p-1">
-                  <X size={16} stroke="black" />
+                  {/* <X size={16} stroke="black" /> */}
                 </div>
               </div>
             </Link>

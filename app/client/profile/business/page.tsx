@@ -254,13 +254,7 @@ const BusinessProfile: React.FC = () => {
               <label className={labelClass}>Business Name{reqStar}</label>
               <input value={form.businessName} onChange={(e) => update("businessName", e.target.value)} placeholder="Type here" className={inputClass} />
             </div>
-            <div>
-              <label className={labelClass}>Contact Number{reqStar}</label>
-              <input value={form.contactNumber} onChange={(e) => update("contactNumber", e.target.value)} placeholder="Type here" className={inputClass} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
             <SelectField label="Industry/Sector" value={form.industry} onChange={(v) => update("industry", v)} options={industries} placeholder="Select your industry/sector" />
             <div>
               <label className={labelClass}>Country{reqStar}</label>
@@ -280,6 +274,8 @@ const BusinessProfile: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
+
 
             {selectedCountry && selectedCountry.states.length > 0 && (
               <div>
@@ -301,6 +297,10 @@ const BusinessProfile: React.FC = () => {
                 </div>
               </div>
             )}
+            <div>
+              <label className={labelClass}>Contact Number{reqStar}</label>
+              <input value={form.contactNumber} onChange={(e) => update("contactNumber", e.target.value)} placeholder="Type here" className={inputClass} />
+            </div>
           </div>
 
           <div>

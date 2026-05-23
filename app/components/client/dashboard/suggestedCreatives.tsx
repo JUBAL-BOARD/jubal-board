@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
+import logo from "../../../assets/icononly.png";
 import { Star, BadgeCheck, MessageCircle, Loader2 } from "lucide-react";
 
 interface Creative {
@@ -19,7 +20,7 @@ const CreativeCard: React.FC<{ creative: Creative }> = ({ creative }) => (
   <div className="bg-white border border-gray-200 rounded-[10px] overflow-hidden min-w-[300px] h-[400px] flex-shrink-0">
     <div className="relative h-[250px]">
       <Image
-        src={creative.portfolioImg}
+        src={logo}
         alt="portfolio"
         fill
         className="object-cover"
