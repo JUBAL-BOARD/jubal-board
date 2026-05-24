@@ -18,6 +18,9 @@ interface Props {
   defaultOpen?: boolean;
 }
 
+const toTitleCase = (str: string) =>
+  str.replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://16.171.168.144:3000";
 
 const SkillCategoryAccordion: React.FC<Props> = ({
@@ -38,11 +41,11 @@ const SkillCategoryAccordion: React.FC<Props> = ({
       setLoading(true);
       setError(null);
       try {
+        const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://16.171.168.144:3000";
+
         const results = await Promise.all(
           (category.services ?? []).map((service) =>
-            fetch(`${BASE_URL}/api/v1/platform-services/${service.id}/skills`, {
-              credentials: "include",
-            }).then((res) => {
+            fetch(`/api/platform-services/${service.id}/skills`).then((res) => {
               if (!res.ok) throw new Error(`Failed for service ${service.id}`);
               return res.json();
             })
@@ -108,21 +111,22 @@ const SkillCategoryAccordion: React.FC<Props> = ({
           {!loading &&
             !error &&
             skills.map((skill) => {
-              const isSelected = selectedSkills.includes(skill.name);
+              const titleCasedName = toTitleCase(skill.name);
+              const isSelected = selectedSkills.includes(titleCasedName);
               return (
-                <button
+                <Link
                   key={skill.id}
-                  onClick={() => onToggleSkill(skill.name)}
+                  href={"/onboarding"}
+                  onClick={() => onToggleSkill(titleCasedName)}
                   className={`flex items-center gap-1.5 px-3.5 py-[7px] rounded-md text-[13px] cursor-pointer transition-all duration-150
-                    ${
-                      isSelected
-                        ? "bg-[#1a1a2e] text-white font-semibold border-none"
-                        : "bg-white text-gray-700 font-normal border border-gray-200"
+                                        ${isSelected
+                      ? "bg-[#1a1a2e] text-white font-semibold border-none"
+                      : "bg-white text-gray-700 font-normal border border-gray-200"
                     }`}
                 >
                   {isSelected && <Check size={12} stroke="white" strokeWidth={3} />}
-                  {skill.name}
-                </button>
+                  {titleCasedName}
+                </Link>
               );
             })}
         </div>
