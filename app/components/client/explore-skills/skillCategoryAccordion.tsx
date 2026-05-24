@@ -116,7 +116,7 @@ const SkillCategoryAccordion: React.FC<Props> = ({
               return (
                 <Link
                   key={skill.id}
-                  href={"/onboarding"}
+                  href={`/client/explore-skills/${encodeURIComponent(category.name)}`}
                   onClick={() => onToggleSkill(titleCasedName)}
                   className={`flex items-center gap-1.5 px-3.5 py-[7px] rounded-md text-[13px] cursor-pointer transition-all duration-150
                                         ${isSelected
