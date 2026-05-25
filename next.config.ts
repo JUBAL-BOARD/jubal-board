@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/v1/:path*",
-        destination: "http://16.171.168.144:3000/api/v1/:path*",
+        destination: "https://api.jubalboard.com/api/v1/:path*",
       },
     ];
   },

@@ -115,7 +115,7 @@ const EditProfile: React.FC = () => {
   useEffect(() => {
     const fetchCountries = async () => {
       try {
-        const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://16.171.168.144:3000";
+        const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.jubalboard.com";
         const response = await fetch(`${BASE_URL}/api/v1/platform/countries`, { credentials: "include" });
         if (response.ok) {
           const apiResponse = await response.json();
@@ -134,7 +134,7 @@ const EditProfile: React.FC = () => {
   useEffect(() => {
     const fetchCurrencies = async () => {
       try {
-        const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://16.171.168.144:3000";
+        const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.jubalboard.com";
         const response = await fetch(`${BASE_URL}/api/v1/platform/currencies`, { credentials: "include" });
         if (response.ok) {
           const apiResponse = await response.json();
@@ -155,7 +155,7 @@ const EditProfile: React.FC = () => {
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://16.171.168.144:3000";
+        const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.jubalboard.com";
         const res = await fetch(`${BASE_URL}/api/v1/categories`, { credentials: "include" });
         if (res.ok) {
           const json = await res.json();

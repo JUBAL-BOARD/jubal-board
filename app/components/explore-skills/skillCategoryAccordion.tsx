@@ -41,7 +41,7 @@ const SkillCategoryAccordion: React.FC<Props> = ({
             setLoading(true);
             setError(null);
             try {
-                const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://16.171.168.144:3000";
+                const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.jubalboard.com";
 
                 const results = await Promise.all(
                     (category.services ?? []).map((service) =>

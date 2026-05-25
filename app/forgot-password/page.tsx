@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import logo from "../assets/icononly.png";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://16.171.168.144:3000";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.jubalboard.com";
 
 async function apiFetch(path: string, body: object) {
   const res = await fetch(`${BASE_URL}${path}`, {
