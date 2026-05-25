@@ -13,11 +13,14 @@ interface PlatformService {
   skills: { id: string; name: string; serviceId: string; isActive: boolean }[];
 }
 
+const CARD_WIDTH = 300;
+const GAP = 14;
+
 const ServicesCarousel: React.FC = () => {
-  const [page, setPage] = useState<number>(0);
+  const [current, setCurrent] = useState<number>(0);
   const [services, setServices] = useState<PlatformService[]>([]);
   const [loading, setLoading] = useState(true);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const isHovered = useRef(false);
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -31,7 +34,6 @@ const ServicesCarousel: React.FC = () => {
         });
         if (!res.ok) throw new Error("Failed to fetch services");
         const json = await res.json();
-        // handle both array response and paginated { data: [] } response
         const list = Array.isArray(json) ? json : Array.isArray(json.data) ? json.data : [];
         setServices(list);
       } catch {
@@ -43,19 +45,15 @@ const ServicesCarousel: React.FC = () => {
     fetchServices();
   }, []);
 
-  const handleScroll = () => {
-    if (!scrollRef.current) return;
-    const { scrollLeft, scrollWidth } = scrollRef.current;
-    const pageWidth = scrollWidth / 3;
-    setPage(Math.round(scrollLeft / pageWidth));
-  };
-
-  const goToPage = (i: number) => {
-    if (!scrollRef.current) return;
-    const pageWidth = scrollRef.current.scrollWidth / 3;
-    scrollRef.current.scrollTo({ left: pageWidth * i, behavior: "smooth" });
-    setPage(i);
-  };
+  // Auto-slide
+  useEffect(() => {
+    if (services.length === 0) return;
+    const interval = setInterval(() => {
+      if (isHovered.current) return;
+      setCurrent((prev) => (prev + 1) % services.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [services]);
 
   if (loading) {
     return (
@@ -80,47 +78,43 @@ const ServicesCarousel: React.FC = () => {
         Services you may like
       </h3>
 
+      {/* Outer clip */}
       <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="flex gap-3.5 overflow-x-auto pb-1 scroll-smooth"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        className="overflow-hidden"
+        onMouseEnter={() => (isHovered.current = true)}
+        onMouseLeave={() => (isHovered.current = false)}
       >
-        {services.map((service) => (
-          <div
-            key={service.id}
-            className="relative rounded-lg overflow-hidden min-w-[300px] h-[300px] flex-shrink-0 cursor-pointer"
-          >
-            {service.imageUrl ? (
-              <Image
-                src={logo}
-                alt={service.name}
-                fill
-                className="object-cover"
-              />
-            ) : (
-              <div className="w-full h-full bg-gray-300" />
-            )}
-            <div className="absolute bottom-0 left-0 right-0 h-[20%] flex items-center justify-center px-3 bg-[#1c1c3a]">
-              <span className="text-white font-semibold text-[13px]">
-                {service.name}
-              </span>
+        {/* Sliding track */}
+        <div
+          className="flex pb-1"
+          style={{
+            gap: GAP,
+            transform: `translateX(-${current * (CARD_WIDTH + GAP)}px)`,
+            transition: "transform 0.8s ease-in-out",
+          }}
+        >
+          {services.map((service) => (
+            <div
+              key={service.id}
+              className="relative rounded-lg overflow-hidden min-w-[300px] h-[300px] flex-shrink-0 cursor-pointer"
+            >
+              <Image src={logo} alt={service.name} fill className="object-cover" />
+              <div className="absolute bottom-0 left-0 right-0 h-[20%] flex items-center justify-center px-3 bg-[#1c1c3a]">
+                <span className="text-white font-semibold text-[13px]">{service.name}</span>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      {/* Pagination Dots */}
+      {/* Dot indicators */}
       <div className="flex justify-center gap-2 mt-3.5">
-        {[0, 1, 2].map((i) => (
+        {services.map((_, i) => (
           <div
             key={i}
-            onClick={() => goToPage(i)}
+            onClick={() => setCurrent(i)}
             className="h-2 rounded-full cursor-pointer transition-all duration-200"
-            style={{
-              width: 8,
-              background: i === page ? "#E2554F" : "#d1d5db",
-            }}
+            style={{ width: 8, background: i === current ? "#E2554F" : "#d1d5db" }}
           />
         ))}
       </div>

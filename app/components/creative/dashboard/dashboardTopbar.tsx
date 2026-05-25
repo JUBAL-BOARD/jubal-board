@@ -48,9 +48,10 @@ const DashboardTopbar: React.FC<Props> = ({ userName, userAvatar, sidebarOpen, o
               <img
                 src={userAvatar}
                 alt={userName}
-                width={36}
-                height={36}
+                width={50}
+                height={50}
                 className="rounded-full object-cover"
+                style={{ width: '50px', height: '50px', minWidth: '50px' }}  // add this
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = "none";
                 }}
@@ -59,9 +60,10 @@ const DashboardTopbar: React.FC<Props> = ({ userName, userAvatar, sidebarOpen, o
               <Image
                 src={userAvatar}
                 alt={userName}
-                width={36}
-                height={36}
+                width={50}
+                height={50}
                 className="rounded-full object-cover"
+                style={{ width: '50px', height: '50px', minWidth: '50px' }}  // add this
               />
             )}
           </Link>
