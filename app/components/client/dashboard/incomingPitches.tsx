@@ -29,8 +29,9 @@ const PitchCard: React.FC<{ pitch: Pitch }> = ({ pitch }) => {
         <Image
           src={pitch.avatar}
           alt={pitch.name}
-          width={80}
-          height={80}
+          width={30}
+          height={30}
+          style={{ width: '30px', height: '30px', minWidth: '30px' }} 
           className="rounded-full object-cover"
         />
         <div className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-white" />

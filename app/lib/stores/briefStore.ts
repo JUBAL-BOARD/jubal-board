@@ -6,16 +6,16 @@ export interface BriefFormData {
   projectCategoryId: string;
   specificSkills: string;
   specificSkillIds: string[];
-  specificSkillNames: string[]; // add this
+  specificSkillNames: string[];
   jobDescription: string;
   referenceFile: File | null;
   referenceFileName: string;
   numCreatives: string;
   currency: string;
-  budgetRange: string;
   budgetMin: string;
   budgetMax: string;
-  timeline: string;
+  timelineValue: string;
+  timelineUnit: string;
   deliveryDate: string;
   modeOfProject: string;
   location: string;
@@ -33,16 +33,16 @@ const defaultForm: BriefFormData = {
   projectCategoryId: "",
   specificSkills: "",
   specificSkillIds: [],
-  specificSkillNames: [], // add this
+  specificSkillNames: [],
   jobDescription: "",
   referenceFile: null,
   referenceFileName: "",
   numCreatives: "1 creative",
   currency: "Dollars ($)",
-  budgetRange: "$50-$100",
   budgetMin: "",
   budgetMax: "",
-  timeline: "Less than 24 hours",
+  timelineValue: "",
+  timelineUnit: "days",
   deliveryDate: "",
   modeOfProject: "Virtual",
   location: "",

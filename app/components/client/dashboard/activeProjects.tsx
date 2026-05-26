@@ -48,6 +48,7 @@ const ProjectRow: React.FC<{ project: Project }> = ({ project }) => (
           alt={project.assignee}
           width={30}
           height={30}
+          style={{ width: '30px', height: '30px', minWidth: '30px' }} 
           className="rounded-full object-cover"
         />
         <span className="text-sm text-black">{project.assignee}</span>

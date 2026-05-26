@@ -5,11 +5,9 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, Upload, Calendar, MapPin, Check, X } from "lucide-react";
 import { useBriefStore } from "../../../lib/stores/briefStore";
 
-// ── Types ──────────────────────────────────────────────────────────────────
 type Category = { id: string; name: string };
 type Skill = { id: string; name: string };
 
-// ── Helpers ────────────────────────────────────────────────────────────────
 const CURRENCY_MAP: Record<string, string> = {
   "Dollars ($)": "USD",
   "Euros (€)": "EUR",
@@ -31,12 +29,6 @@ const NUM_CREATIVES_MAP: Record<string, number> = {
   "5+ creatives": 5,
 };
 
-function parseBudget(range: string): { min: number; max: number } {
-  const nums = range.replace(/\$/g, "").split("-").map(Number);
-  return { min: nums[0] ?? 0, max: nums[1] ?? nums[0] ?? 0 };
-}
-
-// ── Modal ──────────────────────────────────────────────────────────────────
 const CongratulationsModal: React.FC<{ onGoToDashboard: () => void }> = ({ onGoToDashboard }) => (
   <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
     <div className="bg-orange-400/80 rounded-2xl px-12 py-10 w-[80%] lg:w-[420px] flex flex-col items-center text-center shadow-2xl">
@@ -57,7 +49,6 @@ const CongratulationsModal: React.FC<{ onGoToDashboard: () => void }> = ({ onGoT
   </div>
 );
 
-// ── Main Form ──────────────────────────────────────────────────────────────
 const PostBriefForm: React.FC = () => {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,17 +63,14 @@ const PostBriefForm: React.FC = () => {
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [loadingSkills, setLoadingSkills] = useState(false);
 
-  // Fetch categories on mount
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const tokenRes = await fetch("/api/auth/session/token");
         const { token } = await tokenRes.json();
-        console.log("API URL:", process.env.NEXT_PUBLIC_API_URL);
-        const res = await fetch(
-          '/api/v1/briefs/categories',
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const res = await fetch("/api/v1/briefs/categories", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const json = await res.json();
         const list: Category[] = Array.isArray(json) ? json : json.data ?? [];
         setCategories(list);
@@ -95,35 +83,30 @@ const PostBriefForm: React.FC = () => {
     fetchCategories();
   }, []);
 
-  // Fetch skills when category changes (two-step: category → serviceId → skills)
   useEffect(() => {
-  if (!form.projectCategoryId) { setSkills([]); return; }
-  const fetchSkills = async () => {
-    setLoadingSkills(true);
-    try {
-      const tokenRes = await fetch("/api/auth/session/token");
-      const { token } = await tokenRes.json();
-
-      const res = await fetch(
-        `/api/v1/platform-services?categoryId=${form.projectCategoryId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const json = await res.json();
-      const services = Array.isArray(json) ? json : json.data ?? [];
-
-      // Skills are nested inside each service — flatten them all
-      const allSkills: Skill[] = services.flatMap((svc: any) =>
-        Array.isArray(svc.skills) ? svc.skills : []
-      );
-      setSkills(allSkills);
-    } catch {
-      setSkills([]);
-    } finally {
-      setLoadingSkills(false);
-    }
-  };
-  fetchSkills();
-}, [form.projectCategoryId]);
+    if (!form.projectCategoryId) { setSkills([]); return; }
+    const fetchSkills = async () => {
+      setLoadingSkills(true);
+      try {
+        const tokenRes = await fetch("/api/auth/session/token");
+        const { token } = await tokenRes.json();
+        const res = await fetch(`/api/v1/platform-services?categoryId=${form.projectCategoryId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        const services = Array.isArray(json) ? json : json.data ?? [];
+        const allSkills: Skill[] = services.flatMap((svc: any) =>
+          Array.isArray(svc.skills) ? svc.skills : []
+        );
+        setSkills(allSkills);
+      } catch {
+        setSkills([]);
+      } finally {
+        setLoadingSkills(false);
+      }
+    };
+    fetchSkills();
+  }, [form.projectCategoryId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
@@ -132,19 +115,12 @@ const PostBriefForm: React.FC = () => {
   };
 
   const toggleSkill = (skillId: string, skillName: string) => {
-  const currentIds = form.specificSkillIds;
-  const currentNames = form.specificSkillNames;
-
-  const isSelected = currentIds.includes(skillId);
-  setField(
-    "specificSkillIds",
-    isSelected ? currentIds.filter((id) => id !== skillId) : [...currentIds, skillId]
-  );
-  setField(
-    "specificSkillNames",
-    isSelected ? currentNames.filter((n) => n !== skillName) : [...currentNames, skillName]
-  );
-};
+    const currentIds = form.specificSkillIds;
+    const currentNames = form.specificSkillNames;
+    const isSelected = currentIds.includes(skillId);
+    setField("specificSkillIds", isSelected ? currentIds.filter((id) => id !== skillId) : [...currentIds, skillId]);
+    setField("specificSkillNames", isSelected ? currentNames.filter((n) => n !== skillName) : [...currentNames, skillName]);
+  };
 
   const handlePostJob = async () => {
     setError(null);
@@ -153,14 +129,15 @@ const PostBriefForm: React.FC = () => {
     if (!form.projectCategoryId) return setError("Please select a project category.");
     if (form.specificSkillIds.length === 0) return setError("Please select at least one skill.");
     if (!form.jobDescription.trim()) return setError("Job description is required.");
+    if (!form.budgetMin || !form.budgetMax) return setError("Please enter a budget range.");
+    if (Number(form.budgetMin) >= Number(form.budgetMax)) return setError("Max budget must be greater than min.");
+    if (!form.timelineValue) return setError("Please enter a timeline.");
     if (!form.deliveryDate) return setError("Please set a delivery date.");
 
     setSubmitting(true);
     try {
       const tokenRes = await fetch("/api/auth/session/token");
       const { token } = await tokenRes.json();
-
-      const { min, max } = parseBudget(form.budgetRange);
 
       const formData = new FormData();
       formData.append("jobTitle", form.jobTitle);
@@ -169,23 +146,20 @@ const PostBriefForm: React.FC = () => {
       formData.append("jobDescription", form.jobDescription);
       formData.append("numberOfCreatives", String(NUM_CREATIVES_MAP[form.numCreatives] ?? 1));
       formData.append("currency", CURRENCY_MAP[form.currency] ?? "USD");
-      formData.append("budgetMin", String(min));
-      formData.append("budgetMax", String(max));
-      formData.append("timeline", form.timeline);
+      formData.append("budgetMin", form.budgetMin);
+      formData.append("budgetMax", form.budgetMax);
+      formData.append("timeline", `${form.timelineValue} ${form.timelineUnit}`);
       formData.append("deliveryDate", form.deliveryDate);
       formData.append("modeOfProject", MODE_MAP[form.modeOfProject] ?? "VIRTUAL");
       if (form.location) formData.append("location", form.location);
       if (form.referenceFile) formData.append("referenceFiles", form.referenceFile);
 
-      const res = await fetch(
-        '/api/v1/briefs',
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          credentials: "include",
-          body: formData,
-        }
-      );
+      const res = await fetch("/api/v1/briefs", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
+        body: formData,
+      });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -236,6 +210,7 @@ const PostBriefForm: React.FC = () => {
                 setField("projectCategoryId", e.target.value);
                 setField("projectCategory", selected?.name ?? "");
                 setField("specificSkillIds", []);
+                setField("specificSkillNames", []);
               }}
               className={`${inputClass} appearance-none pr-10`}
               disabled={loadingCategories}
@@ -267,11 +242,10 @@ const PostBriefForm: React.FC = () => {
                     key={skill.id}
                     type="button"
                     onClick={() => toggleSkill(skill.id, skill.name)}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                      selected
-                        ? "bg-[#E05C5C] text-white border-[#E05C5C]"
-                        : "bg-white text-gray-600 border-gray-200 hover:border-[#E05C5C]"
-                    }`}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${selected
+                      ? "bg-[#E05C5C] text-white border-[#E05C5C]"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-[#E05C5C]"
+                      }`}
                   >
                     {skill.name}
                   </button>
@@ -336,48 +310,48 @@ const PostBriefForm: React.FC = () => {
         </Field>
 
         <Field label="Select Budget Range">
-          <div className="relative">
-            <select
-              value={form.budgetRange}
-              onChange={(e) => setField("budgetRange", e.target.value)}
-              className={`${inputClass} appearance-none pr-10`}
-            >
-              {["$50-$100", "$100-$500", "$500-$1000", "$1000-$5000"].map((r) => (
-                <option key={r}>{r}</option>
-              ))}
-            </select>
-            <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              type="number"
+              value={form.budgetMin}
+              onChange={(e) => setField("budgetMin", e.target.value)}
+              placeholder="Min"
+              className={inputClass}
+            />
+            <input
+              type="number"
+              value={form.budgetMax}
+              onChange={(e) => setField("budgetMax", e.target.value)}
+              placeholder="Max"
+              className={inputClass}
+            />
           </div>
         </Field>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Timeline">
-            <div className="relative">
+        <Field label="Timeline">
+          <div className="flex gap-2">
+            <input
+              type="number"
+              value={form.timelineValue}
+              onChange={(e) => setField("timelineValue", e.target.value)}
+              placeholder="e.g. 2"
+              style={{ width: "50%" }}
+              className={inputClass}
+            />
+            <div className="relative" style={{ width: "50%" }}>
               <select
-                value={form.timeline}
-                onChange={(e) => setField("timeline", e.target.value)}
+                value={form.timelineUnit}
+                onChange={(e) => setField("timelineUnit", e.target.value)}
                 className={`${inputClass} appearance-none pr-10`}
               >
-                {["Less than 24 hours", "1-3 days", "3-7 days", "1-2 weeks", "1 month+"].map((o) => (
+                {["hours", "days", "weeks", "months"].map((o) => (
                   <option key={o}>{o}</option>
                 ))}
               </select>
               <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             </div>
-          </Field>
-
-          <Field label="Delivery Date">
-            <div className="relative">
-              <input
-                type="date"
-                value={form.deliveryDate}
-                onChange={(e) => setField("deliveryDate", e.target.value)}
-                className={`${inputClass} pr-10`}
-              />
-              <Calendar size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
-          </Field>
-        </div>
+          </div>
+        </Field>
 
         <Field label="Mode of Project">
           <div className="relative">
@@ -406,7 +380,6 @@ const PostBriefForm: React.FC = () => {
 
       </div>
 
-      {/* Bottom Buttons */}
       <div className="bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-6 py-4 flex items-center justify-between z-20">
         <button
           onClick={() => router.push("/client/my-briefs/preview")}
