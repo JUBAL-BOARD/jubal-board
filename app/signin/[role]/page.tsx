@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import logo from "../../assets/icononly.png";
 import clientsigninimg from "../../assets/client/signin.jpg";
+import creativesignimg from "../../assets/creative/Rectangle 514.png"
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { loginUser } from "../../lib/authService";
 import { ApiError } from "../../lib/api";
@@ -33,7 +34,7 @@ const FacebookIcon = () => (
 
 const roleConfig = {
   creative: {
-    image: "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=800&q=80",
+    image: creativesignimg,
     nextRoute: "/creative/profile",
     dashboard: "/creative/dashboard",
   },
