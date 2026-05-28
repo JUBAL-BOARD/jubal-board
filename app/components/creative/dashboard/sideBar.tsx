@@ -34,67 +34,69 @@ const Sidebar: React.FC<SidebarProps> = ({ activeItem }) => {
   const pathname = usePathname();
 
   const handleLogout = async () => {
-  localStorage.clear();
-  sessionStorage.clear();
-  await clearSession();
-  await fetch("/api/v1/auth/logout", { method: "POST" });
-  window.location.href = "/onboarding";
-};
+    localStorage.clear();
+    sessionStorage.clear();
+    await clearSession();
+    await fetch("/api/v1/auth/logout", { method: "POST" });
+    window.location.href = "/onboarding";
+  };
 
   return (
-    <div className="w-[200px] lg:w-[300px] h-full h-screen bg-[#fafafa] border-r border-[#f0f0f0] pt-8 lg:pt-5 flex flex-col overflow-y-auto justify-center lg:justify-start lg:pt-10 lg:pl-10">
-      <div>
-        {navItems.map((item) => {
-          const isActive = pathname === item.path || pathname.startsWith(item.path + "/");
-          return (
-            <Link
-              key={item.label}
-              href={item.path}
-              className={`flex items-center gap-3 px-5 py-[3px] text-md lg:text-xl transition-all duration-150
-                ${isActive
-                  ? "text-[#E2554F] font-heading font-semibold"
-                  : "text-gray-700 font-heading font-normal hover:text-[#e2554f]"
-                }`}
-            >
-              <item.icon size={20} />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </div>
-
-      <div>
-        {bottomItems.map((item) => {
-          const isActive = pathname === item.path || pathname.startsWith(item.path + "/");
-
-          if (item.label === "Log out") {
+    <div className="w-[200px] lg:w-[300px] h-screen bg-[#fafafa] border-r border-[#f0f0f0] flex flex-col overflow-y-auto pt-14 lg:pt-10 lg:pl-10">
+      <div className="flex flex-col flex-1 overflow-y-auto pb-6">
+        <div className="flex flex-col gap-2 lg:gap-4">
+          {navItems.map((item) => {
+            const isActive = pathname === item.path || pathname.startsWith(item.path + "/");
             return (
-              <button
+              <Link
                 key={item.label}
-                onClick={handleLogout}
-                className="flex items-center gap-3 px-5 py-[3px] text-md lg:text-xl transition-all duration-150 text-gray-700 font-heading font-normal hover:text-[#e2554f] w-full text-left"
+                href={item.path}
+                className={`flex items-center gap-3 px-5 py-[3px] text-md lg:text-xl transition-all duration-150 cursor-pointer
+                ${isActive
+                    ? "text-[#E2554F] font-heading font-semibold"
+                    : "text-gray-700 font-heading font-normal hover:text-[#e2554f]"
+                  }`}
               >
                 <item.icon size={20} />
                 <span>{item.label}</span>
-              </button>
+              </Link>
             );
-          }
+          })}
+        </div>
 
-          return (
-            <Link
-              key={item.label}
-              href={item.path}
-              className={`flex items-center gap-3 px-5 py-[3px] text-md lg:text-xl transition-all duration-150
+        <div className="flex flex-col gap-2 lg:gap-4 mt-4">
+          {bottomItems.map((item) => {
+            const isActive = pathname === item.path || pathname.startsWith(item.path + "/");
+
+            if (item.label === "Log out") {
+              return (
+                <button
+                  key={item.label}
+                  onClick={handleLogout}
+                  className="flex items-center gap-3 px-5 py-[3px] text-md lg:text-xl transition-all duration-150 text-gray-700 font-heading font-normal hover:text-[#e2554f] w-full text-left"
+                >
+                  <item.icon size={20} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            }
+
+            return (
+              <Link
+                key={item.label}
+                href={item.path}
+                className={`flex items-center gap-3 px-5 py-[3px] text-md lg:text-xl transition-all duration-150
                 ${isActive
-                  ? "text-[#e2554f] font-heading font-semibold"
-                  : "text-gray-700 font-heading font-normal hover:text-[#e2554f]"
-                }`}
-            >
-              <item.icon size={20} />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+                    ? "text-[#e2554f] font-heading font-semibold"
+                    : "text-gray-700 font-heading font-normal hover:text-[#e2554f]"
+                  }`}
+              >
+                <item.icon size={20} />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

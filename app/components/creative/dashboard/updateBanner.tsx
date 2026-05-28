@@ -67,14 +67,14 @@ const UpdateBanner: React.FC = () => {
   return (
     <div ref={containerRef} className="relative w-full mb-5">
       {/* All three banners side by side */}
-      <div className="lg:flex gap-3">
+      <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
         {banners.map((banner) => {
           const Icon = banner.icon;
           return (
             <Link href="/creative/notifications">
               <div
                 key={banner.id}
-                className="flex-1 flex items-center justify-between rounded-[10px] px-[18px] py-3.5"
+                className="flex-1 flex items-center justify-between rounded-[10px] h-[101px] w-full p-[35px] t"
                 style={{
                   background: banner.bgColor,
                   border: `1px solid ${banner.borderColor}`,
@@ -83,12 +83,9 @@ const UpdateBanner: React.FC = () => {
                 <div className="flex items-center gap-3.5">
                   <Icon size={29} stroke={banner.iconColor} />
                   <div>
-                    <p className="m-0 font-heading font-bold text-lg lg:text-xl" style={{ color: banner.textColor }}>{banner.title}</p>
-                    <p className="m-0 text-sm font-body lg:text-md mt-0.5" style={{ color: banner.textColor }}>{banner.message}</p>
+                    <p className="m-0 font-heading font-bold font-normal text-[18px]" style={{ color: banner.textColor }}>{banner.title}</p>
+                    <p className="m-0 text-[12px] font-body font-medium mt-0.5" style={{ color: banner.textColor }}>{banner.message}</p>
                   </div>
-                </div>
-                <div onClick={() => setVisible(false)} className="cursor-pointer p-1">
-                  <X size={16} stroke="black" />
                 </div>
               </div>
             </Link>

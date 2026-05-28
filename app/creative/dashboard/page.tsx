@@ -26,11 +26,11 @@ const CreativeDashboard: React.FC = () => {
   const [showKycModal, setShowKycModal] = useState(false);
 
   useEffect(() => {
-  if (!kycLoading && kycStatus !== null && kycStatus !== "PROVIDER_APPROVED") {
-    setShowKycModal(true);
-  }
-}, [kycStatus, kycLoading]);
-console.log("kycStatus:", kycStatus, "kycLoading:", kycLoading);
+    if (!kycLoading && kycStatus !== null && kycStatus !== "PROVIDER_APPROVED") {
+      setShowKycModal(true);
+    }
+  }, [kycStatus, kycLoading]);
+  console.log("kycStatus:", kycStatus, "kycLoading:", kycLoading);
 
   if (profileLoading || kycLoading) {
     return (
@@ -70,11 +70,11 @@ console.log("kycStatus:", kycStatus, "kycLoading:", kycLoading);
 
         <div
           className={`
-            fixed top-0 left-0 h-full z-40
-            transition-transform duration-300 ease-in-out
-            ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-            lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:z-10
-          `}
+    fixed top-16 left-0 h-full z-40
+    transition-transform duration-300 ease-in-out
+    ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+    lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:z-10
+  `}
         >
           <button
             className="absolute top-4 right-4 z-50 lg:hidden"
