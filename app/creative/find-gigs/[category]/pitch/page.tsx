@@ -419,10 +419,10 @@ export default function MyPitchPage() {
                 <button
                   type="button"
                   onClick={() => setIsCollaborative((prev) => !prev)}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${isCollaborative ? "bg-[#e84545]" : "bg-gray-200"}`}
+                  className={`relative flex-shrink-0 w-11 h-6 rounded-full cursor-pointer transition-colors duration-200 ${isCollaborative ? "bg-[#E2554F]" : "bg-gray-300"}`}
                 >
                   <span
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${isCollaborative ? "translate-x-7" : "translate-x-1"}`}
+                    className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${isCollaborative ? "translate-x-1" : "translate-x-[-18px]"}`}
                   />
                 </button>
               </div>

@@ -4,8 +4,8 @@ import { NextResponse } from "next/server";
 function isTokenExpired(token: string): boolean {
   try {
     const payload = JSON.parse(atob(token.split(".")[1]));
-    // Fire at 3 minutes before expiry — gives more time to retry
-    return payload.exp * 1000 < Date.now() + 3 * 60_000;
+    // Reduced buffer to 30s — 3 min was causing premature logouts
+    return payload.exp * 1000 < Date.now() + 30_000;
   } catch {
     return true;
   }
@@ -29,18 +29,19 @@ export async function GET() {
   }
 
   if (!isTokenExpired(token)) {
-    const payload = JSON.parse(atob(token.split(".")[1]));
     return NextResponse.json({ token });
   }
 
-
+  // Token is expired (or nearly) — attempt refresh
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://16.171.168.144";
     const refreshToken = cookieStore.get("jb_refresh_token")?.value;
 
     if (!refreshToken) {
+      console.warn("=== SESSION === No refresh token found, logging out.");
       return NextResponse.json({ token: null });
     }
+
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.jubalboard.com";
 
     const res = await fetch(`${baseUrl}/api/v1/auth/refresh-token`, {
       method: "POST",
@@ -49,6 +50,7 @@ export async function GET() {
     });
 
     if (!res.ok) {
+      console.warn("=== SESSION === Refresh endpoint returned non-OK:", res.status);
       cookieStore.delete("jb_token");
       cookieStore.delete("jb_refresh_token");
       return NextResponse.json({ token: null });
@@ -58,21 +60,20 @@ export async function GET() {
     const newToken = data.data?.accessToken;
     const newRefreshToken = data.data?.refreshToken;
 
+    // Guard: if backend didn't return a token, don't silently write undefined
     if (!newToken) {
-      console.log("=== TOKEN DEBUG === Refresh response had no accessToken:", JSON.stringify(data));
+      console.error("=== SESSION === Refresh response missing accessToken:", JSON.stringify(data));
+      cookieStore.delete("jb_token");
+      cookieStore.delete("jb_refresh_token");
       return NextResponse.json({ token: null });
     }
 
-    // Log new access token info
-    const accessPayload = JSON.parse(atob(newToken.split(".")[1]));
-
-    // Log new refresh token info
-    if (newRefreshToken) {
-      const refreshPayload = JSON.parse(atob(newRefreshToken.split(".")[1]));
-    } else {
-    }
-
     const expiresInSeconds = Math.floor((getTokenExpiry(newToken) - Date.now()) / 1000);
+
+    // Diagnostic log — remove once confirmed stable
+    const accessPayload = JSON.parse(atob(newToken.split(".")[1]));
+    console.log("=== SESSION === New token exp:", new Date(accessPayload.exp * 1000).toISOString());
+    console.log("=== SESSION === Cookie maxAge (s):", Math.max(expiresInSeconds, 60 * 30));
 
     cookieStore.set("jb_token", newToken, {
       httpOnly: true,
@@ -94,6 +95,7 @@ export async function GET() {
 
     return NextResponse.json({ token: newToken });
   } catch (err) {
+    console.error("=== SESSION === Unexpected error during refresh:", err);
     return NextResponse.json({ token: null });
   }
 }
