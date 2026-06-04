@@ -99,12 +99,12 @@ const CongratulationsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
             style={{ animation: "progress 4s linear forwards" }}
           />
         </div>
-        <p className="text-xs text-gray-400 mb-5">Redirecting to dashboard...</p>
+        <p className="text-xs text-gray-400 mb-5">Redirecting to my-desk...</p>
         <button
           onClick={onClose}
           className="w-full bg-[#E05C5C] hover:bg-[#c94c4c] text-white font-bold py-3 rounded-xl text-sm transition-colors"
         >
-          Go to Dashboard
+          Go to My Desk
         </button>
       </div>
       <style>{`
@@ -343,7 +343,7 @@ const PaymentMethodPage: React.FC = () => {
         <CongratulationsModal
           onClose={() => {
             setShowCongrats(false);
-            router.push("/client/dashboard");
+            router.push("/client/my-desk");
           }}
         />
       )}

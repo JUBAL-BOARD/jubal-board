@@ -23,9 +23,14 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
   const router = useRouter();
   const setActiveProjectTitle = useCollabStore((s) => s.setActiveProjectTitle);
 
+  const handleViewProject = () => {
+    setActiveProjectTitle(gig.title);
+    router.push(`/creative/my-gigs/${gig.id}`)
+  }
+
   const handleUploadDeliverables = () => {
     setActiveProjectTitle(gig.title);
-    router.push(`/creative/my-gigs/${encodeURIComponent(gig.title)}/upload-deliverables?id=${gig.id}`);
+    router.push(`/creative/my-gigs/${gig.id}/upload-deliverables`)
 };
 
   return (
@@ -95,8 +100,8 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
             <button className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
               <MessageCircle size={12} /> Chat Client
             </button>
-            <button className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
-              <Eye size={12} /> View Pitch
+            <button onClick={handleViewProject} className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
+              <Eye size={12} /> View Project
             </button>
           </>
         )}

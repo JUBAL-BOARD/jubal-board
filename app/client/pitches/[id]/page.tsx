@@ -394,7 +394,7 @@ const PitchDetailPage: React.FC = () => {
                 <div className="mt-2 bg-white border border-gray-100 rounded-xl px-4 py-3 flex items-center justify-between text-sm">
                   <span className="text-gray-500">Payment Mode</span>
                   <span className="font-semibold text-black">
-                    {pitch.paymentMode === "MILESTONE" ? "Milestone" : "Flat Payment"}
+                    {pitch.paymentMode === "MILESTONE" ? "Milestone" : "End of Project"}
                   </span>
                 </div>
               )}

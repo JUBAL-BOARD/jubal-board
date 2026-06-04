@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "api.jubalboard.com" },
       { protocol: "https", hostname: "ui-avatars.com" },
       { protocol: "https", hostname: "jubalboard-storage-989615776310-eu-north-1-an.s3.eu-north-1.amazonaws.com", pathname: "/**" },
+      { protocol: "https", hostname: "jubalboard-192408418160-eu-north-1-an.s3.eu-north-1.amazonaws.com" },
       { protocol: "https", hostname: "placehold.co" },
     ],
   },

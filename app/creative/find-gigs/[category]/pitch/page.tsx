@@ -102,6 +102,7 @@ export default function MyPitchPage() {
 
   // Form fields
   const [coverNote, setCoverNote] = useState("");
+  const [bookingFeeAmount, setBookingFeeAmount] = useState("");
   const [timeline, setTimeline] = useState("Less than 24 hours");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [proposedAmount, setProposedAmount] = useState(""); // no pre-fill
@@ -154,9 +155,14 @@ export default function MyPitchPage() {
     if (!coverNote.trim()) return setError("Please write a cover note.");
     if (!proposedAmount) return setError("Please enter your proposed amount.");
     if (!deliveryDate) return setError("Please set a delivery date.");
+    if (!bookingFeeAmount || Number(bookingFeeAmount) < 1) return setError("Please enter a booking fee amount (minimum 1).");
     if (deliveryDate < todayString()) return setError("Delivery date cannot be in the past.");
     if (paymentMode === "MILESTONE" && milestones.some((m) => !m.title || !m.amount || !m.dueDate)) {
       return setError("Please fill in all milestone fields (title, amount, due date).");
+    }
+    if (paymentMode === "MILESTONE") {
+      const totalPercentage = milestones.reduce((sum, m) => sum + Number(m.amount), 0);
+      if (totalPercentage !== 100) return setError(`Milestone percentages must add up to 100%. Current total: ${totalPercentage}%`);
     }
 
     setSubmitting(true);
@@ -171,15 +177,20 @@ export default function MyPitchPage() {
         currency: gig.currency ?? "USD",
         deliveryDate,
         paymentMode,
+        bookingFeeAmount: parseFloat(bookingFeeAmount),
+        bookingPercentage: 0,
+        installmentFrequency: "MONTHLY",
+        installmentPeriod: 1,
+        paymentCompletionMode: "END_OF_PROJECT",
         isCollaborative,
         milestones: paymentMode === "MILESTONE"
           ? milestones.map((m) => ({
-              title: m.title,
-              description: m.description,
-              amount: parseFloat(m.amount),
-              dueDate: m.dueDate,
-              notes: m.notes,
-            }))
+            title: m.title,
+            description: m.description,
+            percentage: parseFloat(m.amount),
+            dueDate: m.dueDate,
+            notes: m.notes,
+          }))
           : [],
       };
 
@@ -276,12 +287,11 @@ export default function MyPitchPage() {
                   <p className="font-semibold text-black text-lg">{userName}</p>
                   <p className="text-sm text-green-500 font-medium mt-0.5">● Online</p>
                   <p className="text-sm text-black mt-2">Verification Status:</p>
-                  <span className={`inline-block mt-1 p-2 text-white text-xs font-semibold ${
-                    kycStatus === "PROVIDER_APPROVED" ? "bg-green-600" :
+                  <span className={`inline-block mt-1 p-2 text-white text-xs font-semibold ${kycStatus === "PROVIDER_APPROVED" ? "bg-green-600" :
                     kycStatus === "PENDING" ? "bg-yellow-500" : "bg-gray-400"
-                  }`}>
+                    }`}>
                     {kycStatus === "PROVIDER_APPROVED" ? "Verified" :
-                     kycStatus === "PENDING" ? "Pending" : "Unverified"}
+                      kycStatus === "PENDING" ? "Pending" : "Unverified"}
                   </span>
                 </div>
               </div>
@@ -392,18 +402,17 @@ export default function MyPitchPage() {
                 <label className="block text-xs text-gray-500 font-medium mb-2">Payment Mode</label>
                 <div className="flex gap-3">
                   {([
-                    { value: "END_OF_PROJECT", label: "Flat Payment" },
+                    { value: "END_OF_PROJECT", label: "End of Project" },
                     { value: "MILESTONE", label: "Milestone" },
                   ] as const).map((mode) => (
                     <button
                       key={mode.value}
                       type="button"
                       onClick={() => setPaymentMode(mode.value)}
-                      className={`px-5 py-2.5 rounded-lg text-sm font-semibold border transition-colors ${
-                        paymentMode === mode.value
-                          ? "bg-[#e84545] text-white border-[#e84545]"
-                          : "bg-white text-gray-600 border-gray-200 hover:border-[#e84545]"
-                      }`}
+                      className={`px-5 py-2.5 rounded-lg text-sm font-semibold border transition-colors ${paymentMode === mode.value
+                        ? "bg-[#e84545] text-white border-[#e84545]"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-[#e84545]"
+                        }`}
                     >
                       {mode.label}
                     </button>
@@ -445,6 +454,18 @@ export default function MyPitchPage() {
               </div>
               <p className="text-xs text-black mt-1.5">Client's budget: {gig.budget}</p>
             </div>
+            <div className="flex items-center gap-2 mt-3">
+              <span className="text-sm text-black font-medium">{gig.currency ?? "USD"}</span>
+              <input
+                type="number"
+                value={bookingFeeAmount}
+                onChange={(e) => setBookingFeeAmount(e.target.value)}
+                placeholder="Enter booking fee amount (min. 1)"
+                min={1}
+                className="flex-1 px-4 py-2.5 text-sm text-black border border-black rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#e84545]/20"
+              />
+            </div>
+            <p className="text-xs text-black mt-1.5">Booking fee charged upfront before work begins.</p>
           </Section>
 
           {/* Delivery Schedule */}
@@ -515,12 +536,14 @@ export default function MyPitchPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-black mb-1">Amount *</label>
+                        <label className="block text-xs text-black mb-1">Percentage (%) *</label>
                         <input
                           type="number"
                           value={m.amount}
                           onChange={(e) => updateMilestone(i, "amount", e.target.value)}
-                          placeholder="e.g. 500"
+                          placeholder="e.g. 30"
+                          min={1}
+                          max={100}
                           className="w-full px-3 py-2 text-sm text-black border border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e84545]/20"
                         />
                       </div>

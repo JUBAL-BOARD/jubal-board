@@ -100,7 +100,7 @@ const MyGigsContent: React.FC = () => {
       const { token } = await tokenRes.json();
 
       if (!token) {
-        router.push("/sign-up");
+        router.push("/signin");
         return;
       }
 

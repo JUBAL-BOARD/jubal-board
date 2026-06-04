@@ -128,6 +128,7 @@ export interface CreativePitch {
   budget: string;
   timeline: string;
   description: string;
+  currency?: string;
   image: string;
   sentAt: string;
   status: "approved" | "pending" | "rejected" | "ongoing"; // add ongoing

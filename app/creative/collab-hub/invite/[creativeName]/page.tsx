@@ -49,7 +49,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function CollaborationBriefPage() {
   const params = useParams();
   const router = useRouter();
+
+  // The route should be something like /creative/collab-hub/invite/[creativeName]/[creativeId]
+  // or you can pass creativeId as a separate param. Adjust based on your actual route structure.
   const creativeName = decodeURIComponent(params.creativeName as string);
+  const creativeId = params.creativeId as string; // <-- ADD this param to your route
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [role, setRole] = useState("");
@@ -59,7 +63,10 @@ export default function CollaborationBriefPage() {
   const [fee, setFee] = useState("$100");
   const [workMode, setWorkMode] = useState("Virtual");
   const [file, setFile] = useState<File | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
   const { profile: creativeProfile, loading: profileLoading, error } = useCreativeProfile();
 
   if (profileLoading) {
@@ -77,10 +84,81 @@ export default function CollaborationBriefPage() {
       </div>
     );
   }
+
   const userName = creativeProfile?.fullName || "Creative";
   const userAvatar =
     creativeProfile?.avatar ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
+
+  // ─── SEND INVITE ───────────────────────────────────────────────────────────
+  async function handleSendInvite() {
+    // Basic validation
+    if (!role.trim()) {
+      setSendError("Please enter a role.");
+      return;
+    }
+    if (!description.trim()) {
+      setSendError("Please enter a description.");
+      return;
+    }
+    if (!deliveryDate) {
+      setSendError("Please select a delivery date.");
+      return;
+    }
+
+    setSendError(null);
+    setSending(true);
+
+    console.log("1. Building invite payload");
+
+    try {
+      const token = localStorage.getItem("accessToken");
+
+      // If the endpoint needs a file, use FormData instead of JSON.
+      // For now sending JSON — swap to FormData below if the backend needs it.
+      const payload: Record<string, unknown> = {
+        invitedCreativeId: creativeId,   // the creative being invited
+        role,
+        description,
+        timeline,
+        deliveryDate,
+        fee,
+        workMode,
+      };
+
+      console.log("2. Payload ready:", payload);
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/collabs/invite`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log("3. Response status:", res.status);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        console.log("4. Error response body:", errData);
+        throw new Error(errData?.message || `Request failed with status ${res.status}`);
+      }
+
+      const data = await res.json();
+      console.log("5. Success:", data);
+
+      // Navigate to responses page after successful invite
+      router.push("/creative/collab-hub/responses");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      console.log("6. Caught error:", message);
+      setSendError(message);
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <DashboardTopbar
@@ -232,7 +310,7 @@ export default function CollaborationBriefPage() {
                     <select
                       value={timeline}
                       onChange={(e) => setTimeline(e.target.value)}
-                      className="w-full appearance-none px-3 py-2.5 text-sm bg-white text-black border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 pr-8 cursor-pointer"
+                      className="w-full appearance-none px-3 py-2.5 text-sm bg-white text-black border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 pr-8 cursor-pointer"
                     >
                       {timelineOptions.map((o) => <option key={o}>{o}</option>)}
                     </select>
@@ -327,19 +405,32 @@ export default function CollaborationBriefPage() {
             </div>
           </Section>
 
+          {/* Error message */}
+          {sendError && (
+            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+              {sendError}
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex justify-end gap-3 mt-6 pb-10">
             <button
               onClick={() => router.back()}
-              className="flex items-center gap-2 px-6 py-2.5 bg-[#1c1c3a] text-white text-sm font-medium rounded-lg hover:bg-[#2a2a50] transition-colors"
+              disabled={sending}
+              className="flex items-center gap-2 px-6 py-2.5 bg-[#1c1c3a] text-white text-sm font-medium rounded-lg hover:bg-[#2a2a50] transition-colors disabled:opacity-50"
             >
               <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
               Cancel
             </button>
-            <button className="px-6 py-2.5 bg-[#e84545] text-white text-sm font-medium rounded-lg hover:bg-[#d03535] transition-colors">
-              Send Now
+            <button
+              onClick={handleSendInvite}
+              disabled={sending}
+              className="flex items-center gap-2 px-6 py-2.5 bg-[#e84545] text-white text-sm font-medium rounded-lg hover:bg-[#d03535] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sending && <Loader2 size={14} className="animate-spin" />}
+              {sending ? "Sending..." : "Send Now"}
             </button>
           </div>
         </main>

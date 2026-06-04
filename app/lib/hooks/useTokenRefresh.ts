@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { clearSession } from "@/app/lib/session";
 
@@ -21,36 +21,43 @@ export function useTokenRefresh() {
 
   useEffect(() => {
     async function schedule() {
-      const res = await fetch("/api/auth/session", { method: "GET", credentials: "include" });
-      const data = await res.json();
+      try {
+        const res = await fetch("/api/auth/session/token", {
+          method: "GET",
+          credentials: "include",
+        });
 
-      if (!data.token) {
-        await clearSession();
-        router.replace("/signin/creative");
-        return;
-      }
-
-      const expiry = getTokenExpiry(data.token);
-      if (!expiry) return;
-
-      const delay = expiry - Date.now() - REFRESH_BUFFER_MS;
-      console.log(`[useTokenRefresh] Token expires in ${Math.round(delay / 1000)}s`);
-
-      if (delay <= 0) {
-        await clearSession();
-        router.replace("/signin/creative");
-        return;
-      }
-
-      timerRef.current = setTimeout(async () => {
-        const last = localStorage.getItem(LAST_ACTIVITY_KEY);
-        if (last && Date.now() - parseInt(last) < INACTIVITY_LIMIT) {
-          // User is active but token is expiring — nothing we can do without refresh token
-          // Just clear and redirect
+        if (!res.ok) {
+          throw new Error("Failed to refresh session token");
         }
+
+        const data = await res.json();
+        const token = data.token;
+
+        if (!token) {
+          await clearSession();
+          router.replace("/signin/creative");
+          return;
+        }
+
+        const expiry = getTokenExpiry(token);
+        if (!expiry) {
+          await clearSession();
+          router.replace("/signin/creative");
+          return;
+        }
+
+        let delay = expiry - Date.now() - REFRESH_BUFFER_MS;
+        if (delay <= 0) {
+          delay = 1000;
+          console.warn("[useTokenRefresh] Token already expiring; retrying refresh in 1s");
+        }
+        console.log(`[useTokenRefresh] Token expires in ${Math.round(delay / 1000)}s`);
+        timerRef.current = setTimeout(schedule, delay);
+      } catch (err) {
         await clearSession();
         router.replace("/signin/creative");
-      }, delay);
+      }
     }
 
     schedule();

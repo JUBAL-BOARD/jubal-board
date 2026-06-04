@@ -83,7 +83,7 @@ const CongratulationsModal: React.FC<{ onGoToDashboard: () => void }> = ({ onGoT
 export default function UploadDeliverablesPage() {
   const params = useParams();
   const searchParams = useSearchParams();
-  const gigId = searchParams.get("id");
+  const gigId = searchParams.get("id") || (params.projectId as string);
   const gigTitleFromUrl = decodeURIComponent(params.gigTitle as string);
   const router = useRouter();
 
@@ -98,7 +98,15 @@ export default function UploadDeliverablesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { profile, loading: profileLoading } = useCreativeProfile();
-  const { detail, loading: gigLoading, error: gigError } = useGigDetail(gigId);
+  const { detail, loading: gigLoading, error: gigError } = useGigDetail(gigId || null);
+
+  if (!gigId) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-white">
+        <p className="text-red-500 text-lg font-semibold">Error: Project ID is missing.</p>
+      </div>
+    );
+  }
 
   if (profileLoading || gigLoading) {
     return (

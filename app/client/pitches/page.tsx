@@ -142,7 +142,13 @@ const IncomingPitches: React.FC = () => {
 
             return (Array.isArray(list) ? list : []).map((p: any) => {
               const cp = p.creativeProfile;
-              const name = cp?.fullName ?? cp?.name ?? "Creative";
+              const name =
+                cp?.fullName ??
+                cp?.name ??
+                p.creativeName ??       // top-level fallback
+                p.creative?.fullName ?? // nested creative object fallback
+                p.creative?.name ??
+                "Creative";
 
               const finalAvatar =
                 imageMap[name] ??
@@ -155,6 +161,7 @@ const IncomingPitches: React.FC = () => {
                 briefTitle: brief.jobTitle,
                 creativeProfile: {
                   ...cp,
+                  fullName: name,
                   avatarUrl: finalAvatar,
                 },
               };
@@ -254,11 +261,10 @@ const IncomingPitches: React.FC = () => {
               <button
                 key={tab}
                 onClick={() => { setActiveFilter(tab); setVisibleCount(12); }}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  activeFilter === tab
-                    ? "bg-[#E05C5C] text-white"
-                    : "bg-white border border-gray-200 text-black"
-                }`}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeFilter === tab
+                  ? "bg-[#E05C5C] text-white"
+                  : "bg-white border border-gray-200 text-black"
+                  }`}
               >
                 {filterLabels[tab]}
               </button>
@@ -345,7 +351,7 @@ const IncomingPitches: React.FC = () => {
                                 {pitch.creativeProfile?.overallRating?.toFixed(1) ?? "—"}
                               </span>
                               <span className="font-medium text-gray-700">
-                                ${pitch.proposedAmount?.toLocaleString() ?? "—"}
+                                {pitch.currency ?? "$"}{pitch.proposedAmount?.toLocaleString() ?? "—"}
                               </span>
                               <span>{formatDate(pitch.deliveryDate)}</span>
                             </div>
@@ -384,13 +390,12 @@ const IncomingPitches: React.FC = () => {
 
                                 {/* Status badge */}
                                 <span
-                                  className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${
-                                    pitch.status === "ACCEPTED"
-                                      ? "bg-green-100 text-green-600"
-                                      : pitch.status === "REJECTED"
-                                        ? "bg-red-100 text-red-500"
-                                        : "bg-yellow-100 text-yellow-600"
-                                  }`}
+                                  className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${pitch.status === "ACCEPTED"
+                                    ? "bg-green-100 text-green-600"
+                                    : pitch.status === "REJECTED"
+                                      ? "bg-red-100 text-red-500"
+                                      : "bg-yellow-100 text-yellow-600"
+                                    }`}
                                 >
                                   {pitch.status}
                                 </span>

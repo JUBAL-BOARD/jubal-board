@@ -906,6 +906,13 @@ export default function ViewProjectPage() {
                     Revised
                   </button>
                   <button
+                    onClick={() => router.push(`/client/my-desk/${projectId}/collaborate`)}
+                    disabled={actionSubmitting}
+                    className="px-5 py-2 bg-[#00b4d8] hover:bg-[#0096c7] text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    Invite to Collaborate
+                  </button>
+                  <button
                     onClick={handleCompleted}
                     disabled={actionSubmitting}
                     className="px-5 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"

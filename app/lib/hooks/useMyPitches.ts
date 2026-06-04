@@ -45,7 +45,7 @@ export function useMyPitches() {
               const json = await r.json();
               return json.data ?? json; // unwrap { success, data, message }
             }
-          } catch {}
+          } catch { }
           return p.brief; // fallback to the partial brief from pitch response
         })
       );
@@ -54,6 +54,7 @@ export function useMyPitches() {
         const brief = detailedBriefs[i];
         const client = brief?.client;
         const category = brief?.category?.name ?? "—";
+        const currency = p.currency ?? brief?.currency ?? "$";
 
         return {
           id: p.id,
@@ -61,14 +62,14 @@ export function useMyPitches() {
           category,
           budget:
             brief?.budgetMin != null
-              ? `$${brief.budgetMin.toLocaleString()} - $${brief.budgetMax.toLocaleString()}`
-              : `$${p.proposedAmount.toLocaleString()}`,
+              ? `${currency}${brief.budgetMin.toLocaleString()} - ${currency}${brief.budgetMax.toLocaleString()}`
+              : `${currency}${p.proposedAmount.toLocaleString()}`,
           timeline: p.deliveryDate
             ? new Date(p.deliveryDate).toLocaleDateString("en-GB", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })
             : "—",
           description: p.coverNote ?? "",
           image: brief?.referenceFileUrls?.[0] ?? "",
@@ -80,6 +81,7 @@ export function useMyPitches() {
             minute: "2-digit",
           }),
           status: p.status.toLowerCase() as CreativePitch["status"],
+          currency,
           client: {
             id: client?.id ?? "",
             name: client?.name ?? "Client",
@@ -94,7 +96,6 @@ export function useMyPitches() {
           },
         };
       });
-
       setPitches(mapped);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");

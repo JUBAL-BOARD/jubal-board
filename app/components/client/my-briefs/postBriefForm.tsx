@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Upload, Calendar, MapPin, Check, X } from "lucide-react";
+import { ChevronDown, Upload, MapPin, Check, X } from "lucide-react";
 import { useBriefStore } from "../../../lib/stores/briefStore";
 
 type Category = { id: string; name: string };
@@ -131,13 +131,25 @@ const PostBriefForm: React.FC = () => {
     if (!form.jobDescription.trim()) return setError("Job description is required.");
     if (!form.budgetMin || !form.budgetMax) return setError("Please enter a budget range.");
     if (Number(form.budgetMin) >= Number(form.budgetMax)) return setError("Max budget must be greater than min.");
-    if (!form.timelineValue) return setError("Please enter a timeline.");
-    if (!form.deliveryDate) return setError("Please set a delivery date.");
+    if (!form.timelineValue) return setError("Please set a delivery date.");
 
     setSubmitting(true);
     try {
       const tokenRes = await fetch("/api/auth/session/token");
       const { token } = await tokenRes.json();
+
+      const timelineMs: Record<string, number> = {
+        hours: 1000 * 60 * 60,
+        days: 1000 * 60 * 60 * 24,
+        weeks: 1000 * 60 * 60 * 24 * 7,
+        months: 1000 * 60 * 60 * 24 * 30,
+      };
+
+      const deliveryDate = new Date(
+        Date.now() + Number(form.timelineValue) * (timelineMs[form.timelineUnit] ?? 1000 * 60 * 60 * 24)
+      )
+        .toISOString()
+        .split("T")[0];
 
       const formData = new FormData();
       formData.append("jobTitle", form.jobTitle);
@@ -149,7 +161,7 @@ const PostBriefForm: React.FC = () => {
       formData.append("budgetMin", form.budgetMin);
       formData.append("budgetMax", form.budgetMax);
       formData.append("timeline", `${form.timelineValue} ${form.timelineUnit}`);
-      formData.append("deliveryDate", form.deliveryDate);
+      formData.append("deliveryDate", deliveryDate);
       formData.append("modeOfProject", MODE_MAP[form.modeOfProject] ?? "VIRTUAL");
       if (form.location) formData.append("location", form.location);
       if (form.referenceFile) formData.append("referenceFiles", form.referenceFile);
