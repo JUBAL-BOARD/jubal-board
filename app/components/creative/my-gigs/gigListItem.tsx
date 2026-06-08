@@ -1,6 +1,5 @@
-import { Clock, MessageCircle, Eye, Upload, Users } from "lucide-react";
+import { Clock, Eye, Upload, Users, UserPlus, MessageCircle } from "lucide-react";
 import { MyGig } from "@/app/types";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCollabStore } from "@/app/lib/stores/collabStore";
 
@@ -18,20 +17,25 @@ const progressColor: Record<string, string> = {
 };
 
 const GigListItem: React.FC<Props> = ({ gig }) => {
-  const isCollab = gig.status === "Collaborating";
+  const isCollab = gig.status === "Collaborating" || gig.isCollab;
+  const collabReady = !isCollab || gig.collabReady;
 
   const router = useRouter();
   const setActiveProjectTitle = useCollabStore((s) => s.setActiveProjectTitle);
 
   const handleViewProject = () => {
     setActiveProjectTitle(gig.title);
-    router.push(`/creative/my-gigs/${gig.id}`)
-  }
+    router.push(`/creative/my-gigs/${gig.id}`);
+  };
 
   const handleUploadDeliverables = () => {
     setActiveProjectTitle(gig.title);
-    router.push(`/creative/my-gigs/${gig.id}/upload-deliverables`)
-};
+    router.push(`/creative/my-gigs/${gig.id}/upload-deliverables`);
+  };
+
+  const handleInvite = () => {
+    router.push(`/creative/collab-hub`);
+  };
 
   return (
     <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4 bg-[#fafafa] border border-gray-100 rounded-xl px-4 py-4 hover:shadow-sm transition-shadow">
@@ -45,7 +49,14 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <h4 className="font-semibold font-heading text-gray-900 text-sm lg:text-md mb-1.5">{gig.title}</h4>
+          <div className="flex items-center gap-2 mb-1.5">
+            <h4 className="font-semibold font-heading text-gray-900 text-sm lg:text-md">{gig.title}</h4>
+            {isCollab && (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-[#E2554F] text-xs font-medium flex-shrink-0">
+                <Users size={10} /> Collab
+              </span>
+            )}
+          </div>
 
           <div className="flex items-center gap-2 mb-1.5">
             <img src={gig.client.avatar} alt={gig.client.name} className="w-5 h-5 lg:w-6 lg:h-6 rounded-full object-cover" />
@@ -68,6 +79,14 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
                 <span className="text-xs text-black">{gig.collabMates.label}</span>
               </div>
             )}
+
+            {/* Waiting hint */}
+            {isCollab && !collabReady && (
+              <span className="flex items-center gap-1 ml-1 text-xs text-[#E2554F] font-medium">
+                <Users size={11} />
+                Waiting: {gig.collaboratorsJoined ?? 0}/{gig.requiredCollaborators ?? "?"} joined
+              </span>
+            )}
           </div>
 
           {/* Progress */}
@@ -84,18 +103,35 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
         </div>
       </div>
 
-      {/* Actions — row on mobile, column on desktop */}
+      {/* Actions */}
       <div className="flex flex-row lg:flex-col flex-wrap gap-2 flex-shrink-0">
-        {isCollab ? (
+        {isCollab && !collabReady ? (
+          // Collab threshold NOT met — only invite button
+          <button
+            onClick={handleInvite}
+            className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <UserPlus size={12} />
+            Invite to Collaborate
+            <span className="opacity-75">
+              ({gig.collaboratorsJoined ?? 0}/{gig.requiredCollaborators ?? "?"})
+            </span>
+          </button>
+        ) : isCollab && collabReady ? (
+          // Collab threshold MET — show collab actions
           <>
             <button className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
               <Users size={12} /> Group Chat
             </button>
-            <button className="flex items-center justify-center gap-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
+            <button onClick={handleViewProject} className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
               <Eye size={12} /> View Progress
+            </button>
+            <button onClick={handleUploadDeliverables} className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
+              <Upload size={12} /> Upload Deliverables
             </button>
           </>
         ) : (
+          // Regular (non-collab) gig
           <>
             <button className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
               <MessageCircle size={12} /> Chat Client
@@ -103,11 +139,11 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
             <button onClick={handleViewProject} className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
               <Eye size={12} /> View Project
             </button>
+            <button onClick={handleUploadDeliverables} className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
+              <Upload size={12} /> Upload Deliverables
+            </button>
           </>
         )}
-        <button onClick={handleUploadDeliverables} className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
-          <Upload size={12} /> Upload Deliverables
-        </button>
       </div>
 
     </div>

@@ -5,11 +5,135 @@ import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import logo from "../../assets/icononly.png";
 import clientsigninimg from "../../assets/client/signin.jpg";
-import creativesignimg from "../../assets/creative/Rectangle 514.png"
+import creativesignimg from "../../assets/creative/Rectangle 514.png";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { loginUser } from "../../lib/authService";
+import { loginUser, oauthLogin } from "../../lib/authService";
 import { ApiError } from "../../lib/api";
 import { parseAuthToken, parseRefreshToken, saveSession } from "../../lib/session";
+
+// ─── OAuth helpers ────────────────────────────────────────────────────────────
+
+declare global {
+  interface Window {
+    google: any;
+    FB: any;
+    AppleID: any;
+  }
+}
+
+function waitForGoogleSDK(timeout = 5000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.google?.accounts?.id) { resolve(); return; }
+    const interval = setInterval(() => {
+      if (window.google?.accounts?.id) { clearInterval(interval); resolve(); }
+    }, 100);
+    setTimeout(() => { clearInterval(interval); reject(new Error("Google SDK failed to load.")); }, timeout);
+  });
+}
+
+async function getGoogleToken(): Promise<{ token: string; name: string }> {
+  await waitForGoogleSDK();
+  return new Promise((resolve, reject) => {
+    window.google.accounts.id.initialize({
+      client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
+      callback: (res: { credential: string }) => {
+        if (!res.credential) { reject(new Error("Google sign-in failed")); return; }
+        const payload = JSON.parse(atob(res.credential.split(".")[1]));
+        resolve({ token: res.credential, name: payload.name ?? "" });
+      },
+      cancel_on_tap_outside: true,
+    });
+    window.google.accounts.id.prompt((n: any) => {
+      if (n.isNotDisplayed() || n.isSkippedMoment()) {
+        const div = document.createElement("div");
+        div.style.display = "none";
+        document.body.appendChild(div);
+        window.google.accounts.id.renderButton(div, { type: "standard" });
+        (div.querySelector("div[role=button]") as HTMLElement)?.click();
+      }
+    });
+  });
+}
+
+function loadFacebookSDK(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.FB) {
+      window.FB.init({
+        appId: process.env.NEXT_PUBLIC_FACEBOOK_APP_ID!,
+        cookie: true,
+        xfbml: true,
+        version: "v19.0",
+      });
+      resolve();
+      return;
+    }
+    const timeout = setTimeout(() => reject(new Error("Facebook SDK timed out.")), 10000);
+    (window as any).fbAsyncInit = () => {
+      window.FB.init({
+        appId: process.env.NEXT_PUBLIC_FACEBOOK_APP_ID!,
+        cookie: true,
+        xfbml: true,
+        version: "v19.0",
+      });
+      clearTimeout(timeout);
+      resolve();
+    };
+    if (!document.getElementById("facebook-jssdk")) {
+      const script = document.createElement("script");
+      script.id = "facebook-jssdk";
+      script.src = "https://connect.facebook.net/en_US/sdk.js";
+      script.async = true;
+      script.defer = true;
+      script.onerror = () => { clearTimeout(timeout); reject(new Error("Failed to load Facebook SDK.")); };
+      document.body.appendChild(script);
+    }
+  });
+}
+
+async function getFacebookToken(): Promise<{ token: string; name: string }> {
+  await loadFacebookSDK();
+  return new Promise((resolve, reject) => {
+    window.FB.login((res: any) => {
+      if (res.status !== "connected" || !res.authResponse?.accessToken) {
+        reject(new Error("Facebook sign-in cancelled or failed"));
+        return;
+      }
+      const accessToken = res.authResponse.accessToken;
+      window.FB.api("/me", { fields: "name" }, (profile: any) => {
+        resolve({ token: accessToken, name: profile?.name ?? "" });
+      });
+    }, { scope: "public_profile,email" });
+  });
+}
+
+function loadAppleSDK(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.AppleID) { resolve(); return; }
+    const s = document.createElement("script");
+    s.src = "https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js";
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Failed to load Apple SDK"));
+    document.body.appendChild(s);
+  });
+}
+
+async function getAppleToken(): Promise<{ token: string; name: string }> {
+  await loadAppleSDK();
+  window.AppleID.auth.init({
+    clientId: process.env.NEXT_PUBLIC_APPLE_CLIENT_ID!,
+    scope: "name email",
+    redirectURI: process.env.NEXT_PUBLIC_APPLE_REDIRECT_URI ?? window.location.origin,
+    usePopup: true,
+  });
+  const data = await window.AppleID.auth.signIn();
+  const token: string = data.authorization?.id_token ?? "";
+  if (!token) throw new Error("Apple sign-in did not return a token");
+  const name = [data.user?.name?.firstName, data.user?.name?.lastName]
+    .filter(Boolean).join(" ");
+  return { token, name };
+}
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24">
@@ -32,6 +156,8 @@ const FacebookIcon = () => (
   </svg>
 );
 
+// ─── Config ───────────────────────────────────────────────────────────────────
+
 const roleConfig = {
   creative: {
     image: creativesignimg,
@@ -45,6 +171,13 @@ const roleConfig = {
   },
 };
 
+const roleMap: Record<string, string> = {
+  creative: "CREATIVE",
+  client: "CLIENT",
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 const SignIn: React.FC = () => {
   const router = useRouter();
   const params = useParams();
@@ -54,6 +187,7 @@ const SignIn: React.FC = () => {
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<"google" | "apple" | "facebook" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const update = (key: string, value: string) => {
@@ -61,6 +195,16 @@ const SignIn: React.FC = () => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  // ── Redirect helper (shared by email + OAuth) ──────────────────────────────
+  const redirectAfterLogin = (user: any) => {
+    if (user?.profileStatus === "Not Completed") {
+      router.push(user?.userType === "CLIENT" ? "/client/profile" : "/creative/profile");
+    } else {
+      router.push(user?.userType === "CLIENT" ? "/client/dashboard" : "/creative/dashboard");
+    }
+  };
+
+  // ── Email/password sign in ─────────────────────────────────────────────────
   const handleSignIn = async () => {
     if (!form.email || !form.password) {
       setError("Please enter your email and password.");
@@ -77,43 +221,22 @@ const SignIn: React.FC = () => {
         const token = parseAuthToken(data);
         const refreshToken = parseRefreshToken(data);
 
-        if (!token) {
-          throw new Error("Login succeeded but no auth token was returned.");
-        }
-
-        // Add this temporarily to confirm the refresh token key
-        console.log("Login response data.data:", data.data);
+        if (!token) throw new Error("Login succeeded but no auth token was returned.");
 
         await saveSession(token, refreshToken ?? undefined);
 
         const user = data.data?.user;
-        if (user) {
-          localStorage.setItem("userData", JSON.stringify(user));
-        }
+        if (user) localStorage.setItem("userData", JSON.stringify(user));
 
-        if (user?.profileStatus === "Not Completed") {
-          const onboardingRoute = user?.userType === "CLIENT"
-            ? "/client/profile"
-            : "/creative/profile";
-          router.push(onboardingRoute);
-        } else {
-          const dashboardRoute = user?.userType === "CLIENT"
-            ? "/client/dashboard"
-            : "/creative/dashboard";
-          router.push(dashboardRoute);
-        }
+        redirectAfterLogin(user);
       } else if (status === 202) {
         router.push(`/verify-email?email=${encodeURIComponent(form.email)}`);
       }
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.status === 401) {
-          setError("Incorrect email or password. Please try again.");
-        } else if (err.status === 403) {
-          setError("Your account has been restricted. Please contact support.");
-        } else {
-          setError(err.message || "Something went wrong. Please try again.");
-        }
+        if (err.status === 401) setError("Incorrect email or password. Please try again.");
+        else if (err.status === 403) setError("Your account has been restricted. Please contact support.");
+        else setError(err.message || "Something went wrong. Please try again.");
       } else {
         setError(err instanceof Error ? err.message : "Unable to connect. Please check your internet connection.");
       }
@@ -122,10 +245,72 @@ const SignIn: React.FC = () => {
     }
   };
 
+  // ── OAuth sign in ──────────────────────────────────────────────────────────
+  const handleOAuth = async (provider: "google" | "apple" | "facebook") => {
+    setOauthLoading(provider);
+    setError(null);
+
+    try {
+      let token = "";
+      let name = "";
+
+      if (provider === "google") {
+        ({ token, name } = await getGoogleToken());
+      } else if (provider === "facebook") {
+        ({ token, name } = await getFacebookToken());
+      } else {
+        ({ token, name } = await getAppleToken());
+      }
+
+      const providerMap = { google: "GOOGLE", apple: "APPLE", facebook: "FACEBOOK" } as const;
+
+      const { data } = await oauthLogin({
+        provider: providerMap[provider],
+        token,
+        role: roleMap[role] ?? "CREATIVE",
+        name,
+      });
+
+      const authToken = parseAuthToken(data);
+      const refreshToken = parseRefreshToken(data);
+
+      if (!authToken) throw new Error("OAuth login succeeded but no auth token was returned.");
+
+      await saveSession(authToken, refreshToken ?? undefined);
+
+      const user = data.data?.user;
+      if (user) localStorage.setItem("userData", JSON.stringify(user));
+
+      redirectAfterLogin(user);
+
+    } catch (err: any) {
+      const msg: string = err?.message ?? "";
+      const cancelled =
+        msg.toLowerCase().includes("cancel") ||
+        msg.toLowerCase().includes("closed") ||
+        msg.toLowerCase().includes("dismissed");
+
+      if (!cancelled) {
+        if (err instanceof ApiError && err.status === 401) {
+          setError("No account found. Please sign up first.");
+        } else if (err instanceof ApiError && err.status === 409) {
+          setError("An account already exists with this email. Try signing in with your password.");
+        } else {
+          setError(msg || "OAuth sign-in failed. Please try again.");
+        }
+      }
+    } finally {
+      setOauthLoading(null);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleSignIn();
   };
 
+  const isAnyLoading = loading || oauthLoading !== null;
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col lg:flex-row h-screen w-screen lg:overflow-hidden">
       <div className="hidden lg:block relative lg:flex-1 lg:h-full flex-shrink-0">
@@ -156,7 +341,7 @@ const SignIn: React.FC = () => {
               onKeyDown={handleKeyDown}
               placeholder="Email Address"
               type="email"
-              disabled={loading}
+              disabled={isAnyLoading}
               className="w-full border border-gray-200 rounded-lg px-3.5 py-3 text-sm text-black outline-none bg-white disabled:opacity-50"
             />
             <div className="relative">
@@ -166,7 +351,7 @@ const SignIn: React.FC = () => {
                 onKeyDown={handleKeyDown}
                 placeholder="Password"
                 type={showPassword ? "text" : "password"}
-                disabled={loading}
+                disabled={isAnyLoading}
                 className="w-full border border-gray-200 rounded-lg px-3.5 py-3 pr-10 text-sm text-black outline-none bg-white disabled:opacity-50"
               />
               <button onClick={() => setShowPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer p-0 flex">
@@ -183,7 +368,7 @@ const SignIn: React.FC = () => {
 
           <button
             onClick={handleSignIn}
-            disabled={loading}
+            disabled={isAnyLoading}
             className="w-full bg-[#E2554F] border-none rounded-lg py-3 lg:py-3.5 cursor-pointer text-white font-bold text-[15px] mb-3 hover:bg-[#d44a44] transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? <><Loader2 size={16} className="animate-spin" /> Signing in...</> : "Sign in"}
@@ -203,13 +388,24 @@ const SignIn: React.FC = () => {
           </div>
 
           <div className="flex gap-2 lg:gap-2.5 mb-5 lg:mb-6">
-            {[
-              { icon: <GoogleIcon />, label: "Google" },
-              { icon: <AppleIcon />, label: "Apple" },
-              { icon: <FacebookIcon />, label: "Facebook" },
-            ].map(({ icon, label }) => (
-              <button key={label} className="flex-1 flex items-center justify-center gap-1.5 lg:gap-2 bg-white border border-gray-200 rounded-lg py-2 lg:py-2.5 cursor-pointer text-[12px] lg:text-[13px] font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                {icon} {label}
+            {(
+              [
+                { key: "google", icon: <GoogleIcon />, label: "Google" },
+                { key: "apple", icon: <AppleIcon />, label: "Apple" },
+                { key: "facebook", icon: <FacebookIcon />, label: "Facebook" },
+              ] as const
+            ).map(({ key, icon, label }) => (
+              <button
+                key={key}
+                onClick={() => handleOAuth(key)}
+                disabled={isAnyLoading}
+                className="flex-1 flex items-center justify-center gap-1.5 lg:gap-2 bg-white border border-gray-200 rounded-lg py-2 lg:py-2.5 cursor-pointer text-[12px] lg:text-[13px] font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {oauthLoading === key
+                  ? <Loader2 size={15} className="animate-spin text-gray-400" />
+                  : icon
+                }
+                <span>{label}</span>
               </button>
             ))}
           </div>

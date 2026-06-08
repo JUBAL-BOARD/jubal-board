@@ -268,7 +268,8 @@ export default function CreativeCollaboratePage() {
                         crumbs={[
                             { label: "Dashboard", path: "/creative/dashboard" },
                             { label: "My Gigs", path: "/creative/my-gigs" },
-                            { label: "Review Deliverables", path: `/creative/my-gigs/${projectId}` },
+                            { label: "View Project", path: `/creative/my-gigs/${projectId}` },
+                            { label: "Collaborate",  },
                         ]}
                     />
 

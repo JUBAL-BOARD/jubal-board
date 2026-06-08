@@ -6,8 +6,112 @@ import Image from "next/image";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import logo from "../../assets/icononly.png";
 import clientsignup from "../../assets/client/signup.jpg";
-import { registerUser } from "../../lib/authService";
+import { registerUser, oauthLogin } from "../../lib/authService";
 import { ApiError } from "../../lib/api";
+
+// ─── OAuth helpers ────────────────────────────────────────────────────────────
+
+declare global {
+  interface Window {
+    google: any;
+    FB: any;
+    AppleID: any;
+  }
+}
+
+function loadFacebookSDK(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof window !== "undefined" && window.FB) { resolve(); return; }
+    (window as any).fbAsyncInit = () => {
+      window.FB.init({
+        appId: process.env.NEXT_PUBLIC_FACEBOOK_APP_ID!,
+        cookie: true,
+        xfbml: true,
+        version: "v19.0",
+      });
+      resolve();
+    };
+    const s = document.createElement("script");
+    s.src = "https://connect.facebook.net/en_US/sdk.js";
+    s.async = true;
+    document.body.appendChild(s);
+  });
+}
+
+function loadAppleSDK(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (typeof window !== "undefined" && window.AppleID) { resolve(); return; }
+    const s = document.createElement("script");
+    s.src = "https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js";
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Failed to load Apple SDK"));
+    document.body.appendChild(s);
+  });
+}
+
+async function getGoogleToken(): Promise<{ token: string; name: string }> {
+  return new Promise((resolve, reject) => {
+    if (!window.google?.accounts?.id) {
+      reject(new Error("Google SDK not loaded"));
+      return;
+    }
+    window.google.accounts.id.initialize({
+      client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
+      callback: (res: { credential: string }) => {
+        if (!res.credential) { reject(new Error("Google sign-in failed")); return; }
+        const payload = JSON.parse(atob(res.credential.split(".")[1]));
+        resolve({ token: res.credential, name: payload.name ?? "" });
+      },
+      cancel_on_tap_outside: true,
+    });
+    window.google.accounts.id.prompt((n: any) => {
+      if (n.isNotDisplayed() || n.isSkippedMoment()) {
+        const div = document.createElement("div");
+        div.style.display = "none";
+        document.body.appendChild(div);
+        window.google.accounts.id.renderButton(div, { type: "standard" });
+        (div.querySelector("div[role=button]") as HTMLElement)?.click();
+      }
+    });
+  });
+}
+
+async function getFacebookToken(): Promise<{ token: string; name: string }> {
+  await loadFacebookSDK();
+  return new Promise((resolve, reject) => {
+    window.FB.login((res: any) => {
+      if (res.status !== "connected" || !res.authResponse?.accessToken) {
+        reject(new Error("Facebook sign-in cancelled or failed"));
+        return;
+      }
+      const accessToken = res.authResponse.accessToken;
+      window.FB.api("/me", { fields: "name" }, (profile: any) => {
+        resolve({ token: accessToken, name: profile?.name ?? "" });
+      });
+    }, { scope: "public_profile,email" });
+  });
+}
+
+async function getAppleToken(): Promise<{ token: string; name: string }> {
+  await loadAppleSDK();
+  window.AppleID.auth.init({
+    clientId: process.env.NEXT_PUBLIC_APPLE_CLIENT_ID!,
+    scope: "name email",
+    redirectURI: process.env.NEXT_PUBLIC_APPLE_REDIRECT_URI ?? window.location.origin,
+    usePopup: true,
+  });
+  const data = await window.AppleID.auth.signIn();
+  const token: string = data.authorization?.id_token ?? "";
+  if (!token) throw new Error("Apple sign-in did not return a token");
+  const name = [data.user?.name?.firstName, data.user?.name?.lastName]
+    .filter(Boolean).join(" ");
+  return { token, name };
+}
+
+// ─── Also add this to your authService.ts ─────────────────────────────────
+// (shown below the component)
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24">
@@ -41,6 +145,13 @@ const roleConfig = {
   },
 };
 
+const roleMap: Record<string, string> = {
+  creative: "CREATIVE",
+  client: "CLIENT",
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 const SignUp: React.FC = () => {
   const router = useRouter();
   const params = useParams();
@@ -50,6 +161,7 @@ const SignUp: React.FC = () => {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<"google" | "apple" | "facebook" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const update = (key: string, value: string) => {
@@ -57,13 +169,8 @@ const SignUp: React.FC = () => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const roleMap: Record<string, string> = {
-  creative: "CREATIVE",
-  client: "CLIENT",
-};
-
+  // ── Email/password submit ──────────────────────────────────────────────────
   const handleSubmit = async () => {
-    // Client-side validation
     if (!form.name || !form.email || !form.password) {
       setError("Please fill in all fields.");
       return;
@@ -83,21 +190,14 @@ const SignUp: React.FC = () => {
         password: form.password,
         role: roleMap[role] ?? "CREATIVE",
       });
-
-      // Registration successful — backend sends OTP email
-      // Redirect to verify-email screen with email + next route in query
       router.push(
         `/verify-email?email=${encodeURIComponent(form.email)}&role=${role}&next=${encodeURIComponent(config.nextRoute)}`
       );
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.status === 409) {
-          setError("An account with this email already exists. Try signing in.");
-        } else if (err.status === 422) {
-          setError("Please check your details and try again.");
-        } else {
-          setError(err.message || "Something went wrong. Please try again.");
-        }
+        if (err.status === 409) setError("An account with this email already exists. Try signing in.");
+        else if (err.status === 422) setError("Please check your details and try again.");
+        else setError(err.message || "Something went wrong. Please try again.");
       } else {
         setError("Unable to connect. Please check your internet connection.");
       }
@@ -106,10 +206,67 @@ const SignUp: React.FC = () => {
     }
   };
 
+  // ── OAuth submit ───────────────────────────────────────────────────────────
+  const handleOAuth = async (provider: "google" | "apple" | "facebook") => {
+    setOauthLoading(provider);
+    setError(null);
+
+    try {
+      let token = "";
+      let name = "";
+
+      if (provider === "google") {
+        ({ token, name } = await getGoogleToken());
+      } else if (provider === "facebook") {
+        ({ token, name } = await getFacebookToken());
+      } else {
+        ({ token, name } = await getAppleToken());
+      }
+
+      // Map provider to what the backend expects
+      const providerMap = {
+        google: "GOOGLE",
+        apple: "APPLE",
+        facebook: "FACEBOOK",
+      } as const;
+
+      await oauthLogin({
+        provider: providerMap[provider],
+        token,
+        role: roleMap[role] ?? "CREATIVE",
+        name,
+      });
+
+      // OAuth login doesn't require email verification — go straight to app
+      router.push(config.nextRoute);
+
+    } catch (err: any) {
+      // Ignore user-cancelled flows silently
+      const msg: string = err?.message ?? "";
+      const cancelled =
+        msg.toLowerCase().includes("cancel") ||
+        msg.toLowerCase().includes("closed") ||
+        msg.toLowerCase().includes("dismissed");
+
+      if (!cancelled) {
+        if (err instanceof ApiError && err.status === 409) {
+          setError("An account already exists with this email. Try signing in.");
+        } else {
+          setError(msg || "OAuth sign-in failed. Please try again.");
+        }
+      }
+    } finally {
+      setOauthLoading(null);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleSubmit();
   };
 
+  const isAnyLoading = loading || oauthLoading !== null;
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col lg:flex-row h-screen lg:h-screen w-screen lg:overflow-hidden">
 
@@ -162,7 +319,7 @@ const SignUp: React.FC = () => {
               onChange={(e) => update("name", e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Name"
-              disabled={loading}
+              disabled={isAnyLoading}
               className="w-full border border-gray-200 rounded-lg px-3.5 py-3 text-sm text-black outline-none bg-white box-border disabled:opacity-50"
             />
             <input
@@ -171,7 +328,7 @@ const SignUp: React.FC = () => {
               onKeyDown={handleKeyDown}
               placeholder="Email Address"
               type="email"
-              disabled={loading}
+              disabled={isAnyLoading}
               className="w-full border border-gray-200 rounded-lg px-3.5 py-3 text-sm text-black outline-none bg-white box-border disabled:opacity-50"
             />
             <div className="relative">
@@ -181,7 +338,7 @@ const SignUp: React.FC = () => {
                 onKeyDown={handleKeyDown}
                 placeholder="Password"
                 type={showPassword ? "text" : "password"}
-                disabled={loading}
+                disabled={isAnyLoading}
                 className="w-full border border-gray-200 rounded-lg px-3.5 py-3 pr-10 text-sm text-black outline-none bg-white box-border disabled:opacity-50"
               />
               <button
@@ -194,25 +351,18 @@ const SignUp: React.FC = () => {
                 }
               </button>
             </div>
-            <p className="m-0 mb-1 text-xs text-black">
-              Must be at least 8 characters
-            </p>
+            <p className="m-0 mb-1 text-xs text-black">Must be at least 8 characters</p>
           </div>
 
           {/* CTA */}
           <button
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={isAnyLoading}
             className="w-full bg-[#E2554F] border-none rounded-lg py-3 lg:py-3.5 cursor-pointer text-white font-bold text-[15px] mb-3 lg:mb-3.5 hover:bg-[#d44a44] transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                Creating account...
-              </>
-            ) : (
-              "Let's Go"
-            )}
+              <><Loader2 size={16} className="animate-spin" /> Creating account...</>
+            ) : "Let's Go"}
           </button>
 
           {/* Sign in */}
@@ -235,16 +385,23 @@ const SignUp: React.FC = () => {
 
           {/* Social buttons */}
           <div className="flex gap-2 lg:gap-2.5 mb-5 lg:mb-6">
-            {[
-              { icon: <GoogleIcon />, label: "Google" },
-              { icon: <AppleIcon />, label: "Apple" },
-              { icon: <FacebookIcon />, label: "Facebook" },
-            ].map(({ icon, label }) => (
+            {(
+              [
+                { key: "google", icon: <GoogleIcon />, label: "Google" },
+                { key: "apple", icon: <AppleIcon />, label: "Apple" },
+                { key: "facebook", icon: <FacebookIcon />, label: "Facebook" },
+              ] as const
+            ).map(({ key, icon, label }) => (
               <button
-                key={label}
-                className="flex-1 flex items-center justify-center gap-1.5 lg:gap-2 bg-white border border-gray-200 rounded-lg py-2 lg:py-2.5 cursor-pointer text-[12px] lg:text-[13px] font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                key={key}
+                onClick={() => handleOAuth(key)}
+                disabled={isAnyLoading}
+                className="flex-1 flex items-center justify-center gap-1.5 lg:gap-2 bg-white border border-gray-200 rounded-lg py-2 lg:py-2.5 cursor-pointer text-[12px] lg:text-[13px] font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {icon}
+                {oauthLoading === key
+                  ? <Loader2 size={15} className="animate-spin text-gray-400" />
+                  : icon
+                }
                 <span className="hidden sm:inline">{label}</span>
               </button>
             ))}

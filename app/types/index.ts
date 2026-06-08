@@ -181,6 +181,10 @@ export interface MyGig {
     avatars: string[];
     label: string;
   };
+  isCollab?: boolean;
+  collabReady?: boolean;
+  requiredCollaborators?: number;
+  collaboratorsJoined?: number;
 }
 
 export interface ChatMessage {

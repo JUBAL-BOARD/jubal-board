@@ -63,3 +63,24 @@ export async function resendVerification(email: string) {
     body: JSON.stringify({ email }),
   });
 }
+
+export async function oauthLogin(payload: {
+  provider: "GOOGLE" | "APPLE" | "FACEBOOK";
+  token: string;
+  role: string;
+  name: string;
+}) {
+  const providerRouteMap = {
+    GOOGLE: "google",
+    APPLE: "apple",
+    FACEBOOK: "facebook",
+  };
+
+  return apiRequest<LoginResponse>(
+    `/api/v1/auth/oauth/${providerRouteMap[payload.provider]}`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}

@@ -3,10 +3,11 @@ import { Poppins, Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import TokenRefresher from "./components/home/tokenRefresher";
+import Script from "next/script";
 
 const poppins = Poppins({
   subsets: ["latin"],
-  weight: ["400", "600", "700"], // choose what you need
+  weight: ["400", "600", "700"],
   variable: "--font-poppins",
 });
 
@@ -28,9 +29,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${poppins.variable} ${inter.variable} antialiased`}
-      >
+      <body className={`${poppins.variable} ${inter.variable} antialiased`}>
+        <Script
+          src="https://accounts.google.com/gsi/client"
+          strategy="beforeInteractive"
+        />
         <TokenRefresher />
         {children}
         <Toaster position="top-center" />

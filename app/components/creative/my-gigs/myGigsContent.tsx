@@ -29,6 +29,7 @@ interface ApiGigDetail {
   clientId: string;
   progressPercentage: number;
   collabDeadline: string | null;
+  collaboratorsJoined?: number;
 }
 
 const filterChips = ["All Gigs", "Active", "Recent", "Completed", "Revised", "Partially Completed", "On Collab"];
@@ -177,6 +178,11 @@ const MyGigsContent: React.FC = () => {
                   : "No deadline",
               progress: getProgress(detail.status),
               status: apiStatusToMyGig(detail.status),
+              isCollab: detail.status === "COLLABORATING" || g.requiredCollaborators > 1,
+              collabReady: !(detail.status === "COLLABORATING" || g.requiredCollaborators > 1)
+                || ((detail as any).collaboratorsJoined ?? 0) >= g.requiredCollaborators,
+              requiredCollaborators: g.requiredCollaborators,
+              collaboratorsJoined: (detail as any).collaboratorsJoined ?? 0,
             };
           } catch {
             return {
@@ -190,10 +196,15 @@ const MyGigsContent: React.FC = () => {
               dueIn: g.collabDeadline ? getDueIn(g.collabDeadline) : "No deadline",
               progress: getProgress(g.status),
               status: apiStatusToMyGig(g.status),
+              isCollab: g.status === "COLLABORATING" || g.requiredCollaborators > 1,
+              collabReady: !(g.status === "COLLABORATING" || g.requiredCollaborators > 1)
+                || ((g as any).collaboratorsJoined ?? 0) >= g.requiredCollaborators,
+              requiredCollaborators: g.requiredCollaborators,
+              collaboratorsJoined: (g as any).collaboratorsJoined ?? 0,
             };
           }
         })
-      )).filter((gig): gig is MyGig => !!gig?.id && !!gig?.title);
+      )).filter(Boolean) as MyGig[];
 
       setGigs(mapped);
     } catch (err) {
@@ -251,8 +262,8 @@ const MyGigsContent: React.FC = () => {
             key={chip}
             onClick={() => { setActiveChip(chip); setPage(1); }}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeChip === chip
-                ? "bg-[#E2554F] text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              ? "bg-[#E2554F] text-white"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
           >
             {chip}
