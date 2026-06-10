@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import logo from "../../../assets/icononly.png";
 import { Star, BadgeCheck, MessageCircle, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { fetchConversations, createConversation, fetchChatTopics } from "@/app/lib/api/messageApi";
 
 interface Creative {
   id: string;
@@ -16,49 +18,99 @@ interface Creative {
   premium?: boolean;
 }
 
-const CreativeCard: React.FC<{ creative: Creative }> = ({ creative }) => (
-  <div className="bg-white border border-gray-200 rounded-[10px] overflow-hidden min-w-[300px] h-[400px] flex-shrink-0">
-    <div className="relative h-[250px]">
-      <Image src={logo} alt="portfolio" fill className="object-cover" />
-      {creative.premium && (
-        <span className="absolute bottom-2 right-2 bg-[#F59E0B] text-white text-[10px] font-bold px-2 py-0.5 rounded">
-          Premium
-        </span>
-      )}
-    </div>
+const CreativeCard: React.FC<{ creative: Creative }> = ({ creative }) => {
+  const router = useRouter();
+  const [chatLoading, setChatLoading] = useState(false);
 
-    <div className="px-3.5 pt-[30px] pb-3.5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="relative w-[50px] h-[50px] flex-shrink-0" style={{ width: "36px", height: "36px", minWidth: "36px" }}>
-            <Image src={creative.avatar} alt={creative.name} fill className="rounded-full object-cover" />
-            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-white" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1">
-              <span className="text-[13px] font-bold text-[#1a1a2e]">{creative.name}</span>
-              {creative.verified && <BadgeCheck size={14} fill="#3B82F6" stroke="white" />}
+  const handleChatCreative = async () => {
+  try {
+    setChatLoading(true);
+
+    const convRes = await fetchConversations({ limit: 50 });
+    const list = Array.isArray(convRes) ? convRes : convRes.data ?? [];
+    const existing = list.find(
+      (c) => c.otherParticipant.id === creative.id  // 👈 match by id, not name (more reliable)
+    );
+
+    if (existing) {
+      router.push(`/client/messages/${existing.id}`);
+      return;
+    }
+
+    const topics = await fetchChatTopics();
+    if (!topics || topics.length === 0) {
+      console.error("No chat topics available");
+      return;
+    }
+
+    const newConv = await createConversation({
+      recipientId: creative.id,
+      topicId: topics[0].id,
+      type: "DIRECT",
+    });
+
+    router.push(`/client/messages/${newConv.conversation.id}`); // 👈 fixed
+  } catch (err) {
+    console.error("Chat creative failed:", err);
+  } finally {
+    setChatLoading(false);
+  }
+};
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-[10px] overflow-hidden min-w-[300px] h-[400px] flex-shrink-0">
+      <div className="relative h-[250px]">
+        <Image src={logo} alt="portfolio" fill className="object-cover" />
+        {creative.premium && (
+          <span className="absolute bottom-2 right-2 bg-[#F59E0B] text-white text-[10px] font-bold px-2 py-0.5 rounded">
+            Premium
+          </span>
+        )}
+      </div>
+
+      <div className="px-3.5 pt-[30px] pb-3.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="relative w-[50px] h-[50px] flex-shrink-0" style={{ width: "36px", height: "36px", minWidth: "36px" }}>
+              <Image src={creative.avatar} alt={creative.name} fill className="rounded-full object-cover" />
+              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-white" />
             </div>
-            <span className="text-[11px] text-gray-500">{creative.role}</span>
+            <div>
+              <div className="flex items-center gap-1">
+                <span className="text-[13px] font-bold text-[#1a1a2e]">{creative.name}</span>
+                {creative.verified && <BadgeCheck size={14} fill="#3B82F6" stroke="white" />}
+              </div>
+              <span className="text-[11px] text-gray-500">{creative.role}</span>
+            </div>
           </div>
-        </div>
-        <div className="w-7 h-7 rounded-full bg-[#1a1a2e] flex items-center justify-center cursor-pointer">
-          <MessageCircle size={14} stroke="#6B7280" />
-        </div>
-      </div>
 
-      <div className="flex items-center justify-between mt-2.5">
-        <div className="flex items-center gap-1">
-          <Star size={13} fill="#F59E0B" stroke="#F59E0B" />
-          <span className="text-xs font-semibold text-gray-700">{creative.rating.toFixed(1)}</span>
+          {/* Chat button */}
+          <button
+            onClick={handleChatCreative}
+            disabled={chatLoading}
+            className="w-7 h-7 rounded-full bg-[#1a1a2e] flex items-center justify-center cursor-pointer disabled:opacity-60 transition-opacity"
+          >
+            {chatLoading ? (
+              <Loader2 size={14} stroke="#6B7280" className="animate-spin" />
+            ) : (
+              <MessageCircle size={14} stroke="#6B7280" />
+            )}
+          </button>
         </div>
-        <button className="bg-transparent border-none cursor-pointer text-xs text-[#E2554F] font-semibold hover:underline">
-          View Profile
-        </button>
+
+        <div className="flex items-center justify-between mt-2.5">
+          <div className="flex items-center gap-1">
+            <Star size={13} fill="#F59E0B" stroke="#F59E0B" />
+            <span className="text-xs font-semibold text-gray-700">{creative.rating.toFixed(1)}</span>
+          </div>
+          <button className="bg-transparent border-none cursor-pointer text-xs text-[#E2554F] font-semibold hover:underline">
+            View Profile
+          </button>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const SuggestedCreatives: React.FC = () => {
   const [creatives, setCreatives] = useState<Creative[]>([]);

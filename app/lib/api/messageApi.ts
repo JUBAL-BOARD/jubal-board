@@ -44,11 +44,20 @@ export interface ConversationsResponse {
 export interface Message {
   id: string;
   senderId: string;
+  conversationId?: string;
   content: string;
   contentType: "TEXT" | "IMAGE" | "FILE";
   fileUrl: string | null;
+  attachmentUrl?: string | null;
   isRead: boolean;
+  readAt?: string | null;
   createdAt: string;
+  topicId?: string;
+  sender?: {
+    id: string;
+    name: string;
+    avatarUrl?: string | null;
+  };
 }
 
 export interface ConversationDetail {
@@ -56,7 +65,7 @@ export interface ConversationDetail {
     id: string;
     type: "DIRECT" | "GROUP";
     topic: { id: string; name: string };
-    participants: ConversationParticipant[];
+    participants?: ConversationParticipant[];
     createdAt: string;
   };
   messages: {
@@ -65,6 +74,8 @@ export interface ConversationDetail {
     page: number;
     limit: number;
   };
+  page?: number;
+  limit?: number;
 }
 
 export interface SendMessagePayload {
@@ -75,6 +86,20 @@ export interface SendMessagePayload {
 
 export interface CreateConversationPayload {
   recipientId: string;
+  topicId: string;
+  type: "DIRECT" | "GROUP";
+}
+
+// ─── New return type for createConversation ───────────────────────────────────
+
+export interface CreateConversationResponse {
+  conversation: {
+    id: string;
+    type: "DIRECT" | "GROUP";
+    createdAt: string;
+    updatedAt: string;
+    topicId: string;
+  };
   topicId: string;
   type: "DIRECT" | "GROUP";
 }
@@ -126,7 +151,7 @@ export async function fetchConversations(params?: {
 
 export async function createConversation(
   payload: CreateConversationPayload
-): Promise<{ id: string }> {
+): Promise<CreateConversationResponse> { // 👈 updated return type
   const token = await getToken();
   const res = await apiRequest<any>("/api/v1/messages/conversations", {
     method: "POST",

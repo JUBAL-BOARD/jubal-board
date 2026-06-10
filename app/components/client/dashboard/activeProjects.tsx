@@ -4,11 +4,13 @@ import Image from "next/image";
 import { MessageSquare, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { fetchConversations, createConversation, fetchChatTopics } from "@/app/lib/api/messageApi";
 
 interface Project {
   id: string;
   title: string;
   assignee: string;
+  assigneeId: string; // 👈 added
   assigneeAvatar: string;
   status: string;
   progress: number;
@@ -30,45 +32,93 @@ const getProgress = (status: string): number => {
   return map[status] ?? 40;
 };
 
-const ProjectRow: React.FC<{ project: Project }> = ({ project }) => (
-  <div className="flex items-center gap-3 py-3 border-b border-gray-100">
-    <div className="relative w-[100px] h-[100px] flex-shrink-0">
-      <Image
-        src={project.thumbnail}
-        alt={project.title}
-        fill
-        className="object-cover"
-      />
-    </div>
-    <div className="flex-1 min-w-0">
-      <p className="m-0 text-xl font-heading font-semibold text-[#1a1a2e]">{project.title}</p>
-      <div className="flex items-center gap-1.5 my-1">
+const ProjectRow: React.FC<{ project: Project }> = ({ project }) => {
+  const router = useRouter();
+  const [chatLoading, setChatLoading] = useState(false);
+
+  const handleChat = async () => {
+    try {
+      setChatLoading(true);
+
+      const convRes = await fetchConversations({ limit: 50 });
+      const list = Array.isArray(convRes) ? convRes : convRes.data ?? [];
+      const existing = list.find(
+        (c) => c.otherParticipant.id === project.assigneeId
+      );
+
+      if (existing) {
+        router.push(`/client/messages/${existing.id}`);
+        return;
+      }
+
+      const topics = await fetchChatTopics();
+      if (!topics || topics.length === 0) {
+        console.error("No chat topics available");
+        return;
+      }
+
+      const newConv = await createConversation({
+        recipientId: project.assigneeId,
+        topicId: topics[0].id,
+        type: "DIRECT",
+      });
+
+      router.push(`/client/messages/${newConv.conversation.id}`);
+    } catch (err) {
+      console.error("Chat failed:", err);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3 py-3 border-b border-gray-100">
+      <div className="relative w-[100px] h-[100px] flex-shrink-0">
         <Image
-          src={project.assigneeAvatar}
-          alt={project.assignee}
-          width={30}
-          height={30}
-          style={{ width: '30px', height: '30px', minWidth: '30px' }} 
-          className="rounded-full object-cover"
+          src={project.thumbnail}
+          alt={project.title}
+          fill
+          className="object-cover"
         />
-        <span className="text-sm text-black">{project.assignee}</span>
       </div>
-      <span className="text-[15px] text-[#E2554F] font-medium">{project.status}</span>
-      <div className="flex items-center gap-2 mt-1">
-        <div className="flex-1 h-[5px] bg-gray-100 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-[#E2554F] rounded-full"
-            style={{ width: `${project.progress}%` }}
+      <div className="flex-1 min-w-0">
+        <p className="m-0 text-xl font-heading font-semibold text-[#1a1a2e]">{project.title}</p>
+        <div className="flex items-center gap-1.5 my-1">
+          <Image
+            src={project.assigneeAvatar}
+            alt={project.assignee}
+            width={30}
+            height={30}
+            style={{ width: '30px', height: '30px', minWidth: '30px' }}
+            className="rounded-full object-cover"
           />
+          <span className="text-sm text-black">{project.assignee}</span>
         </div>
-        <span className="text-[14px] text-black whitespace-nowrap">{project.progress}%</span>
+        <span className="text-[15px] text-[#E2554F] font-medium">{project.status}</span>
+        <div className="flex items-center gap-2 mt-1">
+          <div className="flex-1 h-[5px] bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[#E2554F] rounded-full"
+              style={{ width: `${project.progress}%` }}
+            />
+          </div>
+          <span className="text-[14px] text-black whitespace-nowrap">{project.progress}%</span>
+        </div>
       </div>
+      <button
+        onClick={handleChat}
+        disabled={chatLoading}
+        className="w-7 h-7 rounded-full bg-[#1a1a2e] flex items-center justify-center cursor-pointer flex-shrink-0 disabled:opacity-60 transition-opacity"
+      >
+        {chatLoading ? (
+          <Loader2 size={14} stroke="white" className="animate-spin" />
+        ) : (
+          <MessageSquare size={14} stroke="white" />
+        )}
+      </button>
     </div>
-    <div className="w-7 h-7 rounded-full bg-[#1a1a2e] flex items-center justify-center cursor-pointer flex-shrink-0">
-      <MessageSquare size={14} stroke="white" />
-    </div>
-  </div>
-);
+  );
+};
 
 const ActiveProjects: React.FC = () => {
   const router = useRouter();
@@ -85,7 +135,6 @@ const ActiveProjects: React.FC = () => {
         const { token } = await tokenRes.json();
         const headers = { Authorization: `Bearer ${token}` };
 
-        // 1. BUILD IMAGE MAP FROM SUGGESTED CREATIVES (Match Hook Logic)
         const imageMap: Record<string, string> = {};
         try {
           const suggestedRes = await fetch("/api/v1/creatives/suggested", {
@@ -116,6 +165,7 @@ const ActiveProjects: React.FC = () => {
           await Promise.all(
             list.slice(0, 4).map(async (p: any) => {
               let creative = null;
+              let creativeId = "";
               let thumbnail = "/placeholder.png";
 
               try {
@@ -145,18 +195,17 @@ const ActiveProjects: React.FC = () => {
                       const matchedPitch = pitchesList.find((pitch: any) => pitch.id === detail.pitchId);
                       if (matchedPitch) {
                         creative = matchedPitch.creativeProfile ?? null;
+                        creativeId = matchedPitch.creativeId ?? ""; // 👈
                       }
                     }
                   }
                 }
               } catch { /* fall back */ }
 
-              // 2. APPLY AVATAR FALLBACK HIERARCHY (Match Hook Logic)
               const assigneeName = creative?.fullName ?? creative?.name ?? "Creative";
-
               const assigneeAvatar =
-                imageMap[assigneeName] ??         // Check suggested map first
-                creative?.avatarUrl ??            // Then creative profile props
+                imageMap[assigneeName] ??
+                creative?.avatarUrl ??
                 creative?.imageUrl ??
                 `https://ui-avatars.com/api/?name=${encodeURIComponent(assigneeName)}&background=1a1a2e&color=fff&size=128`;
 
@@ -164,7 +213,8 @@ const ActiveProjects: React.FC = () => {
                 id: p.id,
                 title: p.title ?? p.brief?.jobTitle ?? "Untitled",
                 assignee: assigneeName,
-                assigneeAvatar: assigneeAvatar,
+                assigneeId: creativeId, // 👈
+                assigneeAvatar,
                 thumbnail,
                 status: p.status ?? "In Progress",
                 progress: getProgress(p.status),

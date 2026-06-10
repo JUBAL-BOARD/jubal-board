@@ -16,7 +16,6 @@ export function useClientProjects(statusFilter?: string) {
         const { token } = await tokenRes.json();
         const headers = { Authorization: `Bearer ${token}` };
 
-        // Build image map from suggested creatives
         const imageMap: Record<string, string> = {};
         try {
           const suggestedRes = await fetch("/api/v1/creatives/suggested", { headers, credentials: "include" });
@@ -26,9 +25,7 @@ export function useClientProjects(statusFilter?: string) {
               if (c.name && c.imageUrl) imageMap[c.name] = c.imageUrl;
             });
           }
-        } catch {
-          // fail silently, avatars will fall back to ui-avatars
-        }
+        } catch {}
 
         const params = new URLSearchParams();
         if (statusFilter) params.set("status", statusFilter);
@@ -46,6 +43,7 @@ export function useClientProjects(statusFilter?: string) {
           await Promise.all(
             list.map(async (p: any) => {
               let creative = null;
+              let creativeId = "";          // 👈 added
               let deadline = p.deadline ? new Date(p.deadline) : null;
               let thumbnail = "/placeholder.png";
 
@@ -60,13 +58,10 @@ export function useClientProjects(statusFilter?: string) {
                   const detail = detailJson.data;
                   deadline = detail.dueDate ? new Date(detail.dueDate) : deadline;
 
-                  // Parse thumbnail from brief's referenceFileUrl
                   try {
                     const urls = JSON.parse(detail.brief?.referenceFileUrl ?? "[]");
                     if (Array.isArray(urls) && urls.length > 0) thumbnail = urls[0];
-                  } catch {
-                    // keep default
-                  }
+                  } catch {}
 
                   if (detail.pitchId && detail.briefId) {
                     const pitchesRes = await fetch(`/api/v1/briefs/${detail.briefId}/pitches`, {
@@ -80,13 +75,12 @@ export function useClientProjects(statusFilter?: string) {
                       const matchedPitch = pitchesList.find((pitch: any) => pitch.id === detail.pitchId);
                       if (matchedPitch) {
                         creative = matchedPitch.creativeProfile ?? null;
+                        creativeId = matchedPitch.creativeId ?? "";  // 👈 added
                       }
                     }
                   }
                 }
-              } catch {
-                // fall back to defaults
-              }
+              } catch {}
 
               const dueLabel = deadline
                 ? `Due ${deadline.toLocaleDateString("en-GB", {
@@ -108,11 +102,7 @@ export function useClientProjects(statusFilter?: string) {
                 DISPUTED: "In Progress",
               };
 
-              const creativeName =
-                creative?.fullName ??
-                creative?.name ??
-                "Creative";
-
+              const creativeName = creative?.fullName ?? creative?.name ?? "Creative";
               const creativeAvatar =
                 imageMap[creativeName] ??
                 creative?.avatarUrl ??
@@ -124,13 +114,12 @@ export function useClientProjects(statusFilter?: string) {
                 title: p.title ?? p.brief?.jobTitle ?? "Untitled",
                 thumbnail,
                 status: statusMap[p.status] ?? "In Progress",
-                progress:
-                  p.status === "COMPLETED" ? 100 : p.status === "REVISION" ? 60 : 40,
+                progress: p.status === "COMPLETED" ? 100 : p.status === "REVISION" ? 60 : 40,
                 dueLabel,
                 chatLabel: "Chat Creative",
                 isCollab: false,
                 assignee: {
-                  id: creative?.id ?? "",
+                  id: creativeId,        // 👈 was creative?.id ?? ""
                   name: creativeName,
                   avatar: creativeAvatar,
                   isOnline: false,

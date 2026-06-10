@@ -3,6 +3,7 @@ import {
   fetchConversationDetail,
   fetchGroupConversationDetail,
   ConversationDetail,
+  Message,
 } from "@/app/lib/api/messageApi";
 
 export function useConversationDetail(
@@ -23,8 +24,18 @@ export function useConversationDetail(
           ? await fetchGroupConversationDetail(conversationId)
           : await fetchConversationDetail(conversationId);
 
-      // Handle both wrapped { data: {...} } and unwrapped responses
       const data: any = (raw as any)?.data ?? raw;
+
+      // API returns messages as a plain array — normalize to { data: [] }
+      if (Array.isArray(data?.messages)) {
+        data.messages = {
+          data: data.messages,
+          total: data.messages.length,
+          page: data.page ?? 1,
+          limit: data.limit ?? 30,
+        };
+      }
+
       setDetail(data);
     } catch (err: any) {
       console.error("useConversationDetail error:", err);
@@ -38,5 +49,21 @@ export function useConversationDetail(
     load();
   }, [load]);
 
-  return { detail, loading, error, refetch: load };
+  const appendMessage = useCallback((newMsg: Message) => {
+    setDetail((prev) => {
+      if (!prev) return prev;
+      const existingMessages = prev.messages?.data ?? [];
+      const alreadyExists = existingMessages.some((m) => m.id === newMsg.id);
+      if (alreadyExists) return prev;
+      return {
+        ...prev,
+        messages: {
+          ...prev.messages,
+          data: [...existingMessages, newMsg],
+        },
+      };
+    });
+  }, []);
+
+  return { detail, loading, error, refetch: load, appendMessage };
 }

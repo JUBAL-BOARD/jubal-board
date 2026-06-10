@@ -1,9 +1,10 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Smile, Paperclip, ArrowLeft, Mic, Loader2 } from "lucide-react";
 import { Conversation } from "@/app/lib/api/messageApi";
 import { useConversationDetail } from "@/app/lib/hooks/useConversationDetail";
 import { sendMessage } from "@/app/lib/api/messageApi";
+import { useSocket } from "@/app/lib/hooks/useSocket";
 import TopicChips from "@/app/components/creative/messages/topicChips";
 import { Topic } from "../../../lib/topic";
 import { formatDistanceToNow } from "date-fns";
@@ -14,17 +15,22 @@ interface Props {
   onBack?: () => void;
 }
 
-const ChatWindow: React.FC<Props> = ({
-  conversation,
-  currentUserId,
-  onBack,
-}) => {
+async function getToken(): Promise<string> {
+  const res = await fetch("/api/auth/session/token", { credentials: "include" });
+  const { token } = await res.json();
+  return token || "";
+}
+
+const ChatWindow: React.FC<Props> = ({ conversation, currentUserId, onBack }) => {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [showChips, setShowChips] = useState(true);
+  const [token, setToken] = useState("");
+  const [isOtherTyping, setIsOtherTyping] = useState(false);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const { detail, loading, refetch } = useConversationDetail(
+  const { detail, loading, appendMessage } = useConversationDetail(
     conversation.id,
     conversation.type
   );
@@ -32,12 +38,42 @@ const ChatWindow: React.FC<Props> = ({
   const messages = detail?.messages.data ?? [];
 
   useEffect(() => {
+    getToken().then(setToken);
+  }, []);
+
+  useEffect(() => {
     setShowChips(true);
   }, [conversation.id]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isOtherTyping]);
+
+  const handleNewMessage = useCallback(
+    (msg: any) => {
+      appendMessage(msg);
+    },
+    [appendMessage]
+  );
+
+  const handleTyping = useCallback(
+    (data: { userId: string; isTyping: boolean }) => {
+      if (data.userId === currentUserId) return;
+      setIsOtherTyping(data.isTyping);
+      if (data.isTyping) {
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => setIsOtherTyping(false), 3000);
+      }
+    },
+    [currentUserId]
+  );
+
+  const { emitTyping, emitRead } = useSocket({
+    conversationId: conversation.id,
+    token,
+    onNewMessage: handleNewMessage,
+    onTyping: handleTyping,
+  });
 
   const handleSend = async (text?: string) => {
     const content = (text ?? input).trim();
@@ -45,11 +81,12 @@ const ChatWindow: React.FC<Props> = ({
     try {
       setSending(true);
       setInput("");
-      await sendMessage(conversation.id, {
+      emitTyping(false);
+      const newMsg = await sendMessage(conversation.id, {
         content,
         contentType: "TEXT",
       });
-      await refetch();
+      appendMessage(newMsg);
     } catch (err) {
       console.error("Send failed:", err);
     } finally {
@@ -68,6 +105,13 @@ const ChatWindow: React.FC<Props> = ({
       handleSend();
     }
   };
+
+  useEffect(() => {
+    const unread = messages.filter(
+      (m) => !m.isRead && m.senderId !== currentUserId
+    );
+    unread.forEach((m) => emitRead(m.id));
+  }, [messages, currentUserId, emitRead]);
 
   const participant = conversation.otherParticipant;
   const avatarFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(
@@ -100,76 +144,91 @@ const ChatWindow: React.FC<Props> = ({
           )}
         </div>
         <div>
-          <p className="font-semibold text-gray-900 text-sm">
-            {participant.name}
+          <p className="font-semibold text-gray-900 text-sm">{participant.name}</p>
+          <p className="text-xs text-gray-400">
+            {isOtherTyping ? (
+              <span className="text-orange-400 italic">typing...</span>
+            ) : (
+              conversation.topic.name
+            )}
           </p>
-          <p className="text-xs text-gray-400">{conversation.topic.name}</p>
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-3 bg-white min-h-0">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="animate-spin text-[#E2554F]" size={24} />
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-sm text-gray-400">
-              No messages yet. Say hello!
-            </p>
-          </div>
-        ) : (
-          messages.map((msg) => {
-            const fromMe = msg.senderId === currentUserId;
-            return (
-              <div
-                key={msg.id}
-                className={`flex flex-col ${
-                  fromMe ? "items-end" : "items-start"
-                }`}
-              >
+      {/* Messages — outer div scrolls, inner div stacks from bottom */}
+      <div className="flex-1 overflow-y-auto bg-white min-h-0">
+        <div className="flex flex-col gap-3 px-3 py-8 justify-end min-h-full">
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="animate-spin text-[#E2554F]" size={24} />
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-sm text-gray-400">No messages yet. Say hello!</p>
+            </div>
+          ) : (
+            messages.map((msg) => {
+              const fromMe = msg.senderId === currentUserId;
+              const avatarUrl =
+                !fromMe
+                  ? msg.sender?.avatarUrl || participant.avatarUrl || avatarFallback
+                  : null;
+
+              return (
                 <div
-                  className={`max-w-[80%] lg:max-w-[65%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                    fromMe
-                      ? "bg-orange-400 text-white rounded-br-sm"
-                      : "bg-gray-100 text-gray-800 rounded-bl-sm"
-                  }`}
+                  key={msg.id}
+                  className={`flex flex-col ${fromMe ? "items-end" : "items-start"}`}
                 >
-                  {msg.contentType === "TEXT" && msg.content}
-                  {msg.contentType === "IMAGE" && (
-                    <img
-                      src={msg.fileUrl || ""}
-                      alt="image"
-                      className="rounded-lg max-w-full"
-                    />
-                  )}
-                  {msg.contentType === "FILE" && (
-                    <a
-                      href={msg.fileUrl || "#"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline flex items-center gap-1"
-                    >
-                      <Paperclip size={12} /> {msg.content || "File"}
-                    </a>
-                  )}
+                  <div
+                    className={`max-w-[80%] lg:max-w-[65%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${fromMe
+                        ? "bg-orange-400 text-white rounded-br-sm"
+                        : "bg-gray-100 text-gray-800 rounded-bl-sm"
+                      }`}
+                  >
+                    {msg.contentType === "TEXT" && msg.content}
+                    {msg.contentType === "IMAGE" && (
+                      <img
+                        src={msg.fileUrl || ""}
+                        alt="image"
+                        className="rounded-lg max-w-full"
+                      />
+                    )}
+                    {msg.contentType === "FILE" && (
+                      <a
+                        href={msg.fileUrl || "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline flex items-center gap-1"
+                      >
+                        <Paperclip size={12} /> {msg.content || "File"}
+                      </a>
+                    )}
+                  </div>
+                  <span className="text-[11px] text-gray-400 mt-1">
+                    {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
+                  </span>
                 </div>
-                <span className="text-[11px] text-gray-400 mt-1">
-                  {formatDistanceToNow(new Date(msg.createdAt), {
-                    addSuffix: true,
-                  })}
-                </span>
+              );
+            })
+          )}
+
+          {/* Typing indicator bubble */}
+          {isOtherTyping && (
+            <div className="flex items-start">
+              <div className="bg-gray-100 px-4 py-2.5 rounded-2xl rounded-bl-sm flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
               </div>
-            );
-          })
-        )}
+            </div>
+          )}
 
-        {showChips && messages.length === 0 && (
-          <TopicChips onSelect={handleTopicSelect} />
-        )}
+          {showChips && messages.length === 0 && (
+            <TopicChips onSelect={handleTopicSelect} />
+          )}
 
-        <div ref={bottomRef} />
+          <div ref={bottomRef} />
+        </div>
       </div>
 
       {/* Input */}
@@ -181,7 +240,10 @@ const ChatWindow: React.FC<Props> = ({
           type="text"
           placeholder="Send a message"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value);
+            emitTyping(e.target.value.length > 0);
+          }}
           onKeyDown={handleKeyDown}
           className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none min-w-0"
         />
@@ -198,11 +260,7 @@ const ChatWindow: React.FC<Props> = ({
             {sending ? (
               <Loader2 size={14} className="animate-spin text-white" />
             ) : (
-              <svg
-                viewBox="0 0 20 20"
-                fill="white"
-                className="w-4 h-4 rotate-90"
-              >
+              <svg viewBox="0 0 20 20" fill="white" className="w-4 h-4 rotate-90">
                 <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
               </svg>
             )}

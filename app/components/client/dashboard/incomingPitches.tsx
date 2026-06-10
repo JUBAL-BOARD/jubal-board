@@ -4,9 +4,11 @@ import Image from "next/image";
 import { Star, BadgeCheck, MessageSquare, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { fetchConversations, createConversation, fetchChatTopics } from "@/app/lib/api/messageApi";
 
 interface Pitch {
   id: string;
+  creativeId: string; // 👈 added
   name: string;
   role: string;
   avatar: string;
@@ -23,6 +25,43 @@ interface Brief {
 
 const PitchCard: React.FC<{ pitch: Pitch }> = ({ pitch }) => {
   const router = useRouter();
+  const [chatLoading, setChatLoading] = useState(false);
+
+  const handleChat = async () => {
+    try {
+      setChatLoading(true);
+
+      const convRes = await fetchConversations({ limit: 50 });
+      const list = Array.isArray(convRes) ? convRes : convRes.data ?? [];
+      const existing = list.find(
+        (c) => c.otherParticipant.id === pitch.creativeId
+      );
+
+      if (existing) {
+        router.push(`/client/messages/${existing.id}`);
+        return;
+      }
+
+      const topics = await fetchChatTopics();
+      if (!topics || topics.length === 0) {
+        console.error("No chat topics available");
+        return;
+      }
+
+      const newConv = await createConversation({
+        recipientId: pitch.creativeId,
+        topicId: topics[0].id,
+        type: "DIRECT",
+      });
+
+      router.push(`/client/messages/${newConv.conversation.id}`);
+    } catch (err) {
+      console.error("Chat failed:", err);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
   return (
     <div className="flex items-center gap-3 p-3.5 border border-gray-100 rounded-[10px] bg-white mb-2.5">
       <div className="relative flex-shrink-0">
@@ -31,7 +70,7 @@ const PitchCard: React.FC<{ pitch: Pitch }> = ({ pitch }) => {
           alt={pitch.name}
           width={30}
           height={30}
-          style={{ width: '30px', height: '30px', minWidth: '30px' }} 
+          style={{ width: '30px', height: '30px', minWidth: '30px' }}
           className="rounded-full object-cover"
         />
         <div className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-white" />
@@ -62,9 +101,17 @@ const PitchCard: React.FC<{ pitch: Pitch }> = ({ pitch }) => {
           </button>
         </div>
       </div>
-      <div className="w-7 h-7 rounded-full bg-[#1a1a2e] flex items-center justify-center cursor-pointer flex-shrink-0">
-        <MessageSquare size={14} stroke="white" />
-      </div>
+      <button
+        onClick={handleChat}
+        disabled={chatLoading}
+        className="w-7 h-7 rounded-full bg-[#1a1a2e] flex items-center justify-center cursor-pointer flex-shrink-0 disabled:opacity-60 transition-opacity"
+      >
+        {chatLoading ? (
+          <Loader2 size={14} stroke="white" className="animate-spin" />
+        ) : (
+          <MessageSquare size={14} stroke="white" />
+        )}
+      </button>
     </div>
   );
 };
@@ -84,12 +131,11 @@ const IncomingPitches: React.FC = () => {
         const { token } = await tokenRes.json();
         const headers = { Authorization: `Bearer ${token}` };
 
-        // 1. BUILD IMAGE MAP FROM SUGGESTED CREATIVES (Match Hook Logic)
         const imageMap: Record<string, string> = {};
         try {
-          const suggestedRes = await fetch("/api/v1/creatives/suggested", { 
-            headers, 
-            credentials: "include" 
+          const suggestedRes = await fetch("/api/v1/creatives/suggested", {
+            headers,
+            credentials: "include"
           });
           if (suggestedRes.ok) {
             const suggestedJson = await suggestedRes.json();
@@ -101,7 +147,6 @@ const IncomingPitches: React.FC = () => {
           // fail silently
         }
 
-        // Step 1: get all briefs
         const briefsRes = await fetch("/api/v1/briefs/me", {
           headers,
           credentials: "include",
@@ -117,7 +162,6 @@ const IncomingPitches: React.FC = () => {
           return;
         }
 
-        // Step 2: fetch pitches for all briefs in parallel
         const pitchResults = await Promise.all(
           briefList.map(async (brief) => {
             try {
@@ -136,8 +180,6 @@ const IncomingPitches: React.FC = () => {
         );
 
         const allPitches = pitchResults.flat();
-
-        // Step 3: filter to PENDING only and take first 4
         const pending = allPitches
           .filter((p: any) => p.status === "PENDING")
           .slice(0, 4);
@@ -145,16 +187,15 @@ const IncomingPitches: React.FC = () => {
         const mapped: Pitch[] = pending.map((p: any) => {
           const cp = p.creativeProfile;
           const name = cp?.fullName ?? cp?.name ?? "Creative";
-
-          // 2. APPLY AVATAR FALLBACK HIERARCHY (Match Hook Logic)
           const avatar =
-            imageMap[name] ??           // 1. Check suggested map
-            cp?.avatarUrl ??            // 2. Check profile avatarUrl
-            cp?.imageUrl ??             // 3. Check profile imageUrl
+            imageMap[name] ??
+            cp?.avatarUrl ??
+            cp?.imageUrl ??
             `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a2e&color=fff&size=128`;
 
           return {
             id: p.id,
+            creativeId: p.creativeId, // 👈
             name,
             role: cp?.professionalRole ?? "Creative",
             avatar,

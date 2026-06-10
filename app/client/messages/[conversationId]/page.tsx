@@ -1,16 +1,15 @@
-// app/client/messages/[conversationId]/page.tsx
 "use client";
-
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useMessageStore } from "../../../lib/stores/messageStore";
 import { Loader2, X } from "lucide-react";
-import ClientChatWindow from "../../../components/client/messages/chatWindow";
-import ClientConversationList from "../../../components/client/messages/conversationList";
+import { useConversations } from "@/app/lib/hooks/useConversations";
+import ClientChatWindow from "@/app/components/client/messages/chatWindow";
+import ClientConversationList from "@/app/components/client/messages/conversationList";
 import Sidebar from "@/app/components/client/dashboard/sideBar";
-import DashboardTopbar from "@/app/components/creative/dashboard/dashboardTopbar";
+import DashboardTopbar from "@/app/components/client/dashboard/dashboardTopbar";
 
 type ClientProfile = {
+  id: string;
   name: string;
   clientProfile: {
     fullName: string;
@@ -21,11 +20,10 @@ type ClientProfile = {
 export default function ClientConversationPage() {
   const { conversationId } = useParams();
   const router = useRouter();
-  const { conversations, setActiveConversation } = useMessageStore();
+  const { conversations, loading: convsLoading } = useConversations();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
-
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -47,24 +45,26 @@ export default function ClientConversationPage() {
     fetchProfile();
   }, []);
 
-  useEffect(() => {
-    if (conversationId) {
-      setActiveConversation(conversationId as string);
-    }
-  }, [conversationId]);
-
   const conversation = conversations.find((c) => c.id === conversationId);
-  if (!conversation) return null;
+  const currentUserId = profile?.id ?? "";
 
   const userName = profile?.clientProfile?.fullName || profile?.name || "Client";
   const userAvatar =
     profile?.clientProfile?.imageUrl ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
 
-  if (profileLoading) {
+  if (profileLoading || convsLoading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-white">
         <Loader2 className="animate-spin text-[#E2554F]" size={40} />
+      </div>
+    );
+  }
+
+  if (!conversation) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-white">
+        <p className="text-sm text-gray-400">Conversation not found.</p>
       </div>
     );
   }
@@ -95,10 +95,10 @@ export default function ClientConversationPage() {
         {/* Sidebar */}
         <div
           className={`
-            fixed top-0 left-0 h-full z-40
-          transition-transform duration-300 ease-in-out
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-          lg:translate-x-0 lg:sticky lg:top-0 lg:h-full lg:z-10
+            absolute top-0 left-0 h-full z-40
+            transition-transform duration-300 ease-in-out
+            ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+            lg:relative lg:translate-x-0 lg:h-full lg:z-10
           `}
         >
           <button
@@ -111,15 +111,15 @@ export default function ClientConversationPage() {
         </div>
 
         {/* Messages layout */}
-        <div className="flex flex-1 overflow-hidden mt-[100px] min-h-0">
+        <div className="flex flex-1 overflow-hidden min-h-0">
 
-          {/* Conversation list */}
+          {/* Conversation list — hidden on mobile */}
           <div className="hidden lg:flex w-72 xl:w-80 border-r border-gray-200 flex-col flex-shrink-0 overflow-hidden">
             <div className="px-4 py-4 border-b border-gray-100 flex-shrink-0">
-              <h2 className="text-lg font-bold text-gray-900">Messages</h2>
+              <h2 className="text-lg font-heading font-bold text-gray-900">Messages</h2>
             </div>
             <div className="flex-1 overflow-y-auto min-h-0">
-              <ClientConversationList />
+              <ClientConversationList activeId={conversationId as string} />
             </div>
           </div>
 
@@ -127,6 +127,7 @@ export default function ClientConversationPage() {
           <div className="flex-1 flex flex-col overflow-hidden min-h-0">
             <ClientChatWindow
               conversation={conversation}
+              currentUserId={currentUserId}
               onBack={() => router.push("/client/messages")}
             />
           </div>

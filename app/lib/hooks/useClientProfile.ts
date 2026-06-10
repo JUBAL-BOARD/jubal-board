@@ -32,6 +32,7 @@ export const useClientProfile = () => {
 
         const json = await res.json();
         const data = json.data ?? json;
+        console.log("client profile payload:", data);
         setProfile(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong.");

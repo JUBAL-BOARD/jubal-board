@@ -83,7 +83,7 @@ export const useCreativeProfile = () => {
         : (activeProfile?.preferredSocialLinks || []).filter(Boolean);
 
       setProfile({
-        id: payload.user?.id || "",
+        id: payload.id || "",
         fullName: extractedName,
         avatar: extractedAvatar,
         dateOfBirth: activeProfile?.dateOfBirth || '',

@@ -171,6 +171,7 @@ export interface MyGig {
   title: string;
   thumbnail: string;
   client: {
+    id: string;
     name: string;
     avatar: string;
   };

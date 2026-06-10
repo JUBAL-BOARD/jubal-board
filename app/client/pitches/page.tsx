@@ -1,11 +1,11 @@
 "use client";
-
 import { useState, useEffect, useCallback } from "react";
 import Sidebar from "../../components/client/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/client/dashboard/dashboardTopbar";
 import Breadcrumb from "../../components/client/my-desk/breadcrumb";
 import { Search, Filter, ChevronDown, X, Star, MessageCircle, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { fetchConversations, createConversation, fetchChatTopics } from "@/app/lib/api/messageApi";
 
 type PitchFilter = "All" | "PENDING" | "ACCEPTED" | "REJECTED";
 
@@ -77,6 +77,47 @@ const IncomingPitches: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [projects, setProjects] = useState<any[]>([]);
+  const [chatLoadingId, setChatLoadingId] = useState<string | null>(null); // 👈 tracks which pitch is loading
+
+  const router = useRouter();
+
+  // 👇 shared chat handler — takes the creativeId from the pitch
+  const handleChat = async (creativeId: string, pitchId: string) => {
+    if (!creativeId) {
+      console.error("No creativeId for chat");
+      return;
+    }
+    try {
+      setChatLoadingId(pitchId);
+
+      const convRes = await fetchConversations({ limit: 50 });
+      const list = Array.isArray(convRes) ? convRes : convRes.data ?? [];
+      const existing = list.find((c) => c.otherParticipant.id === creativeId);
+
+      if (existing) {
+        router.push(`/client/messages/${existing.id}`);
+        return;
+      }
+
+      const topics = await fetchChatTopics();
+      if (!topics || topics.length === 0) {
+        console.error("No chat topics available");
+        return;
+      }
+
+      const newConv = await createConversation({
+        recipientId: creativeId,
+        topicId: topics[0].id,
+        type: "DIRECT",
+      });
+
+      router.push(`/client/messages/${newConv.conversation.id}`);
+    } catch (err) {
+      console.error("Chat failed:", err);
+    } finally {
+      setChatLoadingId(null);
+    }
+  };
 
   const fetchAllPitches = useCallback(async () => {
     setLoading(true);
@@ -113,16 +154,16 @@ const IncomingPitches: React.FC = () => {
       const projectList = Array.isArray(projectsJson.data)
         ? projectsJson.data
         : Array.isArray(projectsJson)
-          ? projectsJson
-          : [];
+        ? projectsJson
+        : [];
       setProjects(projectList);
 
       const briefsJson = await briefsRes.json();
       const briefList: Brief[] = Array.isArray(briefsJson)
         ? briefsJson
         : Array.isArray(briefsJson.data)
-          ? briefsJson.data
-          : briefsJson.data?.briefs ?? [];
+        ? briefsJson.data
+        : briefsJson.data?.briefs ?? [];
 
       if (briefList.length === 0) {
         setPitches([]);
@@ -139,23 +180,20 @@ const IncomingPitches: React.FC = () => {
             if (!res.ok) return [];
             const json = await res.json();
             const list = json.data?.pitches ?? json.data ?? json ?? [];
-
             return (Array.isArray(list) ? list : []).map((p: any) => {
               const cp = p.creativeProfile;
               const name =
                 cp?.fullName ??
                 cp?.name ??
-                p.creativeName ??       // top-level fallback
-                p.creative?.fullName ?? // nested creative object fallback
+                p.creativeName ??
+                p.creative?.fullName ??
                 p.creative?.name ??
                 "Creative";
-
               const finalAvatar =
                 imageMap[name] ??
                 cp?.avatarUrl ??
                 cp?.imageUrl ??
                 `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a2e&color=fff&size=128`;
-
               return {
                 ...p,
                 briefTitle: brief.jobTitle,
@@ -196,7 +234,6 @@ const IncomingPitches: React.FC = () => {
   });
 
   const visible = filtered.slice(0, visibleCount);
-  const router = useRouter();
 
   const userName = profile?.clientProfile?.fullName || profile?.name || "Client";
   const userAvatar =
@@ -234,7 +271,6 @@ const IncomingPitches: React.FC = () => {
             { label: "Dashboard", path: "/client/dashboard" },
             { label: "Incoming Pitches" },
           ]} />
-
           <h1 className="text-2xl font-heading font-extrabold text-black mb-5">Incoming Pitches</h1>
 
           {/* Search + Filter */}
@@ -261,10 +297,11 @@ const IncomingPitches: React.FC = () => {
               <button
                 key={tab}
                 onClick={() => { setActiveFilter(tab); setVisibleCount(12); }}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeFilter === tab
-                  ? "bg-[#E05C5C] text-white"
-                  : "bg-white border border-gray-200 text-black"
-                  }`}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  activeFilter === tab
+                    ? "bg-[#E05C5C] text-white"
+                    : "bg-white border border-gray-200 text-black"
+                }`}
               >
                 {filterLabels[tab]}
               </button>
@@ -291,16 +328,14 @@ const IncomingPitches: React.FC = () => {
               </p>
 
               {filtered.length === 0 ? (
-                <div className="text-center py-20 text-gray-400 text-sm">
-                  No pitches found.
-                </div>
+                <div className="text-center py-20 text-gray-400 text-sm">No pitches found.</div>
               ) : (
                 <div className="bg-[#fafafa] border border-gray-100 rounded-2xl overflow-hidden">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0">
                     {visible.map((pitch) => {
-                      // Match project using pitchId — this is the correct key from the API
                       const matchedProject = projects.find((proj: any) => proj.pitchId === pitch.id);
                       const needsPayment = matchedProject?.status === "PENDING_PAYMENT";
+                      const isChatLoading = chatLoadingId === pitch.id;
 
                       return (
                         <div
@@ -332,15 +367,23 @@ const IncomingPitches: React.FC = () => {
                                   </span>
                                 )}
                               </div>
-                              <button className="w-8 h-8 rounded-full bg-[#1E2A3B] flex items-center justify-center shrink-0">
-                                <MessageCircle size={14} className="text-white" />
+
+                              {/* 👇 Chat button with loading state */}
+                              <button
+                                onClick={() => handleChat(pitch.creativeId, pitch.id)}
+                                disabled={isChatLoading}
+                                className="w-8 h-8 rounded-full bg-[#1E2A3B] flex items-center justify-center shrink-0 disabled:opacity-60 transition-opacity"
+                              >
+                                {isChatLoading
+                                  ? <Loader2 size={14} className="text-white animate-spin" />
+                                  : <MessageCircle size={14} className="text-white" />
+                                }
                               </button>
                             </div>
 
                             <p className="text-xs text-gray-400 mt-0.5">
                               {pitch.creativeProfile?.professionalRole ?? "Creative"}
                             </p>
-
                             <p className="text-xs text-[#E05C5C] mt-0.5 truncate">
                               Brief: {pitch.briefTitle ?? "—"}
                             </p>
@@ -374,7 +417,6 @@ const IncomingPitches: React.FC = () => {
                               </div>
 
                               <div className="flex items-center gap-2">
-                                {/* Complete Payment button — shows when a matched project needs payment */}
                                 {needsPayment && (
                                   <button
                                     onClick={() =>
@@ -387,15 +429,14 @@ const IncomingPitches: React.FC = () => {
                                     Complete Payment
                                   </button>
                                 )}
-
-                                {/* Status badge */}
                                 <span
-                                  className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${pitch.status === "ACCEPTED"
-                                    ? "bg-green-100 text-green-600"
-                                    : pitch.status === "REJECTED"
+                                  className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${
+                                    pitch.status === "ACCEPTED"
+                                      ? "bg-green-100 text-green-600"
+                                      : pitch.status === "REJECTED"
                                       ? "bg-red-100 text-red-500"
                                       : "bg-yellow-100 text-yellow-600"
-                                    }`}
+                                  }`}
                                 >
                                   {pitch.status}
                                 </span>

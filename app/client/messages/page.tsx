@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 import { Loader2, MessageCircle, X } from "lucide-react";
 import Sidebar from "@/app/components/client/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/client/dashboard/dashboardTopbar";
-import MessagesContent from "@/app/components/client/messages/messagesContent";
-import ConversationList from "@/app/components/client/messages/conversationList";
+import ClientConversationList from "@/app/components/client/messages/conversationList";
 
 type ClientProfile = {
+  id: string;
   name: string;
   clientProfile: {
     fullName: string;
@@ -14,12 +14,10 @@ type ClientProfile = {
   };
 };
 
-const MessagesPage: React.FC = () => {
+const ClientMessagesPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showChat, setShowChat] = useState(false);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
-
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -41,7 +39,6 @@ const MessagesPage: React.FC = () => {
     fetchProfile();
   }, []);
 
-
   const userName = profile?.clientProfile?.fullName || profile?.name || "Client";
   const userAvatar =
     profile?.clientProfile?.imageUrl ||
@@ -56,8 +53,7 @@ const MessagesPage: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col overflow-hidden bg-white">
-
+    <div className="flex flex-col h-screen overflow-hidden bg-white">
       <div className="flex-shrink-0">
         <DashboardTopbar
           userName={userName}
@@ -104,19 +100,19 @@ const MessagesPage: React.FC = () => {
               <h2 className="text-lg font-heading font-bold text-gray-900">Messages</h2>
             </div>
             <div className="flex-1 overflow-y-auto min-h-0">
-              <ConversationList />
+              <ClientConversationList />
             </div>
           </div>
 
           {/* Empty state — desktop only */}
           <div className="hidden lg:flex flex-1 flex-col items-center justify-center text-center gap-3">
             <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
-              <MessageCircle size={28} className="text-black" />
+              <MessageCircle size={28} className="text-gray-400" />
             </div>
-            <p className="text-sm font-semibold text-black">
+            <p className="text-sm font-semibold text-gray-800">
               Select a conversation
             </p>
-            <p className="text-xs text-black max-w-[200px]">
+            <p className="text-xs text-gray-400 max-w-[200px]">
               Choose from your existing conversations or start a new one by clicking Chat Creative on any gig.
             </p>
           </div>
@@ -127,4 +123,4 @@ const MessagesPage: React.FC = () => {
   );
 };
 
-export default MessagesPage;
+export default ClientMessagesPage;

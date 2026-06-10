@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Clock, MessageCircle, Eye, Upload, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { useState, useEffect } from "react";
+import { fetchConversations, createConversation, fetchChatTopics } from "@/app/lib/api/messageApi";
+import { useRouter } from "next/navigation";
 
 interface OngoingGig {
   id: string;
@@ -19,6 +21,7 @@ interface MappedGig {
   id: string;
   title: string;
   thumbnail: string;
+  clientId: string;
   dueIn: string;
   client: {
     name: string;
@@ -57,6 +60,9 @@ export default function OngoingGigs() {
   const [gigs, setGigs] = useState<MappedGig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [chatLoadingId, setChatLoadingId] = useState<string | null>(null);
+
+  const router = useRouter();
 
   useEffect(() => {
     const fetchGigs = async () => {
@@ -69,7 +75,6 @@ export default function OngoingGigs() {
           "Content-Type": "application/json",
         };
 
-        // Fetch gigs and approved pitches in parallel
         const [gigsRes, pitchRes] = await Promise.all([
           fetch("/api/v1/projects/creative?filter=Active", { credentials: "include", headers }),
           fetch("/api/v1/pitches/me?status=APPROVED", { credentials: "include", headers }),
@@ -78,7 +83,6 @@ export default function OngoingGigs() {
         const gigsJson = await gigsRes.json();
         const list: OngoingGig[] = Array.isArray(gigsJson.data) ? gigsJson.data : [];
 
-        // Build clientName → avatar map from approved pitches
         const clientAvatarMap: Record<string, string> = {};
         if (pitchRes.ok) {
           const pitchJson = await pitchRes.json();
@@ -122,6 +126,7 @@ export default function OngoingGigs() {
                 return {
                   id: detail.id,
                   title: detail.title,
+                  clientId: g.clientId,
                   thumbnail: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
                   client: {
                     name: g.clientName,
@@ -130,8 +135,8 @@ export default function OngoingGigs() {
                   dueIn: detail.dueDate
                     ? getDueIn(detail.dueDate)
                     : g.collabDeadline
-                      ? getDueIn(g.collabDeadline)
-                      : "—",
+                    ? getDueIn(g.collabDeadline)
+                    : "—",
                   progress: getProgress(detail.status),
                   status: detail.status,
                 };
@@ -139,6 +144,7 @@ export default function OngoingGigs() {
                 return {
                   id: g.id,
                   title: g.title,
+                  clientId: g.clientId,
                   thumbnail: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
                   client: {
                     name: g.clientName,
@@ -163,6 +169,41 @@ export default function OngoingGigs() {
 
     fetchGigs();
   }, []);
+
+  const handleChatClient = async (gig: MappedGig) => {
+    try {
+      setChatLoadingId(gig.id);
+
+      const convRes = await fetchConversations({ limit: 50 });
+      const list = Array.isArray(convRes) ? convRes : convRes.data ?? [];
+      const existing = list.find(
+        (c) => c.otherParticipant.id === gig.clientId
+      );
+
+      if (existing) {
+        router.push(`/creative/messages/${existing.id}`);
+        return;
+      }
+
+      const topics = await fetchChatTopics();
+      if (!topics || topics.length === 0) {
+        console.error("No chat topics available");
+        return;
+      }
+
+      const newConv = await createConversation({
+        recipientId: gig.clientId,
+        topicId: topics[0].id,
+        type: "DIRECT",
+      });
+
+      router.push(`/.../messages/${newConv.conversation.id}`);
+    } catch (err) {
+      console.error("Chat client failed:", err);
+    } finally {
+      setChatLoadingId(null);
+    }
+  };
 
   return (
     <section className="mb-8 bg-[#fafafa] p-4 lg:p-6">
@@ -230,13 +271,25 @@ export default function OngoingGigs() {
                   <span className="text-xs font-medium text-gray-700">{gig.progress}%</span>
                 </div>
                 <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-[#E2554F] rounded-full" style={{ width: `${gig.progress}%` }} />
+                  <div
+                    className="h-full bg-[#E2554F] rounded-full"
+                    style={{ width: `${gig.progress}%` }}
+                  />
                 </div>
               </div>
 
               <div className="flex gap-2 flex-wrap">
-                <button className="flex items-center gap-1.5 bg-[#E2554F] border border-red-200 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-red-300 transition-colors">
-                  <MessageCircle size={12} /> Chat Client
+                <button
+                  onClick={() => handleChatClient(gig)}
+                  disabled={chatLoadingId === gig.id}
+                  className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60"
+                >
+                  {chatLoadingId === gig.id ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <MessageCircle size={12} />
+                  )}
+                  Chat Client
                 </button>
                 <button className="flex items-center gap-1.5 bg-[#E2554F] border border-gray-200 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-red-300 transition-colors">
                   <Eye size={12} /> View Pitch

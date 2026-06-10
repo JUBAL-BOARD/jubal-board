@@ -1,7 +1,9 @@
-import { Clock, Eye, Upload, Users, UserPlus, MessageCircle } from "lucide-react";
+import { Clock, Eye, Upload, Users, UserPlus, MessageCircle, Loader2 } from "lucide-react";
 import { MyGig } from "@/app/types";
 import { useRouter } from "next/navigation";
 import { useCollabStore } from "@/app/lib/stores/collabStore";
+import { useState } from "react";
+import { fetchConversations, createConversation, fetchChatTopics } from "@/app/lib/api/messageApi";
 
 interface Props {
   gig: MyGig;
@@ -19,6 +21,7 @@ const progressColor: Record<string, string> = {
 const GigListItem: React.FC<Props> = ({ gig }) => {
   const isCollab = gig.status === "Collaborating" || gig.isCollab;
   const collabReady = !isCollab || gig.collabReady;
+  const [chatLoading, setChatLoading] = useState(false);
 
   const router = useRouter();
   const setActiveProjectTitle = useCollabStore((s) => s.setActiveProjectTitle);
@@ -34,7 +37,45 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
   };
 
   const handleInvite = () => {
-    router.push(`/creative/collab-hub`);
+    router.push(`/creative/collab-hub/${gig.id}/collaborate`);
+  };
+
+  const handleChatClient = async () => {
+    try {
+      setChatLoading(true);
+
+      // 1. Check if a conversation with this client already exists
+      const convRes = await fetchConversations({ limit: 50 });
+      const list = Array.isArray(convRes) ? convRes : convRes.data ?? [];
+      const existing = list.find(
+        (c) => c.otherParticipant.id === gig.client.id
+      );
+
+      if (existing) {
+        // Conversation exists — go straight to it
+        router.push(`/creative/messages/${existing.id}`);
+        return;
+      }
+
+      // 2. No existing conversation — get the first available topic and create one
+      const topics = await fetchChatTopics();
+      if (!topics || topics.length === 0) {
+        console.error("No chat topics available");
+        return;
+      }
+
+      const newConv = await createConversation({
+        recipientId: gig.client.id,
+        topicId: topics[0].id,
+        type: "DIRECT",
+      });
+
+      router.push(`/.../messages/${newConv.conversation.id}`);
+    } catch (err) {
+      console.error("Chat client failed:", err);
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   return (
@@ -67,7 +108,6 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
             <Clock size={12} className="text-black" />
             <span className="text-xs font-body text-black">Due in {gig.dueIn}</span>
 
-            {/* Collab mates */}
             {isCollab && gig.collabMates && (
               <div className="flex items-center gap-1.5 ml-1">
                 <span className="text-xs font-body text-black">Collab mate:</span>
@@ -80,7 +120,6 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
               </div>
             )}
 
-            {/* Waiting hint */}
             {isCollab && !collabReady && (
               <span className="flex items-center gap-1 ml-1 text-xs text-[#E2554F] font-medium">
                 <Users size={11} />
@@ -106,7 +145,6 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
       {/* Actions */}
       <div className="flex flex-row lg:flex-col flex-wrap gap-2 flex-shrink-0">
         {isCollab && !collabReady ? (
-          // Collab threshold NOT met — only invite button
           <button
             onClick={handleInvite}
             className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors"
@@ -118,7 +156,6 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
             </span>
           </button>
         ) : isCollab && collabReady ? (
-          // Collab threshold MET — show collab actions
           <>
             <button className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
               <Users size={12} /> Group Chat
@@ -131,10 +168,18 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
             </button>
           </>
         ) : (
-          // Regular (non-collab) gig
           <>
-            <button className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
-              <MessageCircle size={12} /> Chat Client
+            <button
+              onClick={handleChatClient}
+              disabled={chatLoading}
+              className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60"
+            >
+              {chatLoading ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                <MessageCircle size={12} />
+              )}
+              Chat Client
             </button>
             <button onClick={handleViewProject} className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
               <Eye size={12} /> View Project
@@ -145,7 +190,6 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
           </>
         )}
       </div>
-
     </div>
   );
 };

@@ -110,7 +110,6 @@ const MyGigsContent: React.FC = () => {
         "Content-Type": "application/json",
       };
 
-      // Fetch gigs and approved pitches in parallel
       const [gigsRes, pitchRes] = await Promise.all([
         fetch(`/api/v1/projects/creative?filter=${filter}`, { credentials: "include", headers }),
         fetch(`/api/v1/pitches/me?status=APPROVED`, { credentials: "include", headers }),
@@ -145,66 +144,95 @@ const MyGigsContent: React.FC = () => {
                     getAvatarFallback(client.name ?? "CL");
                 }
               }
-            } catch { }
+            } catch {}
           })
         );
       }
 
       // Fetch gig details and map
-      const mapped: MyGig[] = (await Promise.all(
-        list.map(async (g) => {
-          try {
-            const detailRes = await fetch(`/api/v1/projects/${g.id}`, {
-              credentials: "include",
-              headers,
-            });
+      const mapped: MyGig[] = (
+        await Promise.all(
+          list.map(async (g) => {
+            try {
+              const detailRes = await fetch(`/api/v1/projects/${g.id}`, {
+                credentials: "include",
+                headers,
+              });
 
-            if (!detailRes.ok) throw new Error("Detail fetch failed");
-            const detailJson = await detailRes.json();
-            const detail: ApiGigDetail = detailJson.data;
+              if (!detailRes.ok) throw new Error("Detail fetch failed");
+              const detailJson = await detailRes.json();
+              const detail: ApiGigDetail = detailJson.data;
 
-            return {
-              id: detail.id,
-              title: detail.title,
-              thumbnail: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
-              client: {
-                name: g.clientName ?? "Unknown Client",
-                avatar: clientAvatarMap[g.clientName] ?? getAvatarFallback(g.clientName ?? "CL"),
-              },
-              dueIn: detail.dueDate
-                ? getDueIn(detail.dueDate)
-                : g.collabDeadline
+              console.log("Gig detail:", detail); // 👈 log to see full shape
+
+              return {
+                id: detail.id,
+                title: detail.title,
+                thumbnail:
+                  "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
+                client: {
+                  id: g.clientId,  // 👈 now passed through
+                  name: g.clientName ?? "Unknown Client",
+                  avatar:
+                    clientAvatarMap[g.clientName] ??
+                    getAvatarFallback(g.clientName ?? "CL"),
+                },
+                dueIn: detail.dueDate
+                  ? getDueIn(detail.dueDate)
+                  : g.collabDeadline
                   ? getDueIn(g.collabDeadline)
                   : "No deadline",
-              progress: getProgress(detail.status),
-              status: apiStatusToMyGig(detail.status),
-              isCollab: detail.status === "COLLABORATING" || g.requiredCollaborators > 1,
-              collabReady: !(detail.status === "COLLABORATING" || g.requiredCollaborators > 1)
-                || ((detail as any).collaboratorsJoined ?? 0) >= g.requiredCollaborators,
-              requiredCollaborators: g.requiredCollaborators,
-              collaboratorsJoined: (detail as any).collaboratorsJoined ?? 0,
-            };
-          } catch {
-            return {
-              id: g.id,
-              title: g.title,
-              thumbnail: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
-              client: {
-                name: g.clientName ?? "Unknown Client",
-                avatar: clientAvatarMap[g.clientId] ?? getAvatarFallback(g.clientName ?? "CL"),
-              },
-              dueIn: g.collabDeadline ? getDueIn(g.collabDeadline) : "No deadline",
-              progress: getProgress(g.status),
-              status: apiStatusToMyGig(g.status),
-              isCollab: g.status === "COLLABORATING" || g.requiredCollaborators > 1,
-              collabReady: !(g.status === "COLLABORATING" || g.requiredCollaborators > 1)
-                || ((g as any).collaboratorsJoined ?? 0) >= g.requiredCollaborators,
-              requiredCollaborators: g.requiredCollaborators,
-              collaboratorsJoined: (g as any).collaboratorsJoined ?? 0,
-            };
-          }
-        })
-      )).filter(Boolean) as MyGig[];
+                progress: getProgress(detail.status),
+                status: apiStatusToMyGig(detail.status),
+                isCollab:
+                  detail.status === "COLLABORATING" ||
+                  g.requiredCollaborators > 1,
+                collabReady:
+                  !(
+                    detail.status === "COLLABORATING" ||
+                    g.requiredCollaborators > 1
+                  ) ||
+                  ((detail as any).collaboratorsJoined ?? 0) >=
+                    g.requiredCollaborators,
+                requiredCollaborators: g.requiredCollaborators,
+                collaboratorsJoined:
+                  (detail as any).collaboratorsJoined ?? 0,
+              };
+            } catch {
+              return {
+                id: g.id,
+                title: g.title,
+                thumbnail:
+                  "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
+                client: {
+                  id: g.clientId,  // 👈 now passed through
+                  name: g.clientName ?? "Unknown Client",
+                  avatar:
+                    clientAvatarMap[g.clientId] ??
+                    getAvatarFallback(g.clientName ?? "CL"),
+                },
+                dueIn: g.collabDeadline
+                  ? getDueIn(g.collabDeadline)
+                  : "No deadline",
+                progress: getProgress(g.status),
+                status: apiStatusToMyGig(g.status),
+                isCollab:
+                  g.status === "COLLABORATING" ||
+                  g.requiredCollaborators > 1,
+                collabReady:
+                  !(
+                    g.status === "COLLABORATING" ||
+                    g.requiredCollaborators > 1
+                  ) ||
+                  ((g as any).collaboratorsJoined ?? 0) >=
+                    g.requiredCollaborators,
+                requiredCollaborators: g.requiredCollaborators,
+                collaboratorsJoined: (g as any).collaboratorsJoined ?? 0,
+              };
+            }
+          })
+        )
+      ).filter(Boolean) as MyGig[];
 
       setGigs(mapped);
     } catch (err) {
@@ -244,7 +272,10 @@ const MyGigsContent: React.FC = () => {
             type="text"
             placeholder="Search"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-300 transition-all"
           />
         </div>
@@ -260,11 +291,15 @@ const MyGigsContent: React.FC = () => {
         {filterChips.map((chip) => (
           <button
             key={chip}
-            onClick={() => { setActiveChip(chip); setPage(1); }}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeChip === chip
-              ? "bg-[#E2554F] text-white"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+            onClick={() => {
+              setActiveChip(chip);
+              setPage(1);
+            }}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              activeChip === chip
+                ? "bg-[#E2554F] text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
           >
             {chip}
           </button>
@@ -283,14 +318,18 @@ const MyGigsContent: React.FC = () => {
           <GigStatsBar gigs={gigs} />
 
           <div className="mt-6">
-            <h2 className="text-2xl font-bold text-black mb-4">All ({filtered.length})</h2>
+            <h2 className="text-2xl font-bold text-black mb-4">
+              All ({filtered.length})
+            </h2>
             <div className="flex flex-col gap-3">
               {paginated.map((gig) => (
                 <GigListItem key={gig.id} gig={gig} />
               ))}
             </div>
             {filtered.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-12">No gigs found.</p>
+              <p className="text-sm text-gray-400 text-center py-12">
+                No gigs found.
+              </p>
             )}
           </div>
 
@@ -299,7 +338,10 @@ const MyGigsContent: React.FC = () => {
             totalPages={totalPages}
             perPage={perPage}
             onPageChange={setPage}
-            onPerPageChange={(val) => { setPerPage(val); setPage(1); }}
+            onPerPageChange={(val) => {
+              setPerPage(val);
+              setPage(1);
+            }}
           />
         </>
       )}

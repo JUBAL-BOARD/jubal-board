@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Search, SlidersHorizontal, ChevronDown, Loader2 } from "lucide-react";
+import { Search, SlidersHorizontal, ChevronDown, Loader2, Mail } from "lucide-react";
+import { useRouter } from "next/navigation";
 import Breadcrumb from "@/app/components/creative/dashboard/breadcrumb";
 import CollabCard from "./collabCard";
 import GigsPagination from "@/app/components/creative/my-gigs/gigsPagination";
@@ -19,6 +20,7 @@ interface Creative {
 const filterChips = ["All", "Design", "Development", "Video", "Writing", "Marketing", "Photography"];
 
 const CollabHubContent: React.FC = () => {
+  const router = useRouter();
   const [activeChip, setActiveChip] = useState("All");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -67,7 +69,6 @@ const CollabHubContent: React.FC = () => {
     fetchCreatives();
   }, []);
 
-  // Client-side filtering
   const filtered = creatives.filter((c) => {
     const matchesSearch =
       c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -88,8 +89,21 @@ const CollabHubContent: React.FC = () => {
           { label: "Collab Hub" },
         ]}
       />
-      <h1 className="text-2xl font-bold font-heading text-gray-900 mb-1">Collaborate</h1>
-      <p className="text-md text-black font-body mb-5">Invite to Collab on a Project</p>
+
+      {/* Title row with Invitations button */}
+      <div className="flex items-start justify-between gap-4 mb-5">
+        <div>
+          <h1 className="text-2xl font-bold font-heading text-gray-900 mb-1">Collaborate</h1>
+          <p className="text-md text-black font-body">Invite to Collab on a Project</p>
+        </div>
+        <button
+          onClick={() => router.push("/creative/collab-hub/invitations")}
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a3e] hover:bg-[#2a2a5e] text-white text-sm font-semibold rounded-lg transition-colors shrink-0"
+        >
+          <Mail size={15} />
+          Invitations
+        </button>
+      </div>
 
       {/* Search + Filter */}
       <div className="flex items-center gap-3 mb-4">
@@ -116,10 +130,11 @@ const CollabHubContent: React.FC = () => {
           <button
             key={chip}
             onClick={() => { setActiveChip(chip); setPage(1); }}
-            className={`px-4 py-1.5 rounded-full text-sm font-heading font-medium transition-colors ${activeChip === chip
+            className={`px-4 py-1.5 rounded-full text-sm font-heading font-medium transition-colors ${
+              activeChip === chip
                 ? "bg-[#E2554F] text-white"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+            }`}
           >
             {chip}
           </button>

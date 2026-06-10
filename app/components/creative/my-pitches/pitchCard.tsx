@@ -1,8 +1,9 @@
 "use client";
-
-import { MessageCircle, BadgeCheck } from "lucide-react";
+import { MessageCircle, BadgeCheck, Loader2 } from "lucide-react";
 import { CreativePitch } from "@/app/types";
-import { useOpenChat } from "../../../lib/hooks/useOpenChat";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { fetchConversations, createConversation, fetchChatTopics } from "@/app/lib/api/messageApi";
 
 interface Props {
   pitch: CreativePitch;
@@ -10,26 +11,54 @@ interface Props {
 
 const statusStyles: Record<string, string> = {
   approved: "bg-green-100 text-green-700",
-  pending:  "bg-orange-100 text-orange-700",
-  ongoing:  "bg-blue-100 text-blue-700",
+  pending: "bg-orange-100 text-orange-700",
+  ongoing: "bg-blue-100 text-blue-700",
   rejected: "bg-red-100 text-red-700",
 };
 
 const PitchCard: React.FC<Props> = ({ pitch }) => {
-  const { openDM } = useOpenChat();
+  const router = useRouter();
+  const [chatLoading, setChatLoading] = useState(false);
 
-  const handleChatClient = () => {
-    openDM({
-      id: pitch.client.id,         // 👈 pitch.client not gig.postedBy
-      name: pitch.client.name,
-      avatar: pitch.client.avatar,
-      isOnline: pitch.client.isOnline,
-    });
+  const handleChatClient = async () => {
+    try {
+      setChatLoading(true);
+
+      // 1. Check if a conversation with this client already exists
+      const convRes = await fetchConversations({ limit: 50 });
+      const list = Array.isArray(convRes) ? convRes : convRes.data ?? [];
+      const existing = list.find(
+        (c) => c.otherParticipant.id === pitch.client.id
+      );
+
+      if (existing) {
+        router.push(`/creative/messages/${existing.id}`);
+        return;
+      }
+
+      // 2. No existing conversation — get the first available topic and create one
+      const topics = await fetchChatTopics();
+      if (!topics || topics.length === 0) {
+        console.error("No chat topics available");
+        return;
+      }
+
+      const newConv = await createConversation({
+        recipientId: pitch.client.id,
+        topicId: topics[0].id,
+        type: "DIRECT",
+      });
+
+      router.push(`/.../messages/${newConv.conversation.id}`);
+    } catch (err) {
+      console.error("Chat client failed:", err);
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   return (
     <div className="flex flex-col bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-md transition-shadow group">
-
       {/* Image */}
       <div className="relative h-40 bg-gray-100 overflow-hidden flex-shrink-0">
         <img
@@ -63,7 +92,6 @@ const PitchCard: React.FC<Props> = ({ pitch }) => {
               <BadgeCheck size={13} fill="blue" stroke="white" className="flex-shrink-0" />
             )}
           </div>
-
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-body text-black">Status:</span>
             <span className={`text-[10px] font-body font-semibold px-2.5 py-0.5 rounded-full capitalize ${statusStyles[pitch.status]}`}>
@@ -78,9 +106,14 @@ const PitchCard: React.FC<Props> = ({ pitch }) => {
         <div className="w-full lg:w-[60%] mx-auto">
           <button
             onClick={handleChatClient}
-            className="w-full flex items-center justify-center gap-2 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold py-2.5 rounded-lg transition-colors"
+            disabled={chatLoading}
+            className="w-full flex items-center justify-center gap-2 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-60"
           >
-            <MessageCircle size={13} />
+            {chatLoading ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <MessageCircle size={13} />
+            )}
             Chat Client
           </button>
         </div>

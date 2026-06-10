@@ -103,45 +103,76 @@ export default function CollabInvitationsPage() {
     };
 
     const fetchInvitations = useCallback(async () => {
-    setLoading(true);
-    try {
-        const token = await getAuthToken();
-        const headers = { Authorization: `Bearer ${token}` };
+        setLoading(true);
+        try {
+            const token = await getAuthToken();
+            const headers = { Authorization: `Bearer ${token}` };
 
-        const res = await fetch("/api/v1/collabs", {
-            headers,
-            credentials: "include",
-        });
-        if (!res.ok) return;
+            const res = await fetch("/api/v1/collabs/my-briefs", {
+                headers,
+                credentials: "include",
+            });
+            if (!res.ok) return;
 
-        const json = await res.json();
-        const list = Array.isArray(json.data) ? json.data : [];
+            const json = await res.json();
+            const list = Array.isArray(json.data) ? json.data : [];
 
-        // Fetch project details for each collab to get the inviter's info
-        const enriched = await Promise.all(
-            list.map(async (collab: any) => {
-                try {
-                    const projectRes = await fetch(`/api/v1/projects/${collab.projectId}`, {
-                        headers,
-                        credentials: "include",
-                    });
-                    if (projectRes.ok) {
-                        const projectJson = await projectRes.json();
-                        const project = projectJson.data ?? projectJson;
-                        console.log("PROJECT DATA:", JSON.stringify(project, null, 2)); // 👈 keep briefly to verify shape
-                        return { ...collab, project };
+            // For each collab, fetch the leadCreative profile using leadCreativeId
+            const enriched = await Promise.all(
+                list.map(async (collab: any) => {
+                    const brief = collab.collabBrief;
+                    const project = brief?.project ?? null;
+                    const leadCreativeId = project?.leadCreativeId ?? null;
+
+                    let invitedBy = null;
+                    if (leadCreativeId) {
+                        try {
+                            const creativeRes = await fetch(`/api/v1/creatives/${leadCreativeId}`, {
+                                headers,
+                                credentials: "include",
+                            });
+                            if (creativeRes.ok) {
+                                const creativeJson = await creativeRes.json();
+                                invitedBy = creativeJson.data ?? creativeJson;
+                            }
+                        } catch {}
                     }
-                } catch {}
-                return collab;
-            })
-        );
 
-        setInvitations(enriched);
-    } catch {
-    } finally {
-        setLoading(false);
-    }
-}, []);
+                    return {
+                        id: collab.id,
+                        projectId: project?.id ?? collab.collabBrief?.projectId,
+                        role: brief?.role ?? "COLLABORATOR",
+                        status: collab.status,
+                        description: brief?.description,
+                        proposedFee: brief?.proposedFee,
+                        timeline: brief?.timeline,
+                        deliveryDate: brief?.deliveryDate,
+                        workMode: brief?.workMode,
+                        createdAt: collab.createdAt,
+                        project: project
+                            ? { id: project.id, title: project.title, status: project.status }
+                            : undefined,
+                        invitedBy: invitedBy
+                            ? {
+                                id: invitedBy.id,
+                                fullName: invitedBy.fullName ?? invitedBy.name,
+                                name: invitedBy.name ?? invitedBy.fullName,
+                                imageUrl: invitedBy.imageUrl ?? invitedBy.avatarUrl,
+                                overallRating: invitedBy.overallRating,
+                                professionalRole: invitedBy.professionalRole,
+                                isVerified: invitedBy.isVerified,
+                            }
+                            : undefined,
+                    };
+                })
+            );
+
+            setInvitations(enriched);
+        } catch {
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
     useEffect(() => {
         fetchInvitations();
@@ -307,8 +338,7 @@ export default function CollabInvitationsPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             {filtered.map((invitation) => {
                                 const inviter = invitation.invitedBy;
-                                const inviterName =
-                                    inviter?.fullName ?? inviter?.name ?? "Creative";
+                                const inviterName = inviter?.fullName ?? inviter?.name ?? "Creative";
                                 const inviterAvatar =
                                     inviter?.imageUrl ??
                                     inviter?.avatarUrl ??
@@ -323,7 +353,6 @@ export default function CollabInvitationsPage() {
                                         key={invitation.id}
                                         className="bg-[#f9f9f9] border border-gray-100 rounded-xl overflow-hidden flex flex-col"
                                     >
-                                        {/* Top accent */}
                                         <div className="h-1 w-full bg-[#e84545]" />
 
                                         <div className="p-4 flex flex-col flex-1">
@@ -359,7 +388,6 @@ export default function CollabInvitationsPage() {
                                                         </div>
                                                     )}
                                                 </div>
-                                                {/* Status badge */}
                                                 <span
                                                     className={`flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full shrink-0 ${status.className}`}
                                                 >
@@ -440,7 +468,7 @@ export default function CollabInvitationsPage() {
                                                 )}
                                             </div>
 
-                                            {/* Actions — only show for PENDING */}
+                                            {/* Actions — only for PENDING */}
                                             {isPending && (
                                                 <div className="flex gap-2 mt-auto">
                                                     <button
@@ -472,7 +500,7 @@ export default function CollabInvitationsPage() {
                                         </div>
                                     </div>
                                 );
-            })}
+                            })}
                         </div>
                     )}
                 </main>
