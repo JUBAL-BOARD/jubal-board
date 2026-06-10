@@ -196,7 +196,7 @@ export interface ChatMessage {
   isQuickReply?: boolean;
 }
 
-// app/types.ts
+
 export type ConversationType = "dm" | "group";
 
 export type Conversation = {
