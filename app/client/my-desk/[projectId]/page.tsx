@@ -1,15 +1,40 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Sidebar from "@/app/components/client/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/client/dashboard/dashboardTopbar";
 import Breadcrumb from "@/app/components/client/my-desk/breadcrumb";
 import { useParams, useRouter } from "next/navigation";
-import { X, ChevronDown, ThumbsUp, DollarSign, Loader2 } from "lucide-react";
+import { X, ChevronDown, ThumbsUp, DollarSign, Loader2, Upload, AlertCircle } from "lucide-react";
 import { showReviewCreativeToast } from "@/app/components/ui/toasts";
 import { showAddtoFavoriteToast } from "@/app/components/ui/toasts";
 import { showPartiallyToast } from "@/app/components/ui/toasts";
 import { showRevisionToast } from "@/app/components/ui/toasts";
+import { raiseDispute } from "@/app/lib/api/disputeApi";
+
+const ISSUE_TYPES = [
+  "POOR_QUALITY",
+  "MISSED_DEADLINE",
+  "INCOMPLETE_DELIVERY",
+  "NON_COMMUNICATION",
+  "FRAUD",
+  "OTHER",
+];
+const ISSUE_TYPE_LABELS: Record<string, string> = {
+  POOR_QUALITY: "Poor Quality",
+  MISSED_DEADLINE: "Missed Deadline",
+  INCOMPLETE_DELIVERY: "Incomplete Delivery",
+  NON_COMMUNICATION: "Non Communication",
+  FRAUD: "Fraud",
+  OTHER: "Other",
+};
+const PREFERRED_OUTCOMES = ["REFUND", "REVISION", "REASSIGNMENT"];
+
+const PREFERRED_OUTCOMES_LABELS: Record<string, string> = {
+  REFUND: "Refund",
+  REVISION: "Revision",
+  REASSIGNMENT: "Reassignment",
+};
 
 const StarIcon = () => (
   <svg viewBox="0 0 20 20" fill="#F5A623" className="w-4 h-4">
@@ -43,6 +68,189 @@ function CollapsibleSection({
     </div>
   );
 }
+
+// ─── Report Dispute Modal ─────────────────────────────────────────────────────
+
+const ReportDisputeModal: React.FC<{
+  onClose: () => void;
+  projectId: string;
+}> = ({ onClose, projectId }) => {
+  const [issueType, setIssueType] = useState(ISSUE_TYPES[0]);
+  const [description, setDescription] = useState("");
+  const [preferredOutcome, setPreferredOutcome] = useState<string | null>(null);
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    setEvidenceFiles((prev) => [...prev, ...files].slice(0, 5));
+  };
+
+  const handleSubmit = async () => {
+    if (!description.trim()) {
+      setError("Please provide a description.");
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      await raiseDispute({
+        projectId,
+        issueType,
+        description,
+        preferredOutcome: preferredOutcome ?? undefined,
+        evidenceFiles,
+      });
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message || "Failed to submit dispute. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl px-10 py-10 w-full max-w-sm flex flex-col items-center text-center shadow-2xl">
+          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+            <AlertCircle size={32} className="text-[#E05C5C]" />
+          </div>
+          <h2 className="text-xl font-bold text-black mb-2">Dispute Submitted</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Your dispute has been raised successfully. Our team will review it shortly.
+          </p>
+          <button
+            onClick={onClose}
+            className="w-full py-3 bg-[#E05C5C] hover:bg-red-600 text-white font-semibold rounded-xl transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center mt-20 z-50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl my-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-6 pb-2">
+          <div className="w-6" />
+          <h2 className="text-xl font-bold text-black">Report a Dispute</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="px-6 pb-6 flex flex-col gap-4 mt-2">
+          {/* Issue Type */}
+          <div className="bg-[#fafafa] rounded-xl p-4">
+            <label className="block text-sm font-semibold text-black mb-2">Issue Type</label>
+            <div className="relative">
+              <select
+                value={issueType}
+                onChange={(e) => setIssueType(e.target.value)}
+                className="w-full appearance-none bg-white border border-gray-200 rounded-lg px-4 py-3 text-sm text-black outline-none pr-10"
+              >
+                {ISSUE_TYPES.map((t) => (
+                  <option key={t} value={t}>{ISSUE_TYPE_LABELS[t]}</option>
+                ))}
+              </select>
+              <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="bg-[#fafafa] rounded-xl p-4">
+            <label className="block text-sm font-semibold text-black mb-2">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Please describe in detail"
+              rows={4}
+              className="w-full bg-white border border-gray-200 rounded-lg px-4 py-3 text-sm text-black placeholder-gray-400 outline-none resize-none"
+            />
+          </div>
+
+          {/* Add Evidence */}
+          <div className="bg-[#fafafa] rounded-xl p-4">
+            <label className="block text-sm font-semibold text-black mb-2">Add Evidence</label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,.pdf"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 px-5 py-2.5 bg-[#E05C5C] hover:bg-red-600 text-white text-sm font-semibold rounded-lg transition-colors"
+            >
+              <Upload size={15} />
+              Upload
+            </button>
+            {evidenceFiles.length > 0 && (
+              <div className="mt-2 flex flex-col gap-1">
+                {evidenceFiles.map((f, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs text-gray-600 bg-white border border-gray-100 rounded px-3 py-1.5">
+                    <span className="truncate max-w-[80%]">{f.name}</span>
+                    <button
+                      onClick={() => setEvidenceFiles((prev) => prev.filter((_, j) => j !== i))}
+                      className="text-gray-400 hover:text-red-500 ml-2"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-gray-400 mt-1">Up to 5 files (images/PDFs, max 10MB each)</p>
+          </div>
+
+          {/* Preferred Outcome */}
+          <div className="bg-[#fafafa] rounded-xl p-4">
+            <label className="block text-sm font-semibold text-black mb-3">Preferred Outcome</label>
+            <div className="flex items-center gap-4 flex-wrap">
+              {PREFERRED_OUTCOMES.map((o) => (
+                <label key={o} className="flex items-center gap-2 cursor-pointer text-sm text-black">
+                  <input
+                    type="radio"
+                    name="preferredOutcome"
+                    value={o}
+                    checked={preferredOutcome === o}
+                    onChange={() => setPreferredOutcome(o)}
+                    className="accent-[#E05C5C]"
+                  />
+                  {o}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-500 text-center">{error}</p>
+          )}
+
+          <button
+            onClick={handleSubmit}
+            disabled={submitting || !description.trim()}
+            className="w-full py-3 bg-[#E05C5C] hover:bg-red-600 text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {submitting && <Loader2 size={15} className="animate-spin" />}
+            Submit
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Existing Modals ──────────────────────────────────────────────────────────
 
 const RevisionsModal: React.FC<{
   onClose: () => void;
@@ -95,7 +303,6 @@ const CongratulationsModal: React.FC<{
   paymentMode?: string;
 }> = ({ onGoToDashboard, submitting, paymentMode }) => {
   const isMilestone = paymentMode === "MILESTONE";
-
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl px-12 py-10 w-[80%] lg:w-[420px] flex flex-col items-center text-center shadow-2xl">
@@ -108,7 +315,7 @@ const CongratulationsModal: React.FC<{
             ? "Milestone payments will be automatically released to your creative within 48 hours."
             : "You have marked this project as completed. Tap below to release payment to your creative."}
         </p>
-        {!isMilestone && (
+        {!isMilestone ? (
           <button
             onClick={onGoToDashboard}
             disabled={submitting}
@@ -117,10 +324,9 @@ const CongratulationsModal: React.FC<{
             {submitting && <Loader2 size={14} className="animate-spin" />}
             Authorize Pay Out
           </button>
-        )}
-        {isMilestone && (
+        ) : (
           <button
-            onClick={onGoToDashboard}  // just close/go to dashboard
+            onClick={onGoToDashboard}
             className="bg-orange-400 border-none rounded-lg px-8 py-2.5 cursor-pointer text-white font-semibold text-xs lg:text-[14px] hover:bg-orange-600 transition-colors"
           >
             Go to Dashboard
@@ -217,7 +423,7 @@ const RateAndReviewModal: React.FC<{
         <div className="text-center px-6 pb-6">
           <button
             onClick={() => onSubmit(rating, review, favourite === "yes")}
-            disabled={rating === 0}  // at minimum a rating is required
+            disabled={rating === 0}
             className="w-[40%] py-3 bg-[#e84545] hover:bg-[#d03535] text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Submit
@@ -227,6 +433,8 @@ const RateAndReviewModal: React.FC<{
     </div>
   );
 };
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ProjectDetail {
   id: string;
@@ -275,6 +483,8 @@ type ClientProfile = {
   clientProfile: { fullName: string; imageUrl: string | null };
 };
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 const getDueIn = (dueDate: string): string => {
   const diff = new Date(dueDate).getTime() - Date.now();
   if (diff <= 0) return "Overdue";
@@ -300,6 +510,8 @@ const statusLabelMap: Record<string, string> = {
   PARTIALLY_COMPLETED: "Partially Completed",
 };
 
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function ViewProjectPage() {
   const params = useParams();
   const router = useRouter();
@@ -311,6 +523,7 @@ export default function ViewProjectPage() {
   const [showCongratsModal, setShowCongratsModal] = useState(false);
   const [showReleasedModal, setShowReleasedModal] = useState(false);
   const [showRateModal, setShowRateModal] = useState(false);
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [deliverablesLoading, setDeliverablesLoading] = useState(false);
@@ -437,17 +650,12 @@ export default function ViewProjectPage() {
     }
   };
 
-  // 2. Replace handleRateSubmit in ViewProjectPage
   const handleRateSubmit = async (rating: number, review: string, addToFavorites: boolean) => {
     setActionSubmitting(true);
     try {
       const token = await getAuthToken();
-      const headers = {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      };
+      const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-      // Submit review
       const reviewRes = await fetch(`/api/v1/reviews`, {
         method: "POST",
         headers,
@@ -456,8 +664,8 @@ export default function ViewProjectPage() {
           projectId,
           rating,
           reviewMessage: review,
-          props: [],          // optional: pass tags/props if you add that UI later
-          addToFavorites,     // backend handles favorites via this flag too
+          props: [],
+          addToFavorites,
         }),
       });
 
@@ -466,14 +674,13 @@ export default function ViewProjectPage() {
         throw new Error(err?.message ?? "Failed to submit review");
       }
 
-      // Also call /favorites separately if they said yes, as a belt-and-suspenders measure
       if (addToFavorites && creative?.creativeId) {
         await fetch(`/api/v1/favorites`, {
           method: "POST",
           headers,
           credentials: "include",
           body: JSON.stringify({ creativeId: creative.creativeId }),
-        }).catch(() => { }); // fail silently — review already succeeded
+        }).catch(() => {});
       }
 
       showReviewCreativeToast();
@@ -481,7 +688,6 @@ export default function ViewProjectPage() {
       router.push("/client/my-desk");
     } catch (err: any) {
       console.error("Review submit error:", err);
-      // optionally show an error toast here
     } finally {
       setActionSubmitting(false);
     }
@@ -529,19 +735,16 @@ export default function ViewProjectPage() {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         credentials: "include",
       });
-      const json = await res.json();
-      console.log("payout response", res.status, json); // ← add this
       if (!res.ok) throw new Error("Failed to authorize payout");
       setShowCongratsModal(false);
       setShowReleasedModal(true);
     } catch (err) {
-      console.log("payout error", err); // ← and this
+      console.error("payout error", err);
     } finally {
       setActionSubmitting(false);
     }
   };
 
-  // Simply open the fileUrl directly — it's already a signed S3 URL
   const handleDownload = (fileUrl: string) => {
     window.open(fileUrl, "_blank");
   };
@@ -584,7 +787,11 @@ export default function ViewProjectPage() {
         />
       )}
       {showCongratsModal && (
-        <CongratulationsModal onGoToDashboard={handleAuthorizePayout} submitting={actionSubmitting} paymentMode={project?.paymentMode} />
+        <CongratulationsModal
+          onGoToDashboard={handleAuthorizePayout}
+          submitting={actionSubmitting}
+          paymentMode={project?.paymentMode}
+        />
       )}
       {showReleasedModal && (
         <ReleasedModal onGoToDashboard={() => { setShowReleasedModal(false); setShowRateModal(true); }} />
@@ -592,10 +799,16 @@ export default function ViewProjectPage() {
       {showRateModal && (
         <RateAndReviewModal
           onClose={() => setShowRateModal(false)}
-          onSubmit={handleRateSubmit}   // now passes (rating, review, favourite)
+          onSubmit={handleRateSubmit}
           creativeAvatar={creativeAvatar}
           creativeName={creativeName}
           creativeRole={creativeRole}
+        />
+      )}
+      {showDisputeModal && (
+        <ReportDisputeModal
+          onClose={() => setShowDisputeModal(false)}
+          projectId={projectId}
         />
       )}
 
@@ -647,10 +860,11 @@ export default function ViewProjectPage() {
                 Review Deliverables
               </button>
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 font-medium hover:bg-gray-50 transition-colors">
-              <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-red-400">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
+            <button
+              onClick={() => setShowDisputeModal(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 font-medium hover:bg-gray-50 transition-colors"
+            >
+              <AlertCircle size={15} className="text-[#E05C5C]" />
               Report a Dispute
             </button>
           </div>
@@ -823,9 +1037,7 @@ export default function ViewProjectPage() {
                                   src={d.fileUrl}
                                   alt={d.fileName}
                                   className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = "none";
-                                  }}
+                                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                                 />
                               ) : (
                                 <span className="text-xs font-semibold text-gray-500 uppercase">{ext || "FILE"}</span>
@@ -885,41 +1097,41 @@ export default function ViewProjectPage() {
                 </div>
               </CollapsibleSection>
 
-              <div className="bg-white border border-gray-100 rounded-xl p-6 mb-10 text-center">
-                <p className="text-sm text-black mb-4 font-medium">
+              <div className="bg-white border border-gray-100 rounded-xl p-6 mb-10">
+                <p className="text-sm text-black mb-6 font-medium text-center">
                   Done reviewing? Pick an option below to update the project status.
                 </p>
-                <div className="flex items-center justify-center gap-3 flex-wrap">
-                  <button
-                    onClick={handlePartially}
-                    disabled={actionSubmitting}
-                    className="px-5 py-2 bg-[#e84545] hover:bg-[#d03535] text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {actionSubmitting && <Loader2 size={13} className="animate-spin" />}
-                    Partially Completed
-                  </button>
-                  <button
-                    onClick={() => setShowModal(true)}
-                    disabled={actionSubmitting}
-                    className="px-5 py-2 bg-yellow-400 hover:bg-yellow-500 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    Revised
-                  </button>
-                  <button
-                    onClick={() => router.push(`/client/my-desk/${projectId}/collaborate`)}
-                    disabled={actionSubmitting}
-                    className="px-5 py-2 bg-[#00b4d8] hover:bg-[#0096c7] text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    Invite to Collaborate
-                  </button>
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex flex-col items-center gap-1">
+                    <p className="text-xs text-gray-400">Need changes made?</p>
+                    <button
+                      onClick={() => setShowModal(true)}
+                      disabled={actionSubmitting}
+                      className="px-6 py-2.5 bg-yellow-400 hover:bg-yellow-500 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      Ask for Revision
+                    </button>
+                  </div>
+
                   <button
                     onClick={handleCompleted}
                     disabled={actionSubmitting}
-                    className="px-5 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                    className="px-8 py-2.5 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
                   >
                     {actionSubmitting && <Loader2 size={13} className="animate-spin" />}
                     Completed
                   </button>
+
+                  <div className="flex flex-col items-center gap-1">
+                    <p className="text-xs text-gray-400">Issues with your project?</p>
+                    <button
+                      onClick={() => setShowDisputeModal(true)}
+                      className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
+                    >
+                      <AlertCircle size={15} className="text-[#E05C5C]" />
+                      Report a Dispute
+                    </button>
+                  </div>
                 </div>
               </div>
             </>
