@@ -74,7 +74,7 @@ const DisputeDetailsContent = ({ id }: { id: string }) => {
             {STATUS_LABEL[dispute.status]}
           </span>
           <div className="mt-4 text-black flex flex-col gap-2">
-            <Row label="Dispute ID:" value={`#DSP-${dispute.id.slice(0,4).toUpperCase()}`} />
+            <Row label="Dispute ID:" value={`#DSP-${dispute.id.slice(0, 4).toUpperCase()}`} />
             <Row
               label="Dispute Date:"
               value={formatDistanceToNow(new Date(dispute.createdAt), { addSuffix: true })}
@@ -88,7 +88,7 @@ const DisputeDetailsContent = ({ id }: { id: string }) => {
         <div>
           <h2 className="text-base font-bold text-black font-heading mb-3">Transaction Details</h2>
           <div className="flex flex-col gap-2">
-            <Row label="Project ID:" value={`#PRJ-${dispute.projectId.slice(0,4).toUpperCase()}`} />
+            <Row label="Project ID:" value={`#PRJ-${dispute.projectId.slice(0, 4).toUpperCase()}`} />
             <Row label="Issue Type:" value={dispute.issueType} />
             {dispute.preferredOutcome && (
               <Row label="Preferred Outcome:" value={dispute.preferredOutcome} />
@@ -114,15 +114,24 @@ const DisputeDetailsContent = ({ id }: { id: string }) => {
               </h2>
               <div className="flex flex-col gap-3">
                 {dispute.evidenceUrls.map((url, i) => {
-                  const isPdf = url.toLowerCase().endsWith(".pdf");
-                  const fileName = url.split("/").pop() || `Evidence ${i + 1}`;
-                  return (
+                  const clean = url.split("?")[0]; // strip query params
+                  const fileName = clean.split("/").pop() || `Evidence ${i + 1}`;
+                  const ext = fileName.split(".").pop()?.toLowerCase();
+
+                  const isImage = ["jpg", "jpeg", "png", "gif", "webp"].includes(ext || "");
+                  const isPdf = ext === "pdf";
+
+                  return isImage ? (
+                    <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                      <img src={url} alt={fileName} className="rounded-lg w-full object-cover max-h-60" />
+                    </a>
+                  ) : (
                     <FileRow
                       key={i}
                       icon={
                         isPdf
                           ? <FileText size={18} className="text-red-500" />
-                          : <ImageIcon size={18} className="text-gray-500" />
+                          : <FileText size={18} className="text-blue-500" /> // generic file icon for doc, mp4, etc.
                       }
                       name={fileName}
                       url={url}

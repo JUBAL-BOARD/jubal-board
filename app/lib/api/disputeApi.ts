@@ -52,7 +52,11 @@ export async function fetchMyDisputes(): Promise<Dispute[]> {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
-  return res.data?.data ?? res.data ?? [];
+  const disputes = (res.data?.data ?? res.data ?? []).map((d: any) => ({
+    ...d,
+    evidenceUrls: d.evidenceFiles,
+  }));
+  return disputes;
 }
 
 export async function fetchDisputeById(id: string): Promise<DisputeDetail> {
@@ -61,7 +65,8 @@ export async function fetchDisputeById(id: string): Promise<DisputeDetail> {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
-  return res.data?.data ?? res.data;
+  const data = res.data?.data ?? res.data;
+  return { ...data, evidenceUrls: data.evidenceFiles };
 }
 
 export async function raiseDispute(payload: RaiseDisputePayload): Promise<Dispute> {
