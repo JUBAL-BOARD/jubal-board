@@ -277,7 +277,6 @@ const TellUsAboutYou: React.FC = () => {
       return;
     }
 
-    // Validate phone before submit
     if (selectedCountry?.code && phoneNumber) {
       const isValid = validatePhone(phoneNumber, selectedCountry.code);
       if (!isValid) {
@@ -296,10 +295,11 @@ const TellUsAboutYou: React.FC = () => {
       const { token } = await tokenRes.json();
       if (!token) throw new Error("Unauthorized");
 
+      // 1. PATCH personal profile
       const formData = new FormData();
       formData.append("fullName", form.fullName.trim());
       formData.append("dateOfBirth", form.dob);
-      formData.append("contactNumber", getE164Phone()); // E.164 format e.g. +2348012345678
+      formData.append("contactNumber", getE164Phone());
       formData.append("streetAddress", form.streetAddress.trim());
       formData.append("postalCode", form.postalCode.trim());
       formData.append("describeYourselfInOneLine", form.description.trim());
@@ -308,17 +308,24 @@ const TellUsAboutYou: React.FC = () => {
       formData.append("professionalRole", form.professionalRole.trim());
       formData.append("currency", selectedCurrency);
       formData.append("rateType", rateTypeApiMap[form.rateType] || "HOURLY");
-      formData.append("minRate", minRate);
-      formData.append("maxRate", maxRate);
+      formData.append("rateRangeMin", minRate);   // ✅ fixed
+      formData.append("rateRangeMax", maxRate);   // ✅ fixed
+
+      // preferredSocialLinks as repeated fields (array<string>)
+      form.socialLinks
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .forEach((link) => formData.append("preferredSocialLinks", link));  // ✅ fixed
 
       selectedCategories.forEach((id) => {
         formData.append("categoriesOfInterest", id);
       });
-      projectFiles.forEach((file) => {
-        formData.append("projectFiles", file);
-      });
+
       const avatarFile = fileInputRef.current?.files?.[0];
       if (avatarFile) formData.append("image", avatarFile);
+
+      // ✅ projectFiles removed from this request
 
       const res = await fetch("/api/v1/creatives/me/personal-profile", {
         method: "PATCH",
@@ -332,6 +339,21 @@ const TellUsAboutYou: React.FC = () => {
         throw new Error(errData.message || "Failed to save profile.");
       }
 
+      // 2. Upload portfolio files one by one ✅
+      if (projectFiles.length > 0) {
+        for (const file of projectFiles) {
+          const fileData = new FormData();
+          fileData.append("file", file);
+          await fetch("/api/v1/creatives/me/portfolio", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: fileData,
+            credentials: "include",
+          });
+        }
+      }
+
+      // 3. Update local storage and redirect
       const userData = localStorage.getItem("userData");
       if (userData) {
         const parsed = JSON.parse(userData);
@@ -422,91 +444,90 @@ const TellUsAboutYou: React.FC = () => {
           </div>
 
           <div>
-              <label className={labelClass}>Country{reqStar}</label>
-              <div className="relative">
-                <select
-                  value={form.country}
-                  onChange={(e) => handleCountryChange(e.target.value)}
-                  className={`${inputClass} appearance-none pr-9 cursor-pointer`}
-                >
-                  <option value="" disabled>Select country</option>
-                  {countries.map((c) => (
-                    <option key={c.id} value={c.name}>{c.name}</option>
-                  ))}
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <ChevronDown size={14} stroke="#6B7280" />
-                </div>
+            <label className={labelClass}>Country{reqStar}</label>
+            <div className="relative">
+              <select
+                value={form.country}
+                onChange={(e) => handleCountryChange(e.target.value)}
+                className={`${inputClass} appearance-none pr-9 cursor-pointer`}
+              >
+                <option value="" disabled>Select country</option>
+                {countries.map((c) => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <ChevronDown size={14} stroke="#6B7280" />
               </div>
             </div>
           </div>
+        </div>
 
-          {selectedCountry && selectedCountry.states.length > 0 && (
-            <div>
-              <label className={labelClass}>State{reqStar}</label>
-              <div className="relative">
-                <select
-                  value={selectedState}
-                  onChange={(e) => setSelectedState(e.target.value)}
-                  className={`${inputClass} appearance-none pr-9 cursor-pointer`}
-                >
-                  <option value="" disabled>Select state</option>
-                  {selectedCountry.states.map((s) => (
-                    <option key={s.id} value={s.name}>{s.name}</option>
-                  ))}
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <ChevronDown size={14} stroke="#6B7280" />
-                </div>
+        {selectedCountry && selectedCountry.states.length > 0 && (
+          <div>
+            <label className={labelClass}>State{reqStar}</label>
+            <div className="relative">
+              <select
+                value={selectedState}
+                onChange={(e) => setSelectedState(e.target.value)}
+                className={`${inputClass} appearance-none pr-9 cursor-pointer`}
+              >
+                <option value="" disabled>Select state</option>
+                {selectedCountry.states.map((s) => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <ChevronDown size={14} stroke="#6B7280" />
               </div>
             </div>
-          )}
+          </div>
+        )}
 
 
-          <div className="grid grid-cols-2 gap-4">
-            {/* Contact Number with live formatting + validation */}
-            <div>
-              <label className={labelClass}>Contact Number{reqStar}</label>
-              <div className={`${inputClass} flex items-center gap-0 p-0 overflow-hidden ${
-                phoneTouched
-                  ? phoneError
-                    ? "border-red-400"
-                    : phoneNumber
-                    ? "border-green-400"
-                    : ""
+        <div className="grid grid-cols-2 gap-4">
+          {/* Contact Number with live formatting + validation */}
+          <div>
+            <label className={labelClass}>Contact Number{reqStar}</label>
+            <div className={`${inputClass} flex items-center gap-0 p-0 overflow-hidden ${phoneTouched
+              ? phoneError
+                ? "border-red-400"
+                : phoneNumber
+                  ? "border-green-400"
                   : ""
+              : ""
               }`}>
-                {phoneCode && (
-                  <span className="px-3 py-[11px] text-[13px] text-black border-r border-gray-200 flex-shrink-0 select-none bg-gray-50">
-                    {phoneCode}
-                  </span>
-                )}
-                <input
-                  value={phoneNumber}
-                  onChange={handlePhoneChange}
-                  onBlur={handlePhoneBlur}
-                  placeholder={
-                    selectedCountry?.code
-                      ? getPhonePlaceholder(selectedCountry.code)
-                      : "Select a country first"
-                  }
-                  disabled={!selectedCountry}
-                  inputMode="tel"
-                  className="flex-1 px-3 py-[11px] text-[13px] text-black outline-none bg-white border-none disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
-                />
-              </div>
-              {phoneTouched && phoneError && (
-                <p className="text-red-400 text-[11px] mt-1">{phoneError}</p>
+              {phoneCode && (
+                <span className="px-3 py-[11px] text-[13px] text-black border-r border-gray-200 flex-shrink-0 select-none bg-gray-50">
+                  {phoneCode}
+                </span>
               )}
-              {phoneTouched && !phoneError && phoneNumber && (
-                <p className="text-green-500 text-[11px] mt-1">✓ Valid phone number</p>
-              )}
-              {selectedCountry?.code && (
-                <p className="text-gray-400 text-[11px] mt-1">
-                  Format: {getPhonePlaceholder(selectedCountry.code)}
-                </p>
-              )}
+              <input
+                value={phoneNumber}
+                onChange={handlePhoneChange}
+                onBlur={handlePhoneBlur}
+                placeholder={
+                  selectedCountry?.code
+                    ? getPhonePlaceholder(selectedCountry.code)
+                    : "Select a country first"
+                }
+                disabled={!selectedCountry}
+                inputMode="tel"
+                className="flex-1 px-3 py-[11px] text-[13px] text-black outline-none bg-white border-none disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
+              />
             </div>
+            {phoneTouched && phoneError && (
+              <p className="text-red-400 text-[11px] mt-1">{phoneError}</p>
+            )}
+            {phoneTouched && !phoneError && phoneNumber && (
+              <p className="text-green-500 text-[11px] mt-1">✓ Valid phone number</p>
+            )}
+            {selectedCountry?.code && (
+              <p className="text-gray-400 text-[11px] mt-1">
+                Format: {getPhonePlaceholder(selectedCountry.code)}
+              </p>
+            )}
+          </div>
 
           <div>
             <label className={labelClass}>Street Address{reqStar}</label>
@@ -527,11 +548,10 @@ const TellUsAboutYou: React.FC = () => {
                 onBlur={() => setDescTouched(true)}
                 rows={4}
                 placeholder="Tell clients who you are, what you do, and what makes you unique..."
-                className={`${inputClass} resize-y leading-relaxed pr-2 ${
-                  descTouched && form.description.trim().length < 50
-                    ? "border-red-400"
-                    : ""
-                }`}
+                className={`${inputClass} resize-y leading-relaxed pr-2 ${descTouched && form.description.trim().length < 50
+                  ? "border-red-400"
+                  : ""
+                  }`}
               />
               <div className={`text-right text-[11px] mt-1 ${form.description.trim().length < 50 ? "text-red-400" : "text-green-500"}`}>
                 {form.description.trim().length}/50 min
