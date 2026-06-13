@@ -37,8 +37,8 @@ const Favorites: React.FC = () => {
         });
         const json = await res.json();
         setProfile(json.data);
-      } catch {
-        // fail silently
+      } catch (err) {
+        console.error("Profile fetch error:", err);
       } finally {
         setProfileLoading(false);
       }
@@ -52,66 +52,56 @@ const Favorites: React.FC = () => {
     try {
       const tokenRes = await fetch("/api/auth/session/token");
       const { token } = await tokenRes.json();
+
+      if (!token) {
+        console.error("No token found");
+        return;
+      }
+
       const headers = {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       };
 
-      // Step 1: get favorited IDs
-      const favRes = await fetch("/api/v1/favorites", {
-        headers,
-        credentials: "include",
-      });
-      if (!favRes.ok) return;
+      const favRes = await fetch("/api/v1/favorites", { headers });
+
+      if (!favRes.ok) {
+        console.error("Favorites fetch failed with status:", favRes.status);
+        return;
+      }
+
       const favJson = await favRes.json();
-      const favList: { id: string; targetId: string }[] =
-        Array.isArray(favJson.data) ? favJson.data : [];
+      console.log("Sample fav item:", JSON.stringify(favJson.data?.[0], null, 2));
+
+      const favList = Array.isArray(favJson.data) ? favJson.data : [];
 
       if (favList.length === 0) {
         setFavorites([]);
         return;
       }
 
-      // Step 2: fetch each creative's public profile
-      const profiles = await Promise.all(
-        favList.map(async (fav) => {
-          try {
-            const res = await fetch(
-              `/api/v1/creatives/${fav.targetId}/public-profile`,
-              { headers, credentials: "include" }
-            );
-            if (!res.ok) return null;
-            const json = await res.json();
-            const c = json.data ?? json;
-            const name = c.name ?? "Creative";
+      const mapped: FavoriteCreative[] = favList.map((fav: any) => ({
+        id: fav.creativeId,
+        name: fav.name ?? "Creative",
+        role: fav.professionalRole ?? "Creative",
+        avatar:
+          fav.photo ??
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(
+            fav.name ?? "Creative"
+          )}&background=1a1a2e&color=fff&size=128`,
+        rating: fav.overallRating ?? 0,
+        rate: fav.services?.[0]
+          ? `$${fav.services[0].priceFrom.toLocaleString()}`
+          : "—",
+        completedProjects: fav.completedProjects ?? 0,
+        online: fav.isOnline ?? false,
+        verified: fav.isPremium ?? false,
+      }));
 
-            return {
-              id: fav.targetId,
-              name,
-              role: c.categoriesOfInterest?.[0]?.name ?? "Creative",
-              avatar:
-                c.avatarUrl ??
-                `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a2e&color=fff&size=128`,
-              rating: c.averageRating ?? 0,
-              rate: c.services?.[0]
-                ? `$${c.services[0].priceFrom.toLocaleString()}`
-                : "—",
-              completedProjects: c.completedProjects ?? 0,
-              online: c.isOnline ?? false,
-              verified: c.isPremium ?? false,
-            } as unknown as FavoriteCreative;
-          } catch {
-            return null;
-          }
-        })
-      );
-
-      const valid = profiles.filter(Boolean) as FavoriteCreative[];
-      setFavorites(valid);
-      // auto-select first
-      if (valid.length > 0) setSelectedId(String(valid[0].id));
-    } catch {
-      // fail silently
+      setFavorites(mapped);
+      if (mapped.length > 0) setSelectedId(String(mapped[0].id));
+    } catch (err) {
+      console.error("Favorites fetch error:", err);
     } finally {
       setFavoritesLoading(false);
     }
@@ -121,15 +111,19 @@ const Favorites: React.FC = () => {
     fetchFavorites();
   }, [fetchFavorites]);
 
-  const filtered = favorites.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.role.toLowerCase().includes(search.toLowerCase())
+  const filtered = favorites.filter(
+    (c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.role.toLowerCase().includes(search.toLowerCase())
   );
 
-  const userName = profile?.clientProfile?.fullName || profile?.name || "Client";
+  const userName =
+    profile?.clientProfile?.fullName || profile?.name || "Client";
   const userAvatar =
     profile?.clientProfile?.imageUrl ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+      userName
+    )}&background=1a1a2e&color=fff&size=128`;
 
   if (profileLoading) {
     return (
@@ -172,10 +166,12 @@ const Favorites: React.FC = () => {
         </div>
 
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <Breadcrumb crumbs={[
-            { label: "Dashboard", path: "/client/dashboard" },
-            { label: "My Favorites" },
-          ]} />
+          <Breadcrumb
+            crumbs={[
+              { label: "Dashboard", path: "/client/dashboard" },
+              { label: "My Favorites" },
+            ]}
+          />
           <h1 className="text-[26px] font-extrabold text-[#1a1a2e] m-0 mb-6">
             My Favorites
           </h1>

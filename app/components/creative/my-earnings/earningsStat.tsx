@@ -8,6 +8,7 @@ interface Props {
 
 const EarningsStats: React.FC<Props> = ({ data }) => {
   const [showWithdraw, setShowWithdraw] = useState(false);
+  const currency = data.currency ?? "USD";
 
   return (
     <>
@@ -16,7 +17,7 @@ const EarningsStats: React.FC<Props> = ({ data }) => {
         <div className="bg-green-50 w-[80%] mx-auto lg:w-full flex flex-col items-center justify-center border border-green-100 rounded-xl px-6 py-5">
           <p className="text-lg font-heading font-medium text-green-600 mb-2">Total Earned</p>
           <p className="text-lg lg:text-3xl font-body font-bold text-green-500">
-            ${data.totalEarned.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            {`${currency} ${data.totalEarned.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
           </p>
         </div>
 
@@ -24,7 +25,7 @@ const EarningsStats: React.FC<Props> = ({ data }) => {
         <div className="bg-purple-50 w-[80%] mx-auto lg:w-full border border-purple-100 rounded-xl px-6 py-5">
           <p className="text-lg font-heading font-medium text-center text-purple-500 mb-2">Pending Earnings</p>
           <p className="text-lg lg:text-3xl font-body font-bold text-center text-gray-900">
-            ${data.pendingEarnings.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            {`${currency} ${data.pendingEarnings.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
           </p>
         </div>
 
@@ -33,7 +34,7 @@ const EarningsStats: React.FC<Props> = ({ data }) => {
           <div>
             <p className="text-lg text-center font-heading font-medium text-yellow-600 mb-2">Available Balance</p>
             <p className="text-lg lg:text-3xl text-center font-body font-bold text-gray-900">
-              ${data.availableBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {`${currency} ${data.availableBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
             </p>
           </div>
           <button

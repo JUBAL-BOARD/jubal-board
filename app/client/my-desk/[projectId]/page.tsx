@@ -11,6 +11,7 @@ import { showAddtoFavoriteToast } from "@/app/components/ui/toasts";
 import { showPartiallyToast } from "@/app/components/ui/toasts";
 import { showRevisionToast } from "@/app/components/ui/toasts";
 import { raiseDispute } from "@/app/lib/api/disputeApi";
+import toast from "react-hot-toast";
 
 const ISSUE_TYPES = [
   "POOR_QUALITY",
@@ -29,12 +30,6 @@ const ISSUE_TYPE_LABELS: Record<string, string> = {
   OTHER: "Other",
 };
 const PREFERRED_OUTCOMES = ["REFUND", "REVISION", "REASSIGNMENT"];
-
-const PREFERRED_OUTCOMES_LABELS: Record<string, string> = {
-  REFUND: "Refund",
-  REVISION: "Revision",
-  REASSIGNMENT: "Reassignment",
-};
 
 const StarIcon = () => (
   <svg viewBox="0 0 20 20" fill="#F5A623" className="w-4 h-4">
@@ -115,7 +110,10 @@ const ReportDisputeModal: React.FC<{
   if (success) {
     return (
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl px-10 py-10 w-full max-w-sm flex flex-col items-center text-center shadow-2xl">
+        <div className="bg-white rounded-2xl px-10 py-10 w-full max-w-sm flex flex-col items-center text-center shadow-2xl relative">
+          <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
           <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
             <AlertCircle size={32} className="text-[#E05C5C]" />
           </div>
@@ -137,7 +135,6 @@ const ReportDisputeModal: React.FC<{
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center mt-20 z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl my-auto">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-2">
           <div className="w-6" />
           <h2 className="text-xl font-bold text-black">Report a Dispute</h2>
@@ -147,7 +144,6 @@ const ReportDisputeModal: React.FC<{
         </div>
 
         <div className="px-6 pb-6 flex flex-col gap-4 mt-2">
-          {/* Issue Type */}
           <div className="bg-[#fafafa] rounded-xl p-4">
             <label className="block text-sm font-semibold text-black mb-2">Issue Type</label>
             <div className="relative">
@@ -164,7 +160,6 @@ const ReportDisputeModal: React.FC<{
             </div>
           </div>
 
-          {/* Description */}
           <div className="bg-[#fafafa] rounded-xl p-4">
             <label className="block text-sm font-semibold text-black mb-2">Description</label>
             <textarea
@@ -176,7 +171,6 @@ const ReportDisputeModal: React.FC<{
             />
           </div>
 
-          {/* Add Evidence */}
           <div className="bg-[#fafafa] rounded-xl p-4">
             <label className="block text-sm font-semibold text-black mb-2">Add Evidence</label>
             <input
@@ -212,7 +206,6 @@ const ReportDisputeModal: React.FC<{
             <p className="text-xs text-gray-400 mt-1">Up to 5 files (images/PDFs, max 10MB each)</p>
           </div>
 
-          {/* Preferred Outcome */}
           <div className="bg-[#fafafa] rounded-xl p-4">
             <label className="block text-sm font-semibold text-black mb-3">Preferred Outcome</label>
             <div className="flex items-center gap-4 flex-wrap">
@@ -232,9 +225,7 @@ const ReportDisputeModal: React.FC<{
             </div>
           </div>
 
-          {error && (
-            <p className="text-sm text-red-500 text-center">{error}</p>
-          )}
+          {error && <p className="text-sm text-red-500 text-center">{error}</p>}
 
           <button
             onClick={handleSubmit}
@@ -250,23 +241,33 @@ const ReportDisputeModal: React.FC<{
   );
 };
 
-// ─── Existing Modals ──────────────────────────────────────────────────────────
+// ─── Revisions Modal ──────────────────────────────────────────────────────────
 
 const RevisionsModal: React.FC<{
   onClose: () => void;
   onSubmit: (notes: string) => Promise<void>;
   projectTitle: string;
   submitting: boolean;
-}> = ({ onClose, onSubmit, projectTitle, submitting }) => {
+  revisionsUsed: number;
+  revisionsAllowed: number;
+}> = ({ onClose, onSubmit, projectTitle, submitting, revisionsUsed, revisionsAllowed }) => {
   const inputClass = "w-full border border-gray-200 rounded-lg px-3.5 py-[11px] text-[13px] text-black outline-none bg-white box-border";
   const [description, setDescription] = useState("");
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center mt-10 justify-center z-50">
-      <div className="bg-white rounded-2xl px-12 py-10 w-[80%] lg:w-[420px] flex flex-col items-center text-center shadow-2xl">
-        <h1 className="text-black text-2xl font-bold mb-4">Request Revision</h1>
+      <div className="bg-white rounded-2xl px-12 py-10 w-[80%] lg:w-[420px] flex flex-col items-center text-center shadow-2xl relative">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+          <X size={20} />
+        </button>
+        <h1 className="text-black text-2xl font-bold mb-2">Request Revision</h1>
+        <p className="text-xs text-gray-400 mb-4">
+          {revisionsUsed} of {revisionsAllowed} revisions used
+        </p>
         <div className="bg-[#fafafa] p-6 mb-4 text-center w-full">
           <h2 className="text-xl font-bold text-black mb-2">{projectTitle}</h2>
-          <span className="inline-block px-4 py-1 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-full mb-4">In Progress</span>
+          <span className="inline-block px-4 py-1 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-full mb-4">
+            In Progress
+          </span>
           <div className="flex items-center gap-3 mb-3 max-w-md mx-auto">
             <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
               <div className="h-full w-[60%] bg-[#e84545] rounded-full" />
@@ -297,15 +298,21 @@ const RevisionsModal: React.FC<{
   );
 };
 
+// ─── Congratulations Modal ────────────────────────────────────────────────────
+
 const CongratulationsModal: React.FC<{
+  onClose: () => void;
   onGoToDashboard: () => void;
   submitting: boolean;
   paymentMode?: string;
-}> = ({ onGoToDashboard, submitting, paymentMode }) => {
+}> = ({ onClose, onGoToDashboard, submitting, paymentMode }) => {
   const isMilestone = paymentMode === "MILESTONE";
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl px-12 py-10 w-[80%] lg:w-[420px] flex flex-col items-center text-center shadow-2xl">
+      <div className="bg-white rounded-2xl px-12 py-10 w-[80%] lg:w-[420px] flex flex-col items-center text-center shadow-2xl relative">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+          <X size={20} />
+        </button>
         <div className="w-[90px] h-[90px] rounded-full bg-[#fb923c] flex items-center justify-center mb-5">
           <ThumbsUp size={52} fill="white" stroke="#fb923c" />
         </div>
@@ -337,9 +344,17 @@ const CongratulationsModal: React.FC<{
   );
 };
 
-const ReleasedModal: React.FC<{ onGoToDashboard: () => void }> = ({ onGoToDashboard }) => (
+// ─── Released Modal ───────────────────────────────────────────────────────────
+
+const ReleasedModal: React.FC<{
+  onClose: () => void;
+  onGoToDashboard: () => void;
+}> = ({ onClose, onGoToDashboard }) => (
   <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-    <div className="bg-white rounded-2xl px-12 py-10 w-[80%] lg:w-[420px] flex flex-col items-center text-center shadow-2xl">
+    <div className="bg-white rounded-2xl px-12 py-10 w-[80%] lg:w-[420px] flex flex-col items-center text-center shadow-2xl relative">
+      <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+        <X size={20} />
+      </button>
       <div className="w-[90px] h-[90px] rounded-full bg-green-400 flex items-center justify-center mb-5">
         <DollarSign size={52} fill="white" stroke="green" />
       </div>
@@ -356,6 +371,8 @@ const ReleasedModal: React.FC<{ onGoToDashboard: () => void }> = ({ onGoToDashbo
     </div>
   </div>
 );
+
+// ─── Rate and Review Modal ────────────────────────────────────────────────────
 
 const RateAndReviewModal: React.FC<{
   onClose: () => void;
@@ -411,7 +428,7 @@ const RateAndReviewModal: React.FC<{
           <p className="font-bold text-black mb-4">Add this Creative to Favourite?</p>
           <div className="flex items-center justify-center gap-3">
             <button
-              onClick={() => { setFavourite("yes"); showAddtoFavoriteToast(); }}
+              onClick={() => { setFavourite("yes"); showAddtoFavoriteToast(creativeName); }}
               className={`px-6 py-2 rounded-lg text-sm font-semibold transition-colors ${favourite === "yes" ? "bg-[#E2554F] text-white" : "bg-[#E2554F]/80 hover:bg-[#E2554F] text-white"}`}
             >Yes</button>
             <button
@@ -453,6 +470,8 @@ interface ProjectDetail {
   pitchId: string | null;
   briefId: string | null;
   paymentMode: "END_OF_PROJECT" | "MILESTONE" | "INSTALLMENTS" | "BOOKING_BALANCE";
+  revisionsAllowed: number;
+  revisionsUsed: number;
 }
 
 interface Deliverable {
@@ -461,9 +480,14 @@ interface Deliverable {
   type: string;
   fileName: string;
   fileUrl: string;
+  signedUrl?: string;
   fileSize: number;
   mimeType: string;
   uploadedAt: string;
+  deliverableType?: string;
+  creativeNote?: string;
+  reviewStatus?: string;
+  reviewFeedback?: string;
 }
 
 interface CreativeProfile {
@@ -550,7 +574,13 @@ export default function ViewProjectPage() {
           }).then((r) => (r.ok ? r.json() : { data: [] }))
         )
       );
-      const all: Deliverable[] = results.flatMap((r) => r.data ?? []);
+      const all: Deliverable[] = results.flatMap((r) =>
+        (r.data ?? []).map((d: any) => ({
+          ...d,
+          type: d.deliverableType ?? d.type,
+          fileUrl: d.signedUrl ?? d.fileUrl,
+        }))
+      );
       setDeliverables(all);
     } catch {
       // fail silently
@@ -651,28 +681,34 @@ export default function ViewProjectPage() {
   };
 
   const handleRateSubmit = async (rating: number, review: string, addToFavorites: boolean) => {
-    setActionSubmitting(true);
-    try {
-      const token = await getAuthToken();
-      const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  setActionSubmitting(true);
+  try {
+    const token = await getAuthToken();
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-      const reviewRes = await fetch(`/api/v1/reviews`, {
-        method: "POST",
-        headers,
-        credentials: "include",
-        body: JSON.stringify({
-          projectId,
-          rating,
-          reviewMessage: review,
-          props: [],
-          addToFavorites,
-        }),
-      });
+    const payload = {
+      projectId,
+      rating,
+      reviewMessage: review,
+      props: [],
+      addToFavorites,
+    };
+    console.log("⭐ Submitting review:", payload);
 
-      if (!reviewRes.ok) {
-        const err = await reviewRes.json().catch(() => ({}));
-        throw new Error(err?.message ?? "Failed to submit review");
-      }
+    const reviewRes = await fetch(`/api/v1/reviews`, {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+
+    console.log("📡 Review response status:", reviewRes.status);
+    const reviewJson = await reviewRes.json();
+    console.log("📦 Review response body:", reviewJson);
+
+    if (!reviewRes.ok) {
+      throw new Error(reviewJson?.message ?? "Failed to submit review");
+    }
 
       if (addToFavorites && creative?.creativeId) {
         await fetch(`/api/v1/favorites`, {
@@ -680,7 +716,7 @@ export default function ViewProjectPage() {
           headers,
           credentials: "include",
           body: JSON.stringify({ creativeId: creative.creativeId }),
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       showReviewCreativeToast();
@@ -704,7 +740,10 @@ export default function ViewProjectPage() {
         body: JSON.stringify({ requestNotes: notes }),
       });
       if (!res.ok) throw new Error("Failed to request revision");
-      setProject((prev) => prev ? { ...prev, status: "REVISION" } : prev);
+      setProject((prev) => prev
+        ? { ...prev, status: "REVISION", revisionsUsed: (prev.revisionsUsed ?? 0) + 1 }
+        : prev
+      );
       setShowModal(false);
       showRevisionToast();
     } catch {
@@ -745,6 +784,19 @@ export default function ViewProjectPage() {
     }
   };
 
+  const handleAskForRevision = () => {
+    const used = project?.revisionsUsed ?? 0;
+    const allowed = project?.revisionsAllowed ?? 2;
+    if (used >= allowed) {
+      toast.error(
+        `You've used all ${allowed} revision${allowed !== 1 ? "s" : ""}. Contact support to request more.`,
+        { duration: 4000 }
+      );
+      return;
+    }
+    setShowModal(true);
+  };
+
   const handleDownload = (fileUrl: string) => {
     window.open(fileUrl, "_blank");
   };
@@ -768,6 +820,10 @@ export default function ViewProjectPage() {
     { label: "Delivery Date", value: project.brief.deliveryDate ? new Date(project.brief.deliveryDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—" },
   ] : [];
 
+  const revisionsUsed = project?.revisionsUsed ?? 0;
+  const revisionsAllowed = project?.revisionsAllowed ?? 2;
+  const revisionLimitReached = revisionsUsed >= revisionsAllowed;
+
   if (loading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-white">
@@ -784,17 +840,23 @@ export default function ViewProjectPage() {
           onSubmit={handleRevisionSubmit}
           projectTitle={project?.title ?? "—"}
           submitting={actionSubmitting}
+          revisionsUsed={revisionsUsed}
+          revisionsAllowed={revisionsAllowed}
         />
       )}
       {showCongratsModal && (
         <CongratulationsModal
+          onClose={() => setShowCongratsModal(false)}
           onGoToDashboard={handleAuthorizePayout}
           submitting={actionSubmitting}
           paymentMode={project?.paymentMode}
         />
       )}
       {showReleasedModal && (
-        <ReleasedModal onGoToDashboard={() => { setShowReleasedModal(false); setShowRateModal(true); }} />
+        <ReleasedModal
+          onClose={() => setShowReleasedModal(false)}
+          onGoToDashboard={() => { setShowReleasedModal(false); setShowRateModal(true); }}
+        />
       )}
       {showRateModal && (
         <RateAndReviewModal
@@ -1092,8 +1154,36 @@ export default function ViewProjectPage() {
               </CollapsibleSection>
 
               <CollapsibleSection title="Message">
-                <div className="w-full px-4 py-3 bg-white border border-gray-100 rounded-lg text-sm text-black min-h-[80px]">
-                  {deliverables[0] ? `Delivery type: ${deliverables[0].type}` : "No message from creative yet."}
+                <div className="flex flex-col gap-3">
+                  {deliverables.length > 0 ? (
+                    deliverables.map((d) => (
+                      <div key={d.id} className="w-full px-4 py-3 bg-white border border-gray-100 rounded-lg text-sm text-black">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-gray-500">
+                            Delivery Type: {d.deliverableType ?? d.type ?? "—"}
+                          </span>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            d.reviewStatus === "APPROVED"
+                              ? "bg-green-100 text-green-600"
+                              : d.reviewStatus === "REVISION_REQUESTED"
+                              ? "bg-orange-100 text-orange-600"
+                              : "bg-yellow-100 text-yellow-600"
+                          }`}>
+                            {d.reviewStatus === "APPROVED"
+                              ? "Approved"
+                              : d.reviewStatus === "REVISION_REQUESTED"
+                              ? "Revision Requested"
+                              : "Pending Review"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-black">
+                          {d.creativeNote ?? "No message from creative."}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-400">No message from creative yet.</p>
+                  )}
                 </div>
               </CollapsibleSection>
 
@@ -1105,11 +1195,18 @@ export default function ViewProjectPage() {
                   <div className="flex flex-col items-center gap-1">
                     <p className="text-xs text-gray-400">Need changes made?</p>
                     <button
-                      onClick={() => setShowModal(true)}
+                      onClick={handleAskForRevision}
                       disabled={actionSubmitting}
-                      className="px-6 py-2.5 bg-yellow-400 hover:bg-yellow-500 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+                      className={`px-6 py-2.5 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 ${
+                        revisionLimitReached
+                          ? "bg-gray-400 cursor-not-allowed"
+                          : "bg-yellow-400 hover:bg-yellow-500"
+                      }`}
                     >
                       Ask for Revision
+                      <span className="text-xs opacity-75">
+                        ({revisionsUsed}/{revisionsAllowed})
+                      </span>
                     </button>
                   </div>
 

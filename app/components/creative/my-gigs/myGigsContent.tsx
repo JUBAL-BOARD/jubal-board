@@ -32,17 +32,28 @@ interface ApiGigDetail {
   collaboratorsJoined?: number;
 }
 
-const filterChips = ["All Gigs", "Active", "Recent", "Completed", "Revised", "Partially Completed", "On Collab"];
+interface ApiCollabGig {
+  id: string;
+  projectId: string;
+  projectTitle: string;
+  projectStatus: string;
+  role: string;
+  progressPercentage: number;
+  deliveryDate: string | null;
+  collabStatus: string;
+  client: {
+    id: string;
+    name: string;
+    avatarUrl: string;
+  };
+  leadCreative: {
+    id: string;
+    name: string;
+    avatarUrl: string;
+  };
+}
 
-const chipToFilter: Record<string, string> = {
-  "All Gigs": "all",
-  Active: "active",
-  Recent: "recent",
-  Completed: "completed",
-  Revised: "revised",
-  "Partially Completed": "partially_completed",
-  "On Collab": "on_collab",
-};
+const filterChips = ["All Gigs", "Active", "Recent", "Completed", "Revised", "Partially Completed", "On Collab"];
 
 const apiStatusToMyGig = (status: string): MyGig["status"] => {
   const map: Record<string, MyGig["status"]> = {
@@ -89,11 +100,10 @@ const MyGigsContent: React.FC = () => {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(6);
   const [gigs, setGigs] = useState<MyGig[]>([]);
-  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchGigs = useCallback(async (filter: string) => {
+  const fetchGigs = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -110,23 +120,23 @@ const MyGigsContent: React.FC = () => {
         "Content-Type": "application/json",
       };
 
-      const [gigsRes, pitchRes] = await Promise.all([
-        fetch(`/api/v1/projects/creative?filter=${filter}`, { credentials: "include", headers }),
+      // Fetch both regular gigs and collab gigs in parallel
+      const [gigsRes, pitchRes, collabGigsRes] = await Promise.all([
+        fetch(`/api/v1/projects/creative?filter=all`, { credentials: "include", headers }),
         fetch(`/api/v1/pitches/me?status=APPROVED`, { credentials: "include", headers }),
+        fetch(`/api/v1/collabs/my-gigs`, { credentials: "include", headers }),
       ]);
 
       if (!gigsRes.ok) throw new Error(`Failed to fetch gigs (${gigsRes.status})`);
 
       const gigsJson = await gigsRes.json();
       const list: ApiGig[] = Array.isArray(gigsJson.data) ? gigsJson.data : [];
-      setTotal(gigsJson.total ?? list.length);
 
-      // Build clientId → avatar map from approved pitches
+      // Build clientName → avatar map from approved pitches
       const clientAvatarMap: Record<string, string> = {};
       if (pitchRes.ok) {
         const pitchJson = await pitchRes.json();
         const pitchList = Array.isArray(pitchJson.data) ? pitchJson.data : [];
-
         await Promise.all(
           pitchList.map(async (p: any) => {
             try {
@@ -139,18 +149,16 @@ const MyGigsContent: React.FC = () => {
                 const client = json.data?.client;
                 if (client?.name) {
                   clientAvatarMap[client.name] =
-                    client.imageUrl ??
-                    client.avatarUrl ??
-                    getAvatarFallback(client.name ?? "CL");
+                    client.imageUrl ?? client.avatarUrl ?? getAvatarFallback(client.name);
                 }
               }
-            } catch {}
+            } catch { }
           })
         );
       }
 
-      // Fetch gig details and map
-      const mapped: MyGig[] = (
+      // Map regular gigs
+      const mappedRegular: MyGig[] = (
         await Promise.all(
           list.map(async (g) => {
             try {
@@ -158,83 +166,125 @@ const MyGigsContent: React.FC = () => {
                 credentials: "include",
                 headers,
               });
-
               if (!detailRes.ok) throw new Error("Detail fetch failed");
               const detailJson = await detailRes.json();
               const detail: ApiGigDetail = detailJson.data;
 
-              console.log("Gig detail:", detail); // 👈 log to see full shape
+              const isCollab =
+                detail.status === "COLLABORATING" ||
+                (detail.status === "IN_PROGRESS" && g.requiredCollaborators > 1) ||
+                g.requiredCollaborators > 1;
+
+              let collaboratorsJoined = 1;
+              if (isCollab) {
+                try {
+                  const briefsRes = await fetch(`/api/v1/collabs/project/${g.id}/briefs`, {
+                    credentials: "include",
+                    headers,
+                  });
+                  if (briefsRes.ok) {
+                    const briefsJson = await briefsRes.json();
+                    const briefs = Array.isArray(briefsJson.data) ? briefsJson.data : [];
+                    const acceptedCount = briefs
+                      .flatMap((b: any) => b.collaborations ?? [])
+                      .filter((c: any) => c.status === "ACCEPTED").length;
+                    collaboratorsJoined = 1 + acceptedCount;
+                  }
+                } catch { }
+              }
+
+              const collabReady = !isCollab || collaboratorsJoined >= g.requiredCollaborators;
 
               return {
                 id: detail.id,
                 title: detail.title,
-                thumbnail:
-                  "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
+                thumbnail: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
                 client: {
-                  id: g.clientId,  // 👈 now passed through
+                  id: g.clientId,
                   name: g.clientName ?? "Unknown Client",
-                  avatar:
-                    clientAvatarMap[g.clientName] ??
-                    getAvatarFallback(g.clientName ?? "CL"),
+                  avatar: clientAvatarMap[g.clientName] ?? getAvatarFallback(g.clientName ?? "CL"),
                 },
                 dueIn: detail.dueDate
                   ? getDueIn(detail.dueDate)
                   : g.collabDeadline
-                  ? getDueIn(g.collabDeadline)
-                  : "No deadline",
+                    ? getDueIn(g.collabDeadline)
+                    : "No deadline",
                 progress: getProgress(detail.status),
                 status: apiStatusToMyGig(detail.status),
-                isCollab:
-                  detail.status === "COLLABORATING" ||
-                  g.requiredCollaborators > 1,
-                collabReady:
-                  !(
-                    detail.status === "COLLABORATING" ||
-                    g.requiredCollaborators > 1
-                  ) ||
-                  ((detail as any).collaboratorsJoined ?? 0) >=
-                    g.requiredCollaborators,
+                isCollab,
+                collabReady,
                 requiredCollaborators: g.requiredCollaborators,
-                collaboratorsJoined:
-                  (detail as any).collaboratorsJoined ?? 0,
-              };
+                collaboratorsJoined,
+                isCollabMember: false,
+              } as MyGig;
             } catch {
               return {
                 id: g.id,
                 title: g.title,
-                thumbnail:
-                  "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
+                thumbnail: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
                 client: {
-                  id: g.clientId,  // 👈 now passed through
+                  id: g.clientId,
                   name: g.clientName ?? "Unknown Client",
-                  avatar:
-                    clientAvatarMap[g.clientId] ??
-                    getAvatarFallback(g.clientName ?? "CL"),
+                  avatar: clientAvatarMap[g.clientName] ?? getAvatarFallback(g.clientName ?? "CL"),
                 },
-                dueIn: g.collabDeadline
-                  ? getDueIn(g.collabDeadline)
-                  : "No deadline",
+                dueIn: g.collabDeadline ? getDueIn(g.collabDeadline) : "No deadline",
                 progress: getProgress(g.status),
                 status: apiStatusToMyGig(g.status),
-                isCollab:
-                  g.status === "COLLABORATING" ||
-                  g.requiredCollaborators > 1,
-                collabReady:
-                  !(
-                    g.status === "COLLABORATING" ||
-                    g.requiredCollaborators > 1
-                  ) ||
-                  ((g as any).collaboratorsJoined ?? 0) >=
-                    g.requiredCollaborators,
+                isCollab: g.status === "COLLABORATING" || g.requiredCollaborators > 1,
+                collabReady: false,
                 requiredCollaborators: g.requiredCollaborators,
-                collaboratorsJoined: (g as any).collaboratorsJoined ?? 0,
-              };
+                collaboratorsJoined: 1,
+                isCollabMember: false,
+              } as MyGig;
             }
           })
         )
       ).filter(Boolean) as MyGig[];
 
-      setGigs(mapped);
+      // Map collab member gigs from /api/v1/collabs/my-gigs
+      let mappedCollabGigs: MyGig[] = [];
+      if (collabGigsRes.ok) {
+        const collabGigsJson = await collabGigsRes.json();
+        const collabList: ApiCollabGig[] = Array.isArray(collabGigsJson.data)
+          ? collabGigsJson.data
+          : [];
+
+        mappedCollabGigs = collabList.map((c) => {
+        
+          return {
+            id: c.projectId,
+            title: c.projectTitle,
+            thumbnail: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
+            client: {
+              id: c.client?.id ?? "",
+              name: c.client?.name ?? "Unknown Client",
+              avatar: c.client?.avatarUrl ?? getAvatarFallback(c.client?.name ?? "CL"),
+            },
+            dueIn: c.deliveryDate ? getDueIn(c.deliveryDate) : "No deadline",
+            progress: c.progressPercentage ?? 0,
+            status: apiStatusToMyGig(c.projectStatus),
+            isCollab: true,
+            collabReady: true,
+            requiredCollaborators: 0,
+            collaboratorsJoined: 0,
+            isCollabMember: true,
+            collabId: c.id,
+            collabRole: c.role,
+            leadCreative: c.leadCreative
+              ? {
+                name: c.leadCreative.name,
+                avatar: c.leadCreative.avatarUrl ?? getAvatarFallback(c.leadCreative.name),
+              }
+              : undefined,
+          };
+        });
+      }
+
+      // Merge — avoid duplicates by projectId
+      const regularIds = new Set(mappedRegular.map((g) => g.id));
+      const uniqueCollabGigs = mappedCollabGigs.filter((g) => !regularIds.has(g.id));
+
+      setGigs([...mappedRegular, ...uniqueCollabGigs]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -243,13 +293,25 @@ const MyGigsContent: React.FC = () => {
   }, [router]);
 
   useEffect(() => {
-    fetchGigs(chipToFilter[activeChip]);
+    fetchGigs();
     setPage(1);
-  }, [activeChip, fetchGigs]);
+  }, [fetchGigs]);
 
-  const filtered = gigs.filter((gig) =>
-    gig.title.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = gigs.filter((gig) => {
+    const matchesSearch = gig.title.toLowerCase().includes(search.toLowerCase());
+    const matchesChip = (() => {
+      switch (activeChip) {
+        case "Active": return gig.status === "Active";
+        case "Recent": return true;
+        case "Completed": return gig.status === "Completed";
+        case "Revised": return gig.status === "Revised";
+        case "Partially Completed": return gig.status === "Partially Completed";
+        case "On Collab": return gig.isCollab === true;
+        default: return true;
+      }
+    })();
+    return matchesSearch && matchesChip;
+  });
 
   const totalPages = Math.ceil(filtered.length / perPage);
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
@@ -295,11 +357,10 @@ const MyGigsContent: React.FC = () => {
               setActiveChip(chip);
               setPage(1);
             }}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              activeChip === chip
-                ? "bg-[#E2554F] text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeChip === chip
+              ? "bg-[#E2554F] text-white"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
           >
             {chip}
           </button>
@@ -316,7 +377,6 @@ const MyGigsContent: React.FC = () => {
       {!loading && !error && (
         <>
           <GigStatsBar gigs={gigs} />
-
           <div className="mt-6">
             <h2 className="text-2xl font-bold text-black mb-4">
               All ({filtered.length})
@@ -327,12 +387,9 @@ const MyGigsContent: React.FC = () => {
               ))}
             </div>
             {filtered.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-12">
-                No gigs found.
-              </p>
+              <p className="text-sm text-gray-400 text-center py-12">No gigs found.</p>
             )}
           </div>
-
           <GigsPagination
             currentPage={page}
             totalPages={totalPages}

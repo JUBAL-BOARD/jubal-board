@@ -34,35 +34,62 @@ const MyEarningsContent: React.FC = () => {
 
       const earningsJson = await earningsRes.json();
       const txJson = await txRes.json();
+      const currency = earningsJson.data?.currency ?? "USD"; // 👈 get currency
 
       // Map earnings
       setEarningsData({
         totalEarned: earningsJson.data.totalEarned,
         pendingEarnings: earningsJson.data.pendingBalance,
         availableBalance: earningsJson.data.availableBalance,
+        currency: earningsJson.data.currency ?? "USD", // 👈 add this
       });
 
       const rawList = Array.isArray(txJson.data)
         ? txJson.data
-        : Array.isArray(txJson.data?.items)
-          ? txJson.data.items
-          : Array.isArray(txJson)
-            ? txJson
-            : [];
+        : Array.isArray(txJson.data?.transactions) // 👈 fix nesting
+          ? txJson.data.transactions
+          : Array.isArray(txJson.data?.items)
+            ? txJson.data.items
+            : Array.isArray(txJson)
+              ? txJson
+              : [];
 
-      // Map transactions
-      const mapped: Transaction[] = rawList.map((tx: any) => {
-        const date = new Date(tx.createdAt);
-        return {
-          id: tx.id,
-          details: tx.reference,
-          paymentMethod: "Wallet",
-          date: date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
-          time: date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
-          amount: `₦${tx.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-          status: capitalizeFirst(tx.type) as Transaction["status"],
-        };
-      });
+      const mapped: Transaction[] = await Promise.all(
+        rawList.map(async (tx: any) => {
+          const date = new Date(tx.createdAt);
+
+          // Extract project ID from reference string
+          const projectIdMatch = tx.reference?.match(/project:\s*([a-f0-9-]{36})/i);
+          let details = tx.reference;
+
+          if (projectIdMatch) {
+            const projectId = projectIdMatch[1];
+            try {
+              const projectRes = await fetch(`/api/v1/projects/${projectId}`, {
+                credentials: "include",
+                headers,
+              });
+              if (projectRes.ok) {
+                const projectJson = await projectRes.json();
+                const title = projectJson.data?.title;
+                if (title) {
+                  details = tx.reference.replace(projectId, title);
+                }
+              }
+            } catch { }
+          }
+
+          return {
+            id: tx.id,
+            details,
+            paymentMethod: "Wallet",
+            date: date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+            time: date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+            amount: `${currency} ${tx.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+            status: capitalizeFirst(tx.type) as Transaction["status"],
+          };
+        })
+      );
       setTransactions(mapped);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");

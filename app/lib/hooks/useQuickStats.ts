@@ -16,16 +16,27 @@ export function useQuickStats() {
         const { token } = await tokenRes.json();
         const headers = { Authorization: `Bearer ${token}` };
 
-        const [projectsRes, earningsRes] = await Promise.all([
+        const [projectsRes, earningsRes, collabGigsRes] = await Promise.all([
           fetch("/api/v1/projects/creative?filter=Active", { headers, credentials: "include" }),
           fetch("/api/v1/earnings", { headers, credentials: "include" }),
+          fetch("/api/v1/collabs/my-gigs", { headers, credentials: "include" }),
         ]);
 
         const projectsJson = await projectsRes.json();
         const earningsJson = await earningsRes.json();
+        const collabGigsJson = collabGigsRes.ok ? await collabGigsRes.json() : { data: [] };
 
         const projects = projectsJson.data?.data ?? projectsJson.data ?? [];
-        setActiveProjects(Array.isArray(projects) ? projects.length : projectsJson.data?.total ?? 0);
+        const regularCount = Array.isArray(projects)
+          ? projects.length
+          : projectsJson.data?.total ?? 0;
+
+        const collabGigs = Array.isArray(collabGigsJson.data) ? collabGigsJson.data : [];
+        const collabCount = collabGigs.filter(
+          (c: any) => c.projectStatus === "IN_PROGRESS"
+        ).length;
+
+        setActiveProjects(regularCount + collabCount);
 
         const earnings = earningsJson.data ?? earningsJson;
         setWeeklyEarnings(earnings.availableBalance ?? 0);

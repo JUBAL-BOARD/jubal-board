@@ -113,6 +113,10 @@ interface Deliverable {
   fileSize: number;
   mimeType: string;
   uploadedAt: string;
+  creativeNote?: string;
+  reviewStatus?: string;
+  collabId?: string;
+  isCollabDeliverable?: boolean;
 }
 
 interface CreativeProfile {
@@ -188,17 +192,67 @@ export default function CreativeViewProjectPage() {
   const fetchDeliverables = async (token: string) => {
     setDeliverablesLoading(true);
     try {
+      const headers = { Authorization: `Bearer ${token}` };
+
+      // Step 1: fetch regular project deliverables
       const types = ["INITIAL", "REVISION", "FINAL"];
-      const results = await Promise.all(
+      const regularResults = await Promise.all(
         types.map((type) =>
           fetch(`/api/v1/projects/${projectId}/deliverables?type=${type}`, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers,
             credentials: "include",
           }).then((r) => (r.ok ? r.json() : { data: [] }))
         )
       );
-      const all: Deliverable[] = results.flatMap((r) => r.data ?? []);
-      setDeliverables(all);
+      const regularDeliverables: Deliverable[] = regularResults.flatMap((r) => r.data ?? []);
+
+      // Step 2: fetch collab briefs to get collab IDs
+      const briefsRes = await fetch(`/api/v1/collabs/project/${projectId}/briefs`, {
+        headers,
+        credentials: "include",
+      });
+
+      let collabDeliverables: Deliverable[] = [];
+      if (briefsRes.ok) {
+        const briefsJson = await briefsRes.json();
+        const briefs = Array.isArray(briefsJson.data) ? briefsJson.data : [];
+
+        // Step 3: get accepted collab IDs
+        const collabIds: string[] = briefs
+          .flatMap((b: any) => b.collaborations ?? [])
+          .filter((c: any) => c.status === "ACCEPTED")
+          .map((c: any) => c.id);
+
+        // Step 4: fetch deliverables for each collab
+        const collabResults = await Promise.all(
+          collabIds.map((collabId) =>
+            fetch(`/api/v1/collabs/${collabId}/deliverables`, {
+              headers,
+              credentials: "include",
+            }).then((r) => (r.ok ? r.json() : { data: [] }))
+          )
+        );
+
+        collabDeliverables = collabResults.flatMap((r) =>
+          (r.data ?? []).map((d: any) => ({
+            id: d.id,
+            projectId: d.projectId,
+            type: d.deliverableType ?? d.type,
+            fileName: d.fileName,
+            fileUrl: d.signedUrl ?? d.fileUrl,
+            fileSize: d.fileSize ?? 0,
+            mimeType: d.mimeType ?? "",
+            uploadedAt: d.createdAt,
+            creativeNote: d.creativeNote,
+            reviewStatus: d.reviewStatus,
+            collabId: d.collaborationId,
+            isCollabDeliverable: true,
+          }))
+        );
+      }
+
+      // Step 5: merge both
+      setDeliverables([...regularDeliverables, ...collabDeliverables]);
     } catch {
       // fail silently
     } finally {
@@ -291,6 +345,28 @@ export default function CreativeViewProjectPage() {
   const handleDownload = (fileUrl: string) => {
     window.open(fileUrl, "_blank");
   };
+
+  const handleReviewDeliverable = async (collabId: string, deliverableId: string, status: "APPROVED" | "REVISION_REQUESTED") => {
+  try {
+    const token = await getAuthToken();
+    const res = await fetch(`/api/v1/collabs/${collabId}/deliverables/${deliverableId}/status`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) throw new Error("Failed to update deliverable status");
+
+    // Refresh deliverables
+    const token2 = await getAuthToken();
+    await fetchDeliverables(token2);
+  } catch {
+    // fail silently
+  }
+};
 
   const loading = profileLoading || gigLoading;
 
@@ -423,6 +499,15 @@ export default function CreativeViewProjectPage() {
                 </svg>
                 Review Deliverables
               </button>
+              {(detail?.status === "COLLABORATING" || (detail?.requiredCollaborators ?? 0) > 1) && (
+                <Link
+                  href={`/creative/collab-hub/${projectId}/collab-progress`}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#1c1c3a] text-white text-sm font-semibold rounded-lg hover:bg-[#2e2e5a] transition-colors border border-[#1c1c3a]"
+                >
+                  <Users size={15} />
+                  View Collab Progress
+                </Link>
+              )}
             </div>
             <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 font-medium hover:bg-gray-50 transition-colors">
               <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-red-400">
@@ -674,55 +759,91 @@ export default function CreativeViewProjectPage() {
                       <Loader2 className="animate-spin text-[#E2554F]" size={24} />
                     </div>
                   ) : deliverables.length > 0 ? (
-                    <>
-                      <div className="grid grid-cols-3 gap-2 mb-3">
-                        {deliverables.map((d, i) => {
-                          const ext = d.fileName?.split(".").pop()?.toLowerCase() ?? "";
-                          const isImage =
-                            d.mimeType?.startsWith("image/") ||
-                            ["jpg", "jpeg", "png", "gif", "webp"].includes(ext);
-                          return (
-                            <div
-                              key={d.id ?? i}
-                              className="h-20 rounded-lg overflow-hidden bg-gray-100 border border-gray-100 flex items-center justify-center"
-                            >
-                              {isImage ? (
-                                <img
-                                  src={d.fileUrl}
-                                  alt={d.fileName}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = "none";
-                                  }}
-                                />
-                              ) : (
-                                <span className="text-xs font-semibold text-gray-500 uppercase">
-                                  {ext || "FILE"}
-                                </span>
-                              )}
+                    <div className="flex flex-col gap-3">
+                      {deliverables.map((d, i) => {
+                        const ext = d.fileName?.split(".").pop()?.toLowerCase() ?? "";
+                        const isImage =
+                          d.mimeType?.startsWith("image/") ||
+                          ["jpg", "jpeg", "png", "gif", "webp"].includes(ext);
+                        return (
+                          <div key={d.id ?? i} className="border border-gray-100 rounded-lg p-3 bg-white">
+                            <div className="flex items-center gap-3">
+                              {/* Preview */}
+                              <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 border border-gray-100 flex items-center justify-center flex-shrink-0">
+                                {isImage ? (
+                                  <img
+                                    src={d.fileUrl}
+                                    alt={d.fileName}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = "none";
+                                    }}
+                                  />
+                                ) : (
+                                  <span className="text-xs font-semibold text-gray-500 uppercase">
+                                    {ext || "FILE"}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Info */}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-black truncate">{d.fileName}</p>
+                                <p className="text-xs text-gray-400">{d.type}</p>
+                                {d.creativeNote && (
+                                  <p className="text-xs text-gray-500 mt-0.5 italic">"{d.creativeNote}"</p>
+                                )}
+                                {d.isCollabDeliverable && d.reviewStatus && (
+                                  <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded-full ${d.reviewStatus === "APPROVED"
+                                      ? "bg-green-100 text-green-600"
+                                      : d.reviewStatus === "REVISION_REQUESTED"
+                                        ? "bg-orange-100 text-orange-600"
+                                        : "bg-yellow-100 text-yellow-600"
+                                    }`}>
+                                    {d.reviewStatus === "APPROVED"
+                                      ? "Approved"
+                                      : d.reviewStatus === "REVISION_REQUESTED"
+                                        ? "Revision Requested"
+                                        : "Pending Review"}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Actions */}
+                              <div className="flex flex-col gap-1.5 flex-shrink-0">
+                                <button
+                                  onClick={() => handleDownload(d.fileUrl)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#e84545] hover:bg-[#d03535] text-white text-xs font-semibold rounded-lg transition-colors"
+                                >
+                                  <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                                  </svg>
+                                  Download
+                                </button>
+
+                                {/* Approve / Request Revision — only for collab deliverables pending review */}
+                                {d.isCollabDeliverable && d.reviewStatus === "PENDING_REVIEW" && (
+                                  <>
+                                    <button
+                                      onClick={() => handleReviewDeliverable(d.collabId!, d.id, "APPROVED")}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition-colors"
+                                    >
+                                      Approve
+                                    </button>
+                                    <button
+                                      onClick={() => handleReviewDeliverable(d.collabId!, d.id, "REVISION_REQUESTED")}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-400 hover:bg-orange-500 text-white text-xs font-semibold rounded-lg transition-colors"
+                                    >
+                                      Request Revision
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {deliverables.map((d) => (
-                          <button
-                            key={d.id}
-                            onClick={() => handleDownload(d.fileUrl)}
-                            className="flex items-center gap-2 px-4 py-2 bg-[#e84545] hover:bg-[#d03535] text-white text-sm font-semibold rounded-lg transition-colors"
-                          >
-                            <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                              <path
-                                fillRule="evenodd"
-                                d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
-                            {d.fileName ?? "Download"}
-                          </button>
-                        ))}
-                      </div>
-                    </>
+                          </div>
+                        );
+                      })}
+                    </div>
                   ) : (
                     <p className="text-sm text-gray-400">No deliverables uploaded yet.</p>
                   )}
@@ -775,19 +896,6 @@ export default function CreativeViewProjectPage() {
                     : "No message from creative yet."}
                 </div>
               </CollapsibleSection>
-
-              <div className="bg-white border border-gray-100 rounded-xl p-6 mb-10 text-center">
-                <p className="text-sm text-black mb-4 font-medium">
-                  Need extra hands on this project?
-                </p>
-                <Link
-                  href={`/creative/my-gigs/${projectId}/collaborate`}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#e84545] hover:bg-[#d03535] text-white text-sm font-semibold rounded-lg transition-colors"
-                >
-                  <Users size={15} />
-                  Invite to Collaborate
-                </Link>
-              </div>
             </>
           )}
           <div className="pb-10" />

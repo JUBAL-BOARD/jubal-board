@@ -21,6 +21,7 @@ export interface GigDetail {
   // client info fetched from brief
   clientName: string;
   clientAvatar: string;
+  requiredCollaborators: number;
 }
 
 export function useGigDetail(id: string | null) {
@@ -81,6 +82,7 @@ export function useGigDetail(id: string | null) {
           milestones: Array.isArray(project.milestones) ? project.milestones : [],
           clientName,
           clientAvatar,
+          requiredCollaborators: project.requiredCollaborators ?? 1,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");

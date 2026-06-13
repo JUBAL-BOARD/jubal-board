@@ -17,8 +17,7 @@ const periodToDateRange: Record<string, string> = {
   "This year": "thisYear",
 };
 
-const fmt = (n: number) =>
-  `₦${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+
 
 const EarningsBreakdown: React.FC = () => {
   const [period, setPeriod] = useState("This month");
@@ -26,32 +25,48 @@ const EarningsBreakdown: React.FC = () => {
   const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currency, setCurrency] = useState("USD");
+  const fmt = (n: number) =>
+  `${currency} ${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
   const fetchBreakdown = useCallback(async (selectedPeriod: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const tokenRes = await fetch("/api/auth/session/token");
-      const { token } = await tokenRes.json();
+  setLoading(true);
+  setError(null);
+  try {
+    const tokenRes = await fetch("/api/auth/session/token");
+    const { token } = await tokenRes.json();
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
 
-      const dateRange = periodToDateRange[selectedPeriod] ?? "thisMonth";
-      const res = await fetch(`/api/v1/earnings/breakdown?dateRange=${dateRange}`, {
+    const dateRange = periodToDateRange[selectedPeriod] ?? "thisMonth";
+
+    const [breakdownRes, earningsRes] = await Promise.all([
+      fetch(`/api/v1/earnings/breakdown?dateRange=${dateRange}`, {
         credentials: "include",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+        headers,
+      }),
+      fetch(`/api/v1/earnings`, {
+        credentials: "include",
+        headers,
+      }),
+    ]);
 
-      if (!res.ok) throw new Error(`Breakdown fetch failed (${res.status})`);
-      const json = await res.json();
-      setBreakdown(json.data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setLoading(false);
+    if (!breakdownRes.ok) throw new Error(`Breakdown fetch failed (${breakdownRes.status})`);
+    const json = await breakdownRes.json();
+    setBreakdown(json.data);
+
+    if (earningsRes.ok) {
+      const earningsJson = await earningsRes.json();
+      setCurrency(earningsJson.data?.currency ?? "USD");
     }
-  }, []);
+  } catch (err) {
+    setError(err instanceof Error ? err.message : "Something went wrong");
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
   useEffect(() => {
     fetchBreakdown(period);

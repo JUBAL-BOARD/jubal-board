@@ -32,9 +32,12 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
   };
 
   const handleUploadDeliverables = () => {
-    setActiveProjectTitle(gig.title);
+  if (gig.isCollabMember && gig.collabId) {
+    router.push(`/creative/collab-hub/briefs/${gig.collabId}/upload-deliverables`);
+  } else {
     router.push(`/creative/my-gigs/${gig.id}/upload-deliverables`);
-  };
+  }
+};
 
   const handleInvite = () => {
     router.push(`/creative/collab-hub/${gig.id}/collaborate`);
@@ -44,7 +47,6 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
     try {
       setChatLoading(true);
 
-      // 1. Check if a conversation with this client already exists
       const convRes = await fetchConversations({ limit: 50 });
       const list = Array.isArray(convRes) ? convRes : convRes.data ?? [];
       const existing = list.find(
@@ -52,12 +54,10 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
       );
 
       if (existing) {
-        // Conversation exists — go straight to it
         router.push(`/creative/messages/${existing.id}`);
         return;
       }
 
-      // 2. No existing conversation — get the first available topic and create one
       const topics = await fetchChatTopics();
       if (!topics || topics.length === 0) {
         console.error("No chat topics available");
@@ -70,7 +70,7 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
         type: "DIRECT",
       });
 
-      router.push(`/.../messages/${newConv.conversation.id}`);
+      router.push(`/creative/messages/${newConv.conversation.id}`);
     } catch (err) {
       console.error("Chat client failed:", err);
     } finally {
@@ -90,6 +90,7 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
 
         {/* Info */}
         <div className="flex-1 min-w-0">
+          {/* Title + Collab badge */}
           <div className="flex items-center gap-2 mb-1.5">
             <h4 className="font-semibold font-heading text-gray-900 text-sm lg:text-md">{gig.title}</h4>
             {isCollab && (
@@ -99,31 +100,72 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
             )}
           </div>
 
+          {/* Client */}
           <div className="flex items-center gap-2 mb-1.5">
-            <img src={gig.client.avatar} alt={gig.client.name} className="w-5 h-5 lg:w-6 lg:h-6 rounded-full object-cover" />
-            <span className="text-xs lg:text-sm text-black font-body font-medium">{gig.client.name}</span>
+            <img
+              src={gig.client.avatar}
+              alt={gig.client.name}
+              className="w-5 h-5 lg:w-6 lg:h-6 rounded-full object-cover"
+            />
+            <span className="text-xs lg:text-sm text-black font-body font-medium">
+              {gig.client.name}
+            </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1 mb-1.5">
-            <Clock size={12} className="text-black" />
-            <span className="text-xs font-body text-black">Due in {gig.dueIn}</span>
+          {/* Due + collab info */}
+          <div className="items-center gap-1 mb-1.5">
+            <div className="flex items-center gap-1">
+              <Clock size={12} className="text-black" />
+              <span className="text-xs font-body text-black">Due in {gig.dueIn}</span>
+            </div>
 
+            {/* Collab mates (if available) */}
             {isCollab && gig.collabMates && (
               <div className="flex items-center gap-1.5 ml-1">
                 <span className="text-xs font-body text-black">Collab mate:</span>
                 <div className="flex -space-x-1.5">
                   {gig.collabMates.avatars.map((av, i) => (
-                    <img key={i} src={av} alt="" className="w-5 h-5 rounded-full border border-white object-cover" />
+                    <img
+                      key={i}
+                      src={av}
+                      alt=""
+                      className="w-5 h-5 rounded-full border border-white object-cover"
+                    />
                   ))}
                 </div>
                 <span className="text-xs text-black">{gig.collabMates.label}</span>
               </div>
             )}
 
-            {isCollab && !collabReady && (
+            {/* Lead creative (for collab members) */}
+            {gig.isCollabMember && gig.leadCreative && (
+              <div className="flex items-center gap-1.5 ml-1">
+                <span className="text-xs font-body text-black">Lead:</span>
+                <img
+                  src={gig.leadCreative.avatar}
+                  alt={gig.leadCreative.name}
+                  className="w-5 h-5 rounded-full border border-white object-cover"
+                />
+                <span className="text-xs text-black">{gig.leadCreative.name}</span>
+              </div>
+            )}
+
+            {/* Collab role (for collab members) */}
+            {gig.isCollabMember && gig.collabRole && (
               <span className="flex items-center gap-1 ml-1 text-xs text-[#E2554F] font-medium">
                 <Users size={11} />
-                Waiting: {gig.collaboratorsJoined ?? 0}/{gig.requiredCollaborators ?? "?"} joined
+                Role: {gig.collabRole}
+              </span>
+            )}
+
+            {/* Collaborators count (for lead creative only) */}
+            {isCollab && !gig.isCollabMember && (
+              <span className="flex items-center gap-1 ml-1 text-xs text-[#E2554F] font-medium">
+                <Users size={11} />
+                {collabReady
+                  ? `${gig.collaboratorsJoined ?? 0}/${gig.requiredCollaborators ?? "?"} collaborators`
+                  : `Waiting: ${gig.collaboratorsJoined ?? 0}/${gig.requiredCollaborators ?? "?"} joined`
+                }
               </span>
             )}
           </div>
@@ -144,30 +186,68 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
 
       {/* Actions */}
       <div className="flex flex-row lg:flex-col flex-wrap gap-2 flex-shrink-0">
-        {isCollab && !collabReady ? (
-          <button
-            onClick={handleInvite}
-            className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors"
-          >
-            <UserPlus size={12} />
-            Invite to Collaborate
-            <span className="opacity-75">
-              ({gig.collaboratorsJoined ?? 0}/{gig.requiredCollaborators ?? "?"})
-            </span>
-          </button>
+        {/* Collab member actions */}
+        {gig.isCollabMember ? (
+          <>
+            <button
+              className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <Users size={12} /> Group Chat
+            </button>
+            <button
+              onClick={handleViewProject}
+              className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <Eye size={12} /> View Project
+            </button>
+            <button
+              onClick={handleUploadDeliverables}
+              className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <Upload size={12} /> Upload Deliverables
+            </button>
+          </>
+        ) : isCollab && !collabReady ? (
+          /* Lead creative — collab not yet full */
+          <>
+            <button
+              onClick={handleInvite}
+              className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <UserPlus size={12} />
+              Invite to Collaborate
+              <span className="opacity-75">
+                ({gig.collaboratorsJoined ?? 0}/{gig.requiredCollaborators ?? "?"})
+              </span>
+            </button>
+            <button
+              onClick={() => router.push(`/creative/collab-hub/${gig.id}/responses`)}
+              className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <Eye size={12} /> View Responses
+            </button>
+          </>
         ) : isCollab && collabReady ? (
+          /* Lead creative — collab full */
           <>
             <button className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
               <Users size={12} /> Group Chat
             </button>
-            <button onClick={handleViewProject} className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
+            <button
+              onClick={handleViewProject}
+              className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            >
               <Eye size={12} /> View Progress
             </button>
-            <button onClick={handleUploadDeliverables} className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
+            <button
+              onClick={handleUploadDeliverables}
+              className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            >
               <Upload size={12} /> Upload Deliverables
             </button>
           </>
         ) : (
+          /* Regular gig */
           <>
             <button
               onClick={handleChatClient}
@@ -181,10 +261,16 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
               )}
               Chat Client
             </button>
-            <button onClick={handleViewProject} className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
+            <button
+              onClick={handleViewProject}
+              className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            >
               <Eye size={12} /> View Project
             </button>
-            <button onClick={handleUploadDeliverables} className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors">
+            <button
+              onClick={handleUploadDeliverables}
+              className="flex items-center justify-center gap-1.5 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-body font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            >
               <Upload size={12} /> Upload Deliverables
             </button>
           </>

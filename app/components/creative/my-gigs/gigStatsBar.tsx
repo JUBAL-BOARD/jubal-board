@@ -9,7 +9,7 @@ const GigStatsBar: React.FC<Props> = ({ gigs }) => {
   const completed = gigs.filter((g) => g.status === "Completed").length;
   const active = gigs.filter((g) => g.status === "Active" || g.status === "In Progress").length;
   const revised = gigs.filter((g) => g.status === "Revised").length;
-  const onCollab = gigs.filter((g) => g.status === "Collaborating").length;
+ const onCollab = gigs.filter((g) => g.isCollab).length;
 
   const stats = [
     { label: "All Gigs", count: all, bg: "bg-[#FFD6D4]", text: "text-black" },

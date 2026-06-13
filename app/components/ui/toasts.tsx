@@ -62,7 +62,7 @@ export const showReviewCreativeToast = () => {
   );
 };
 
-export const showAddtoFavoriteToast = () => {
+export const showAddtoFavoriteToast = (name: string) => {
   toast.custom(
     (t) => (
       <div
@@ -74,7 +74,7 @@ export const showAddtoFavoriteToast = () => {
           <Check size={18} strokeWidth={3} className="text-white" />
         </div>
         <p className="text-sm text-gray-700 leading-snug">
-          Natasha John has been successfully added to your favorite for multiple jobs.
+          {name} has been successfully added to your favorite for multiple jobs.
         </p>
       </div>
     ),

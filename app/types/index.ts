@@ -183,9 +183,13 @@ export interface MyGig {
     label: string;
   };
   isCollab?: boolean;
+  collabId?: string;
   collabReady?: boolean;
   requiredCollaborators?: number;
   collaboratorsJoined?: number;
+  isCollabMember?: boolean;
+  collabRole?: string;
+  leadCreative?: { name: string; avatar: string };
 }
 
 export interface ChatMessage {
@@ -229,6 +233,7 @@ export interface EarningsData {
   totalEarned: number;
   pendingEarnings: number;
   availableBalance: number;
+  currency: string; // 👈 add this
 }
 
 export interface Transaction {

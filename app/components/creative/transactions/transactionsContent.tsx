@@ -33,6 +33,13 @@ const TransactionsContent: React.FC = () => {
       const tokenRes = await fetch("/api/auth/session/token");
       const { token } = await tokenRes.json();
 
+      const earningsRes = await fetch(`/api/v1/earnings`, {
+        credentials: "include",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const earningsJson = await earningsRes.json();
+      const currency = earningsJson.data?.currency ?? "USD";
+
       const res = await fetch(
         `/api/v1/earnings/transactions?page=${page}&limit=${perPage}`,
         {
@@ -49,37 +56,69 @@ const TransactionsContent: React.FC = () => {
 
       const rawList = Array.isArray(json.data)
         ? json.data
-        : Array.isArray(json.data?.items)
-        ? json.data.items
-        : Array.isArray(json)
-        ? json
-        : [];
+        : Array.isArray(json.data?.transactions)
+          ? json.data.transactions
+          : Array.isArray(json.data?.items)
+            ? json.data.items
+            : Array.isArray(json)
+              ? json
+              : [];
 
       setTotalCount(
-        json.total ?? json.totalCount ?? json.data?.total ?? rawList.length
+        json.total ??
+        json.totalCount ??
+        json.data?.total ??
+        json.data?.meta?.total ??
+        rawList.length
       );
 
-      const mapped: Transaction[] = rawList.map((tx: any) => {
-        const date = new Date(tx.createdAt);
-        return {
-          id: tx.id,
-          details: tx.reference,
-          paymentMethod: "Wallet",
-          date: date.toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          }),
-          time: date.toLocaleTimeString("en-GB", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          amount: `₦${tx.amount.toLocaleString("en-US", {
-            minimumFractionDigits: 2,
-          })}`,
-          status: capitalizeFirst(tx.type) as Transaction["status"],
-        };
-      });
+      const mapped: Transaction[] = await Promise.all(
+        rawList.map(async (tx: any) => {
+          const date = new Date(tx.createdAt);
+
+          // Extract project ID from reference string
+          const projectIdMatch = tx.reference?.match(
+            /project:\s*([a-f0-9-]{36})/i
+          );
+          let details = tx.reference;
+
+          if (projectIdMatch) {
+            const projectId = projectIdMatch[1];
+            try {
+              const projectRes = await fetch(`/api/v1/projects/${projectId}`, {
+                credentials: "include",
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (projectRes.ok) {
+                const projectJson = await projectRes.json();
+                const title = projectJson.data?.title;
+                if (title) {
+                  details = tx.reference.replace(projectId, title);
+                }
+              }
+            } catch { }
+          }
+
+          return {
+            id: tx.id,
+            details,
+            paymentMethod: "Wallet",
+            date: date.toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }),
+            time: date.toLocaleTimeString("en-GB", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            amount: `${currency} ${tx.amount.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+            })}`,
+            status: capitalizeFirst(tx.type) as Transaction["status"],
+          };
+        })
+      );
 
       setTransactions(mapped);
     } catch (err) {
