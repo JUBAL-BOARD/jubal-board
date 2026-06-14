@@ -23,12 +23,16 @@ const FavoriteCreativeCard: React.FC<Props> = ({ creative, isSelected, onSelect 
       <div className="flex items-start gap-3 flex-1 min-w-0">
         {/* Avatar */}
         <div className="relative flex-shrink-0">
-          <Image
+          <img
             src={creative.avatar}
             alt={creative.name}
             width={48}
             height={48}
-            className="rounded-full object-cover"
+            className="rounded-full object-cover w-12 h-12"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src =
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(creative.name)}&background=1a1a2e&color=fff&size=128`;
+            }}
           />
           {creative.online && (
             <div className="absolute bottom-px right-px w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-white" />

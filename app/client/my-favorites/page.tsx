@@ -25,6 +25,7 @@ const Favorites: React.FC = () => {
   const [favorites, setFavorites] = useState<FavoriteCreative[]>([]);
   const [favoritesLoading, setFavoritesLoading] = useState(true);
 
+
   // fetch profile
   useEffect(() => {
     const fetchProfile = async () => {
@@ -72,6 +73,7 @@ const Favorites: React.FC = () => {
 
       const favJson = await favRes.json();
       console.log("Sample fav item:", JSON.stringify(favJson.data?.[0], null, 2));
+      console.log("Full fav response:", JSON.stringify(favJson, null, 2));
 
       const favList = Array.isArray(favJson.data) ? favJson.data : [];
 
@@ -80,23 +82,37 @@ const Favorites: React.FC = () => {
         return;
       }
 
-      const mapped: FavoriteCreative[] = favList.map((fav: any) => ({
-        id: fav.creativeId,
-        name: fav.name ?? "Creative",
-        role: fav.professionalRole ?? "Creative",
-        avatar:
-          fav.photo ??
-          `https://ui-avatars.com/api/?name=${encodeURIComponent(
-            fav.name ?? "Creative"
-          )}&background=1a1a2e&color=fff&size=128`,
-        rating: fav.overallRating ?? 0,
-        rate: fav.services?.[0]
-          ? `$${fav.services[0].priceFrom.toLocaleString()}`
-          : "—",
-        completedProjects: fav.completedProjects ?? 0,
-        online: fav.isOnline ?? false,
-        verified: fav.isPremium ?? false,
-      }));
+      const mapped: FavoriteCreative[] = await Promise.all(
+        favList.map(async (fav: any) => {
+          let photo = null;
+
+          try {
+            const profileRes = await fetch(`/api/v1/creatives/${fav.creativeId}/public-profile`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const profileJson = await profileRes.json();
+            photo = profileJson.data?.imageUrl || null;
+          } catch (err) {
+            console.error("Failed to fetch creative profile:", err);
+          }
+
+          return {
+            id: fav.creativeId,
+            name: fav.name ?? "Creative",
+            role: fav.professionalRole ?? "Creative",
+            avatar:
+              photo ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(fav.name ?? "Creative")}&background=1a1a2e&color=fff&size=128`,
+            rating: fav.overallRating ?? 0,
+            rate: fav.services?.[0]
+              ? `$${fav.services[0].priceFrom.toLocaleString()}`
+              : "—",
+            completedProjects: fav.completedProjects ?? 0,
+            online: fav.isOnline ?? false,
+            verified: fav.isPremium ?? false,
+          };
+        })
+      );
 
       setFavorites(mapped);
       if (mapped.length > 0) setSelectedId(String(mapped[0].id));
