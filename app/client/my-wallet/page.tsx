@@ -28,8 +28,17 @@ const capitalizeFirst = (str: string): TransactionStatus => {
   return map[str] ?? "Pending";
 };
 
-const fmt = (n: number) =>
-  `₦${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+const fmt = (n: number, currency: string = "NGN") =>
+  new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+  }).format(n);
+
+const extractProjectId = (reference: string): string | null => {
+  const match = reference.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  return match ? match[0] : null;
+};
 
 const Wallet: React.FC = () => {
   const [search, setSearch] = useState<string>("");
@@ -38,10 +47,7 @@ const Wallet: React.FC = () => {
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const [availableBalance, setAvailableBalance] = useState("₦0.00");
-  const [totalCredit, setTotalCredit] = useState("₦0.00");
-  const [totalSpent, setTotalSpent] = useState("₦0.00");
+  const [currency, setCurrency] = useState<string>("NGN");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [walletLoading, setWalletLoading] = useState(true);
   const [walletError, setWalletError] = useState<string | null>(null);
@@ -56,7 +62,6 @@ const Wallet: React.FC = () => {
         "Content-Type": "application/json",
       };
 
-      // Fetch profile, wallet balance, and transactions in parallel
       const [profileRes, walletRes, txRes] = await Promise.all([
         fetch("/api/v1/clients/me", { headers, credentials: "include" }),
         fetch("/api/v1/wallet", { headers, credentials: "include" }),
@@ -69,14 +74,13 @@ const Wallet: React.FC = () => {
         setProfile(profileJson.data);
       }
 
-      // Wallet balance
+      // Wallet — just grab currency
+      let resolvedCurrency = "NGN";
       if (walletRes.ok) {
         const walletJson = await walletRes.json();
         const w = walletJson.data ?? walletJson;
-        setAvailableBalance(fmt(w.availableBalance ?? 0));
-
-        // Compute totalCredit and totalSpent from transactions below
-        // (wallet endpoint doesn't return these directly)
+        resolvedCurrency = w.currency ?? "NGN";
+        setCurrency(resolvedCurrency);
       } else {
         setWalletError("Failed to load wallet balance.");
       }
@@ -84,39 +88,46 @@ const Wallet: React.FC = () => {
       // Transactions
       if (txRes.ok) {
         const txJson = await txRes.json();
-        const list = Array.isArray(txJson.data) ? txJson.data : [];
+        const list = Array.isArray(txJson.data?.transactions) ? txJson.data.transactions : [];
 
-        // Compute totals from transactions
-        let credit = 0;
-        let spent = 0;
-        list.forEach((tx: any) => {
-          if (tx.type === "CREDIT") credit += tx.amount;
-          if (tx.type === "DEBIT") spent += tx.amount;
-        });
-        setTotalCredit(fmt(credit));
-        setTotalSpent(fmt(spent));
+        const mapped: Transaction[] = await Promise.all(
+          list.map(async (tx: any) => {
+            const date = new Date(tx.createdAt);
+            const status =
+              tx.status === "PENDING" ? "Pending"
+              : tx.status === "REVERSED" ? "Reversed"
+              : capitalizeFirst(tx.type);
+            const isCredit = tx.type === "CREDIT";
 
-        const mapped: Transaction[] = list.map((tx: any) => {
-          const date = new Date(tx.createdAt);
-          const status = capitalizeFirst(tx.type);
-          const isCredit = tx.type === "CREDIT";
-          return {
-            id: tx.id,
-            details: tx.reference,
-            paymentMethod: "Wallet",
-            date: date.toLocaleDateString("en-GB", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            }),
-            time: date.toLocaleTimeString("en-GB", {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            amount: `${isCredit ? "+" : "-"}${fmt(tx.amount)}`,
-            status,
-          };
-        });
+            let details = tx.reference;
+            const projectId = extractProjectId(tx.reference);
+
+            if (projectId) {
+              try {
+                const projRes = await fetch(`/api/v1/projects/${projectId}`, { headers });
+                if (projRes.ok) {
+                  const projJson = await projRes.json();
+                  const title = projJson.data?.title;
+                  if (title) {
+                    details = tx.reference.replace(projectId, title);
+                  }
+                }
+              } catch (_) {}
+            } else if (tx.reference.startsWith("Stripe Fund:")) {
+              details = "Wallet Top-up via Stripe";
+            }
+
+            return {
+              id: tx.id,
+              details,
+              paymentMethod: tx.paymentMethod ?? "Wallet",
+              date: date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+              time: date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+              amount: `${isCredit ? "+" : "-"}${fmt(tx.amount, resolvedCurrency)}`,
+              status,
+            };
+          })
+        );
 
         setTransactions(mapped);
       }
@@ -202,8 +213,7 @@ const Wallet: React.FC = () => {
           ) : walletError ? (
             <p className="text-sm text-red-500 text-center py-6">{walletError}</p>
           ) : (
-            <WalletSummaryCards
-            />
+            <WalletSummaryCards />
           )}
 
           {/* Search + Filter */}
