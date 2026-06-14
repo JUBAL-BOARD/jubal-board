@@ -5,6 +5,7 @@ import { Star, BadgeCheck, MessageSquare, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { fetchConversations, createConversation, fetchChatTopics } from "@/app/lib/api/messageApi";
+import Link from "next/link";
 
 interface Pitch {
   id: string;
@@ -90,9 +91,11 @@ const PitchCard: React.FC<{ pitch: Pitch }> = ({ pitch }) => {
           <span className="text-[14px] text-black">{pitch.completedProjects} Completed Projects</span>
         </div>
         <div className="flex gap-3.5 mt-1.5">
+          <Link href={`/client/explore-skills/creative-profile/${pitch.creativeId}`}>
           <button className="bg-transparent border-none cursor-pointer text-xs text-[#E2554F] font-semibold p-0 hover:underline">
             View Profile
           </button>
+          </Link>
           <button
             onClick={() => router.push(`/client/pitches/${pitch.id}`)}
             className="bg-transparent border-none cursor-pointer text-xs text-[#E2554F] font-semibold p-0 hover:underline"

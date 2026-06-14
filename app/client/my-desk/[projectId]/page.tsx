@@ -5,7 +5,7 @@ import Sidebar from "@/app/components/client/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/client/dashboard/dashboardTopbar";
 import Breadcrumb from "@/app/components/client/my-desk/breadcrumb";
 import { useParams, useRouter } from "next/navigation";
-import { X, ChevronDown, ThumbsUp, DollarSign, Loader2, Upload, AlertCircle } from "lucide-react";
+import { X, ChevronDown, ThumbsUp, DollarSign, Loader2, Upload, AlertCircle, Check } from "lucide-react";
 import { showReviewCreativeToast } from "@/app/components/ui/toasts";
 import { showAddtoFavoriteToast } from "@/app/components/ui/toasts";
 import { showPartiallyToast } from "@/app/components/ui/toasts";
@@ -319,7 +319,7 @@ const CongratulationsModal: React.FC<{
         <h2 className="text-[22px] font-bold text-orange-400 m-0 mb-1">All Done</h2>
         <p className="text-[14px] text-gray-600 m-0 mb-7 leading-relaxed max-w-[260px]">
           {isMilestone
-            ? "Milestone payments will be automatically released to your creative within 48 hours."
+            ? "All milestones are complete. The final milestone payment will be automatically released to your creative within 48 hours."
             : "You have marked this project as completed. Tap below to release payment to your creative."}
         </p>
         {!isMilestone ? (
@@ -555,6 +555,9 @@ export default function ViewProjectPage() {
   const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionSubmitting, setActionSubmitting] = useState(false);
+  const [milestoneSubmittingId, setMilestoneSubmittingId] = useState<string | null>(null);
+  const [bookingFeeSubmitting, setBookingFeeSubmitting] = useState(false);
+  const [bookingFeeReleased, setBookingFeeReleased] = useState(false);
 
   const getAuthToken = async () => {
     const tokenRes = await fetch("/api/auth/session/token");
@@ -784,6 +787,70 @@ export default function ViewProjectPage() {
     }
   };
 
+  // For MILESTONE projects: the congrats modal closes to dashboard,
+  // since milestone payouts auto-release within 48h (no manual authorize step).
+  const handleMilestoneGoToDashboard = () => {
+    setShowCongratsModal(false);
+    router.push("/client/my-desk");
+  };
+
+  const handleMarkMilestoneComplete = async (milestoneId: string) => {
+    if (!project) return;
+    setMilestoneSubmittingId(milestoneId);
+    try {
+      const token = await getAuthToken();
+      const res = await fetch(`/api/v1/projects/${projectId}/milestones/${milestoneId}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to mark milestone completed");
+
+      const updatedMilestones = project.milestones.map((m) =>
+        m.id === milestoneId ? { ...m, isCompleted: true, completedAt: new Date().toISOString() } : m
+      );
+      const allCompleted = updatedMilestones.every((m) => m.isCompleted);
+
+      setProject((prev) => prev ? { ...prev, milestones: updatedMilestones } : prev);
+
+      if (allCompleted) {
+        try {
+          await updateStatus("COMPLETED");
+        } catch {
+          // fail silently
+        }
+        setShowCongratsModal(true);
+      } else {
+        toast.success("Milestone marked as completed.");
+      }
+    } catch {
+      toast.error("Failed to mark milestone as completed. Please try again.");
+    } finally {
+      setMilestoneSubmittingId(null);
+    }
+  };
+
+  const handleReleaseBookingFee = async () => {
+    setBookingFeeSubmitting(true);
+    try {
+      const token = await getAuthToken();
+      const res = await fetch(`/api/v1/projects/${projectId}/release-booking-fee`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to release booking fee");
+      const json = await res.json();
+      setBookingFeeReleased(true);
+      setProject((prev) => prev ? { ...prev, progressPercentage: 50 } : prev);
+      toast.success(json?.message ?? "Booking fee released to creative wallet.");
+    } catch {
+      toast.error("Failed to release booking fee. Please try again.");
+    } finally {
+      setBookingFeeSubmitting(false);
+    }
+  };
+
   const handleAskForRevision = () => {
     const used = project?.revisionsUsed ?? 0;
     const allowed = project?.revisionsAllowed ?? 2;
@@ -823,6 +890,8 @@ export default function ViewProjectPage() {
   const revisionsUsed = project?.revisionsUsed ?? 0;
   const revisionsAllowed = project?.revisionsAllowed ?? 2;
   const revisionLimitReached = revisionsUsed >= revisionsAllowed;
+  const isMilestoneProject = project?.paymentMode === "MILESTONE";
+  const isBookingBalanceProject = project?.paymentMode === "BOOKING_BALANCE";
 
   if (loading) {
     return (
@@ -847,7 +916,7 @@ export default function ViewProjectPage() {
       {showCongratsModal && (
         <CongratulationsModal
           onClose={() => setShowCongratsModal(false)}
-          onGoToDashboard={handleAuthorizePayout}
+          onGoToDashboard={isMilestoneProject ? handleMilestoneGoToDashboard : handleAuthorizePayout}
           submitting={actionSubmitting}
           paymentMode={project?.paymentMode}
         />
@@ -951,6 +1020,29 @@ export default function ViewProjectPage() {
                   </svg>
                   <span>Due in {project?.dueDate ? getDueIn(project.dueDate) : "—"}</span>
                 </div>
+                {isBookingBalanceProject && (
+                  <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col items-center gap-2">
+                    <p className="text-xs text-gray-500">
+                      {bookingFeeReleased
+                        ? "Booking fee has been released to your creative."
+                        : "Release the upfront booking fee to your creative to move this project to 50% progress."}
+                    </p>
+                    <button
+                      onClick={handleReleaseBookingFee}
+                      disabled={bookingFeeSubmitting || bookingFeeReleased}
+                      className="flex items-center gap-2 px-6 py-2.5 bg-[#E2554F] hover:bg-red-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {bookingFeeSubmitting && <Loader2 size={14} className="animate-spin" />}
+                      {bookingFeeReleased ? (
+                        <>
+                          <Check size={15} /> Booking Fee Released
+                        </>
+                      ) : (
+                        "Release Booking Fee"
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="bg-[#fafafa] p-6 mb-4">
@@ -1009,9 +1101,20 @@ export default function ViewProjectPage() {
                             </p>
                           )}
                         </div>
-                        <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${m.isCompleted ? "bg-green-100 text-green-600" : "bg-red-100 text-red-400"}`}>
-                          {m.isCompleted ? "Completed" : "Pending"}
-                        </span>
+                        {isMilestoneProject && !m.isCompleted ? (
+                          <button
+                            onClick={() => handleMarkMilestoneComplete(m.id)}
+                            disabled={milestoneSubmittingId === m.id}
+                            className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-[#E2554F] hover:bg-red-600 text-white transition-colors disabled:opacity-50"
+                          >
+                            {milestoneSubmittingId === m.id && <Loader2 size={12} className="animate-spin" />}
+                            Mark Complete
+                          </button>
+                        ) : (
+                          <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${m.isCompleted ? "bg-green-100 text-green-600" : "bg-red-100 text-red-400"}`}>
+                            {m.isCompleted ? "Completed" : "Pending"}
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1041,6 +1144,24 @@ export default function ViewProjectPage() {
                     </svg>
                     <span>Due in {project?.dueDate ? getDueIn(project.dueDate) : "—"}</span>
                   </div>
+                  {isBookingBalanceProject && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <button
+                        onClick={handleReleaseBookingFee}
+                        disabled={bookingFeeSubmitting || bookingFeeReleased}
+                        className="flex items-center gap-2 px-5 py-2 bg-[#E2554F] hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {bookingFeeSubmitting && <Loader2 size={12} className="animate-spin" />}
+                        {bookingFeeReleased ? (
+                          <>
+                            <Check size={13} /> Booking Fee Released
+                          </>
+                        ) : (
+                          "Release Booking Fee"
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="bg-[#fafafa] p-6 flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -1142,9 +1263,20 @@ export default function ViewProjectPage() {
                             </p>
                           )}
                         </div>
-                        <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${m.isCompleted ? "bg-green-100 text-green-600" : "bg-red-100 text-red-400"}`}>
-                          {m.isCompleted ? "Completed" : "Pending"}
-                        </span>
+                        {isMilestoneProject && !m.isCompleted ? (
+                          <button
+                            onClick={() => handleMarkMilestoneComplete(m.id)}
+                            disabled={milestoneSubmittingId === m.id}
+                            className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-[#E2554F] hover:bg-red-600 text-white transition-colors disabled:opacity-50"
+                          >
+                            {milestoneSubmittingId === m.id && <Loader2 size={12} className="animate-spin" />}
+                            Mark Complete
+                          </button>
+                        ) : (
+                          <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${m.isCompleted ? "bg-green-100 text-green-600" : "bg-red-100 text-red-400"}`}>
+                            {m.isCompleted ? "Completed" : "Pending"}
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1210,14 +1342,16 @@ export default function ViewProjectPage() {
                     </button>
                   </div>
 
-                  <button
-                    onClick={handleCompleted}
-                    disabled={actionSubmitting}
-                    className="px-8 py-2.5 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {actionSubmitting && <Loader2 size={13} className="animate-spin" />}
-                    Completed
-                  </button>
+                  {!isMilestoneProject && (
+                    <button
+                      onClick={handleCompleted}
+                      disabled={actionSubmitting}
+                      className="px-8 py-2.5 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {actionSubmitting && <Loader2 size={13} className="animate-spin" />}
+                      Completed
+                    </button>
+                  )}
 
                   <div className="flex flex-col items-center gap-1">
                     <p className="text-xs text-gray-400">Issues with your project?</p>
@@ -1230,6 +1364,11 @@ export default function ViewProjectPage() {
                     </button>
                   </div>
                 </div>
+                {isMilestoneProject && (
+                  <p className="text-xs text-gray-400 text-center mt-4">
+                    For milestone-based projects, mark each milestone complete in the Milestones section above. The project will be marked completed once all milestones are done.
+                  </p>
+                )}
               </div>
             </>
           )}

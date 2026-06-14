@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useMyPitches } from "./useMyPitches";
 
+const ACTIVE_PROJECT_STATUSES = ["IN_PROGRESS", "REVISION"];
+
 export function useQuickStats() {
   const [activeProjects, setActiveProjects] = useState(0);
   const [weeklyEarnings, setWeeklyEarnings] = useState(0);
   const [loading, setLoading] = useState(true);
-
   const { pitches } = useMyPitches();
   const pendingPitches = pitches.filter((p) => p.status === "pending").length;
 
@@ -27,16 +28,26 @@ export function useQuickStats() {
         const collabGigsJson = collabGigsRes.ok ? await collabGigsRes.json() : { data: [] };
 
         const projects = projectsJson.data?.data ?? projectsJson.data ?? [];
-        const regularCount = Array.isArray(projects)
-          ? projects.length
-          : projectsJson.data?.total ?? 0;
-
         const collabGigs = Array.isArray(collabGigsJson.data) ? collabGigsJson.data : [];
-        const collabCount = collabGigs.filter(
-          (c: any) => c.projectStatus === "IN_PROGRESS"
-        ).length;
 
-        setActiveProjects(regularCount + collabCount);
+        const activeIds = new Set<string>();
+
+        if (Array.isArray(projects)) {
+          projects.forEach((p: any) => {
+            if (ACTIVE_PROJECT_STATUSES.includes(p.status) && p.id) {
+              activeIds.add(p.id);
+            }
+          });
+        }
+
+        collabGigs.forEach((c: any) => {
+          const id = c.projectId ?? c.id;
+          if (ACTIVE_PROJECT_STATUSES.includes(c.projectStatus) && id) {
+            activeIds.add(id);
+          }
+        });
+
+        setActiveProjects(activeIds.size);
 
         const earnings = earningsJson.data ?? earningsJson;
         setWeeklyEarnings(earnings.availableBalance ?? 0);

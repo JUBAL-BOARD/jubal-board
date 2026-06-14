@@ -99,7 +99,7 @@ const CreativeCard: React.FC<CreativeCardProps> = ({ id, name, role, rating, ava
         <span className="text-xs font-semibold text-gray-800">{rating.toFixed(1)}</span>
       </div>
       <div className="text-center">
-        <Link href={`/client/explore-skills/creative-profile`}>
+        <Link href={`/client/explore-skills/creative-profile/${id}`}>
           <span className="text-xs text-red-500 font-semibold hover:underline cursor-pointer">
             View Profile
           </span>
@@ -128,72 +128,89 @@ const CategoryGigsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchAll = async () => {
-      setLoading(true);
-      try {
-        const tokenRes = await fetch("/api/auth/session/token");
-        const { token } = await tokenRes.json();
-        const headers = { Authorization: `Bearer ${token}` };
+  const fetchAll = async () => {
+    setLoading(true);
+    try {
+      const tokenRes = await fetch("/api/auth/session/token");
+      const { token } = await tokenRes.json();
+      const headers = { Authorization: `Bearer ${token}` };
 
-        // ✅ FIX: Use categoryId directly — no need to fetch all categories and name-match
-        const [profileRes, suggestedRes, detailRes, recommendedRes, topRatedRes, verifiedRes] = await Promise.all([
-          fetch("/api/v1/clients/me", { headers, credentials: "include" }),
-          fetch("/api/v1/creatives/suggested", { headers, credentials: "include" }),
-          fetch(`/api/v1/categories/${categoryId}`, { headers, credentials: "include" }),
-          fetch(`/api/v1/creatives?categoryId=${categoryId}&recommended=true&sort=recommended`, { headers, credentials: "include" }),
-          fetch(`/api/v1/creatives?categoryId=${categoryId}&sort=rating`, { headers, credentials: "include" }),
-          fetch(`/api/v1/creatives?categoryId=${categoryId}&verified=true`, { headers, credentials: "include" }),
-        ]);
+      // ✅ FIX: params.category is the category NAME (URL-decoded), not an id.
+      // Resolve it to the actual category id via /api/v1/categories first.
+      const decodedName = decodeURIComponent(categoryId);
 
-        // Profile
-        if (profileRes.ok) {
-          const profileJson = await profileRes.json();
-          setProfile(profileJson.data);
-        }
+      const categoriesRes = await fetch("/api/v1/categories", { headers, credentials: "include" });
+      const categoriesJson = categoriesRes.ok ? await categoriesRes.json() : { data: [] };
+      const categoriesList = Array.isArray(categoriesJson.data) ? categoriesJson.data : [];
+      const matchedCategory = categoriesList.find((c: any) => c.name === decodedName);
 
-        // Build imageUrl lookup map from suggested endpoint
-        const imageMap: Record<string, string> = {};
-        if (suggestedRes.ok) {
-          const suggestedJson = await suggestedRes.json();
-          (Array.isArray(suggestedJson.data) ? suggestedJson.data : []).forEach((c: any) => {
-            if (c.id && c.imageUrl) imageMap[c.id] = c.imageUrl;
-          });
-        }
-
-        // ✅ FIX: Get category name and services from the detail response
-        if (detailRes.ok) {
-          const detailJson = await detailRes.json();
-          const detail = detailJson.data ?? detailJson;
-          setCategoryName(detail.name ?? ""); // ✅ Set name for breadcrumb
-          setServices(Array.isArray(detail.services) ? detail.services : []);
-        }
-
-        const parseCreatives = async (res: Response): Promise<SuggestedCreative[]> => {
-          if (!res.ok) return [];
-          const json = await res.json();
-          return (Array.isArray(json.data) ? json.data : []).map((c: any) => ({
-            ...c,
-            imageUrl: imageMap[c.id] ?? c.photo ?? null,
-          }));
-        };
-
-        const [recommended, topRated, verified] = await Promise.all([
-          parseCreatives(recommendedRes),
-          parseCreatives(topRatedRes),
-          parseCreatives(verifiedRes),
-        ]);
-
-        setCategoryCreatives({ recommended, topRated, verified });
-
-      } catch {
-        // fail silently
-      } finally {
+      if (!matchedCategory) {
         setLoading(false);
+        return;
       }
-    };
 
-    fetchAll();
-  }, [categoryId]); // ✅ FIX: depend on categoryId, not categoryName
+      const resolvedCategoryId = matchedCategory.id;
+
+      const [profileRes, suggestedRes, detailRes, recommendedRes, topRatedRes, verifiedRes] = await Promise.all([
+        fetch("/api/v1/clients/me", { headers, credentials: "include" }),
+        fetch("/api/v1/creatives/suggested", { headers, credentials: "include" }),
+        fetch(`/api/v1/categories/${resolvedCategoryId}`, { headers, credentials: "include" }),
+        fetch(`/api/v1/creatives?categoryId=${resolvedCategoryId}&recommended=true&sort=recommended`, { headers, credentials: "include" }),
+        fetch(`/api/v1/creatives?categoryId=${resolvedCategoryId}&sort=rating`, { headers, credentials: "include" }),
+        fetch(`/api/v1/creatives?categoryId=${resolvedCategoryId}&verified=true`, { headers, credentials: "include" }),
+      ]);
+
+      // Profile
+      if (profileRes.ok) {
+        const profileJson = await profileRes.json();
+        setProfile(profileJson.data);
+      }
+
+      // Build imageUrl lookup map from suggested endpoint
+      const imageMap: Record<string, string> = {};
+      if (suggestedRes.ok) {
+        const suggestedJson = await suggestedRes.json();
+        (Array.isArray(suggestedJson.data) ? suggestedJson.data : []).forEach((c: any) => {
+          if (c.id && c.imageUrl) imageMap[c.id] = c.imageUrl;
+        });
+      }
+
+      if (detailRes.ok) {
+        const detailJson = await detailRes.json();
+        const detail = detailJson.data ?? detailJson;
+        setCategoryName(detail.name ?? matchedCategory.name ?? "");
+        setServices(Array.isArray(detail.services) ? detail.services : []);
+      } else {
+        setCategoryName(matchedCategory.name ?? "");
+        setServices(Array.isArray(matchedCategory.services) ? matchedCategory.services : []);
+      }
+
+      const parseCreatives = async (res: Response): Promise<SuggestedCreative[]> => {
+        if (!res.ok) return [];
+        const json = await res.json();
+        return (Array.isArray(json.data) ? json.data : []).map((c: any) => ({
+          ...c,
+          imageUrl: imageMap[c.id] ?? c.photo ?? null,
+        }));
+      };
+
+      const [recommended, topRated, verified] = await Promise.all([
+        parseCreatives(recommendedRes),
+        parseCreatives(topRatedRes),
+        parseCreatives(verifiedRes),
+      ]);
+
+      setCategoryCreatives({ recommended, topRated, verified });
+
+    } catch {
+      // fail silently
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchAll();
+}, [categoryId]); // ✅ FIX: depend on categoryId, not categoryName
 
   const userName = profile?.clientProfile?.fullName || profile?.name || "Client";
   const userAvatar =
@@ -235,9 +252,8 @@ const CategoryGigsPage: React.FC = () => {
           <div className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />
         )}
         <div
-          className={`fixed top-0 left-0 h-full z-40 transition-transform duration-300 ease-in-out ${
-            sidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:z-10`}
+          className={`fixed top-0 left-0 h-full z-40 transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
+            } lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:z-10`}
         >
           <button className="absolute top-4 right-4 z-50 lg:hidden" onClick={() => setSidebarOpen(false)}>
             <X size={22} />
@@ -282,11 +298,10 @@ const CategoryGigsPage: React.FC = () => {
               <button
                 key={chip}
                 onClick={() => setActiveChip(chip)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  activeChip === chip
-                    ? "bg-red-500 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeChip === chip
+                  ? "bg-red-500 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
               >
                 {chip}
               </button>

@@ -6,6 +6,7 @@ import logo from "../../../assets/icononly.png";
 import { Star, BadgeCheck, MessageCircle, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { fetchConversations, createConversation, fetchChatTopics } from "@/app/lib/api/messageApi";
+import Link from "next/link";
 
 interface Creative {
   id: string;
@@ -23,39 +24,39 @@ const CreativeCard: React.FC<{ creative: Creative }> = ({ creative }) => {
   const [chatLoading, setChatLoading] = useState(false);
 
   const handleChatCreative = async () => {
-  try {
-    setChatLoading(true);
+    try {
+      setChatLoading(true);
 
-    const convRes = await fetchConversations({ limit: 50 });
-    const list = Array.isArray(convRes) ? convRes : convRes.data ?? [];
-    const existing = list.find(
-      (c) => c.otherParticipant.id === creative.id  // 👈 match by id, not name (more reliable)
-    );
+      const convRes = await fetchConversations({ limit: 50 });
+      const list = Array.isArray(convRes) ? convRes : convRes.data ?? [];
+      const existing = list.find(
+        (c) => c.otherParticipant.id === creative.id  // 👈 match by id, not name (more reliable)
+      );
 
-    if (existing) {
-      router.push(`/client/messages/${existing.id}`);
-      return;
+      if (existing) {
+        router.push(`/client/messages/${existing.id}`);
+        return;
+      }
+
+      const topics = await fetchChatTopics();
+      if (!topics || topics.length === 0) {
+        console.error("No chat topics available");
+        return;
+      }
+
+      const newConv = await createConversation({
+        recipientId: creative.id,
+        topicId: topics[0].id,
+        type: "DIRECT",
+      });
+
+      router.push(`/client/messages/${newConv.conversation.id}`); // 👈 fixed
+    } catch (err) {
+      console.error("Chat creative failed:", err);
+    } finally {
+      setChatLoading(false);
     }
-
-    const topics = await fetchChatTopics();
-    if (!topics || topics.length === 0) {
-      console.error("No chat topics available");
-      return;
-    }
-
-    const newConv = await createConversation({
-      recipientId: creative.id,
-      topicId: topics[0].id,
-      type: "DIRECT",
-    });
-
-    router.push(`/client/messages/${newConv.conversation.id}`); // 👈 fixed
-  } catch (err) {
-    console.error("Chat creative failed:", err);
-  } finally {
-    setChatLoading(false);
-  }
-};
+  };
 
   return (
     <div className="bg-white border border-gray-200 rounded-[10px] overflow-hidden min-w-[300px] h-[400px] flex-shrink-0">
@@ -103,9 +104,11 @@ const CreativeCard: React.FC<{ creative: Creative }> = ({ creative }) => {
             <Star size={13} fill="#F59E0B" stroke="#F59E0B" />
             <span className="text-xs font-semibold text-gray-700">{creative.rating.toFixed(1)}</span>
           </div>
-          <button className="bg-transparent border-none cursor-pointer text-xs text-[#E2554F] font-semibold hover:underline">
-            View Profile
-          </button>
+          <Link href={`/client/explore-skills/creative-profile/${creative.id}`}>
+            <button className="bg-transparent border-none cursor-pointer text-xs text-[#E2554F] font-semibold hover:underline">
+              View Profile
+            </button>
+          </Link>
         </div>
       </div>
     </div>
