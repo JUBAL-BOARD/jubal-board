@@ -6,6 +6,7 @@ import Breadcrumb from "../../components/client/my-desk/breadcrumb";
 import { Search, Filter, ChevronDown, X, Star, MessageCircle, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { fetchConversations, createConversation, fetchChatTopics } from "@/app/lib/api/messageApi";
+import Link from "next/link";
 
 type PitchFilter = "All" | "PENDING" | "ACCEPTED" | "REJECTED";
 
@@ -154,16 +155,16 @@ const IncomingPitches: React.FC = () => {
       const projectList = Array.isArray(projectsJson.data)
         ? projectsJson.data
         : Array.isArray(projectsJson)
-        ? projectsJson
-        : [];
+          ? projectsJson
+          : [];
       setProjects(projectList);
 
       const briefsJson = await briefsRes.json();
       const briefList: Brief[] = Array.isArray(briefsJson)
         ? briefsJson
         : Array.isArray(briefsJson.data)
-        ? briefsJson.data
-        : briefsJson.data?.briefs ?? [];
+          ? briefsJson.data
+          : briefsJson.data?.briefs ?? [];
 
       if (briefList.length === 0) {
         setPitches([]);
@@ -297,11 +298,10 @@ const IncomingPitches: React.FC = () => {
               <button
                 key={tab}
                 onClick={() => { setActiveFilter(tab); setVisibleCount(12); }}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  activeFilter === tab
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeFilter === tab
                     ? "bg-[#E05C5C] text-white"
                     : "bg-white border border-gray-200 text-black"
-                }`}
+                  }`}
               >
                 {filterLabels[tab]}
               </button>
@@ -401,9 +401,11 @@ const IncomingPitches: React.FC = () => {
 
                             <div className="flex items-center justify-between mt-2">
                               <div className="flex items-center gap-4">
-                                <button className="text-xs text-[#E05C5C] font-medium hover:underline">
-                                  View Profile
-                                </button>
+                                <Link href={`/client/explore-skills/creative-profile/${pitch.creativeId}`}>
+                                  <button className="text-xs text-[#E05C5C] font-medium hover:underline">
+                                    View Profile
+                                  </button>
+                                </Link>
                                 <button
                                   onClick={() =>
                                     router.push(
@@ -430,13 +432,12 @@ const IncomingPitches: React.FC = () => {
                                   </button>
                                 )}
                                 <span
-                                  className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${
-                                    pitch.status === "ACCEPTED"
+                                  className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${pitch.status === "ACCEPTED"
                                       ? "bg-green-100 text-green-600"
                                       : pitch.status === "REJECTED"
-                                      ? "bg-red-100 text-red-500"
-                                      : "bg-yellow-100 text-yellow-600"
-                                  }`}
+                                        ? "bg-red-100 text-red-500"
+                                        : "bg-yellow-100 text-yellow-600"
+                                    }`}
                                 >
                                   {pitch.status}
                                 </span>

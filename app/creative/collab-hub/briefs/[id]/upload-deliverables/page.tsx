@@ -165,7 +165,7 @@ export default function CollabUploadDeliverablesPage() {
 
       const formData = new FormData();
       files.forEach((file) => formData.append("files", file));
-      formData.append("note", note);
+      formData.append("creativeNote", note);
 
       const res = await fetch(`/api/v1/collabs/${id}/deliverables`, {
         method: "POST",

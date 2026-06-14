@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import { useMyPitches } from "./useMyPitches";
 
 const ACTIVE_PROJECT_STATUSES = ["IN_PROGRESS", "REVISION"];
+const ACTIVE_COLLAB_STATUSES = ["ACCEPTED", "ACTIVE", "IN_PROGRESS", "ONGOING"];
 
 export function useQuickStats() {
   const [activeProjects, setActiveProjects] = useState(0);
   const [weeklyEarnings, setWeeklyEarnings] = useState(0);
   const [loading, setLoading] = useState(true);
   const { pitches } = useMyPitches();
+
   const pendingPitches = pitches.filter((p) => p.status === "pending").length;
 
   useEffect(() => {
@@ -29,25 +31,28 @@ export function useQuickStats() {
 
         const projects = projectsJson.data?.data ?? projectsJson.data ?? [];
         const collabGigs = Array.isArray(collabGigsJson.data) ? collabGigsJson.data : [];
+        console.log("Sample collab gig:", collabGigs[0]);
+        console.log("collabGigsJson raw:", collabGigsJson);
+        console.log("collabGigs status:", collabGigsRes.status, collabGigsRes.ok);
 
-        const activeIds = new Set<string>();
-
+        // Count active regular projects
+        let activeProjectCount = 0;
         if (Array.isArray(projects)) {
-          projects.forEach((p: any) => {
-            if (ACTIVE_PROJECT_STATUSES.includes(p.status) && p.id) {
-              activeIds.add(p.id);
-            }
-          });
+          activeProjectCount = projects.filter((p: any) =>
+            ACTIVE_PROJECT_STATUSES.includes(p.status)
+          ).length;
         }
 
+        // Count active collab gigs separately (different entity type)
+        let activeCollabCount = 0;
         collabGigs.forEach((c: any) => {
-          const id = c.projectId ?? c.id;
-          if (ACTIVE_PROJECT_STATUSES.includes(c.projectStatus) && id) {
-            activeIds.add(id);
+          const status = c.status ?? c.gigStatus ?? c.projectStatus;
+          if (ACTIVE_COLLAB_STATUSES.includes(status)) {
+            activeCollabCount++;
           }
         });
 
-        setActiveProjects(activeIds.size);
+        setActiveProjects(activeProjectCount + activeCollabCount);
 
         const earnings = earningsJson.data ?? earningsJson;
         setWeeklyEarnings(earnings.availableBalance ?? 0);

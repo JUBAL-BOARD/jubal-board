@@ -77,9 +77,8 @@ const TransactionsContent: React.FC = () => {
           const date = new Date(tx.createdAt);
 
           // Extract project ID from reference string
-          const projectIdMatch = tx.reference?.match(
-            /project:\s*([a-f0-9-]{36})/i
-          );
+          const projectIdMatch = tx.reference?.match(/project:\s*([a-f0-9-]{36})/i);
+          const milestoneIdMatch = tx.reference?.match(/milestone\s+\d+\s+\w+:\s*([a-f0-9-]{36})/i);
           let details = tx.reference;
 
           if (projectIdMatch) {
@@ -92,9 +91,20 @@ const TransactionsContent: React.FC = () => {
               if (projectRes.ok) {
                 const projectJson = await projectRes.json();
                 const title = projectJson.data?.title;
-                if (title) {
-                  details = tx.reference.replace(projectId, title);
-                }
+                if (title) details = tx.reference.replace(projectId, title);
+              }
+            } catch { }
+          } else if (milestoneIdMatch) {
+            const milestoneId = milestoneIdMatch[1];
+            try {
+              const milestoneRes = await fetch(`/api/v1/projects/milestones/${milestoneId}`, {
+                credentials: "include",
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (milestoneRes.ok) {
+                const milestoneJson = await milestoneRes.json();
+                const title = milestoneJson.data?.projectTitle ?? milestoneJson.data?.title;
+                if (title) details = tx.reference.replace(milestoneId, title);
               }
             } catch { }
           }
