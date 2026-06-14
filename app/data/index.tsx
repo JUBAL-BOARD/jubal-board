@@ -812,6 +812,7 @@ export const earningsData: EarningsData = {
   totalEarned: 25000,
   pendingEarnings: 20000,
   availableBalance: 5000,
+  currency: "",
 };
 
 export const recentTransactions: Transaction[] = [
