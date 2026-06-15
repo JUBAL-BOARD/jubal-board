@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface Props {
   userName: string;
@@ -7,7 +7,61 @@ interface Props {
 
 const WelcomeBar: React.FC<Props> = ({ userName }) => {
   const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [accountType, setAccountType] = useState<"Personal" | "Business">("Personal");
+
+  const getHeaders = async () => {
+    const tokenRes = await fetch("/api/auth/session/token");
+    const { token } = await tokenRes.json();
+    return {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+  };
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const headers = await getHeaders();
+        const res = await fetch("/api/v1/creatives/me/online-status", {
+          method: "GET",
+          credentials: "include",
+          headers,
+        });
+        const data = await res.json();
+        const status = data?.data?.showOnlineStatus ?? data?.showOnlineStatus;
+        if (typeof status === "boolean") {
+          setIsOnline(status);
+        }
+      } catch (err) {
+        console.error("Failed to fetch online status:", err);
+      }
+    };
+    fetchStatus();
+  }, []);
+
+  const toggleOnlineStatus = async () => {
+    const newStatus = !isOnline;
+    setIsOnline(newStatus); // optimistic update
+    setLoading(true);
+
+    try {
+      const headers = await getHeaders();
+      const res = await fetch("/api/v1/creatives/me/online-status", {
+        method: "PATCH",
+        credentials: "include",
+        headers,
+        body: JSON.stringify({ showOnlineStatus: newStatus }),
+      });
+
+      if (!res.ok) throw new Error("Failed to update status");
+    } catch (err) {
+      console.error("Failed to update online status:", err);
+      setIsOnline(!newStatus); // revert on failure
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="lg:flex items-end justify-between mb-5">
@@ -24,8 +78,10 @@ const WelcomeBar: React.FC<Props> = ({ userName }) => {
         {/* Online/Offline Toggle */}
         <div className="flex items-center gap-2">
           <div
-            onClick={() => setIsOnline(!isOnline)}
-            className="w-11 h-6 rounded-full cursor-pointer relative transition-colors duration-200"
+            onClick={() => !loading && toggleOnlineStatus()}
+            className={`w-11 h-6 rounded-full relative transition-colors duration-200 ${
+              loading ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+            }`}
             style={{ background: isOnline ? "#22C55E" : "#D1D5DB" }}
           >
             <div

@@ -94,16 +94,23 @@ const ChatWindow: React.FC<Props> = ({ conversation, currentUserId, onBack }) =>
     const socket = getGlobalSocket();
     if (!socket || isClosed) return;
 
-    socket.emit("conversation:set-topic", {
-      conversationId: conversation.id,
-      topicId: topic.id,
-    });
+    if (!currentTopic?.id) {
+      // No topic set yet — set it first then send the label as a message
+      socket.emit("conversation:set-topic", {
+        conversationId: conversation.id,
+        topicId: topic.id,
+      });
 
-    socket.once("conversation:topic-set", (data: any) => {
-      console.log("Topic set:", data);
-      setCurrentTopic(data.topic);
-      setShowChips(false);
-    });
+      socket.once("conversation:topic-set", (data: any) => {
+        setCurrentTopic(data.topic);
+        emitMessage(topic.label, "TEXT");
+        if (!topic.subtopics?.length) setShowChips(false);
+      });
+    } else {
+      // Topic already set — just send subtopic as a message
+      emitMessage(topic.label, "TEXT");
+      if (!topic.subtopics?.length) setShowChips(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -151,7 +158,9 @@ const ChatWindow: React.FC<Props> = ({ conversation, currentUserId, onBack }) =>
           )}
         </div>
         <div>
-          <p className="font-semibold text-gray-900 text-sm">{participant.name}</p>
+          <p className="font-semibold text-gray-900 text-sm">
+            {(conversation as any).project?.title ?? participant.name}
+          </p>
           <p className="text-xs text-gray-400">
             {isOtherTyping ? (
               <span className="text-orange-400 italic">typing...</span>
@@ -226,7 +235,7 @@ const ChatWindow: React.FC<Props> = ({ conversation, currentUserId, onBack }) =>
             </div>
           )}
 
-          {showChips && messages.length === 0 && !hasTopic && (
+          {showChips && messages.length === 0 && (
             <TopicChips onSelect={handleTopicSelect} />
           )}
 
