@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Search, SlidersHorizontal, ChevronDown } from "lucide-react";
 import Breadcrumb from "@/app/components/creative/dashboard/breadcrumb";
 import GigsPagination from "@/app/components/creative/my-gigs/gigsPagination";
@@ -25,6 +25,70 @@ const TransactionsContent: React.FC = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Cache: milestoneId -> projectTitle, built lazily and shared across renders
+  const milestoneTitleCache = useRef<Map<string, string>>(new Map());
+  // Cache: have we already scanned all projects' milestones?
+  const milestonesScanned = useRef(false);
+
+  const findProjectTitleByMilestoneId = useCallback(
+    async (milestoneId: string, token: string): Promise<string | null> => {
+      const cache = milestoneTitleCache.current;
+
+      if (cache.has(milestoneId)) {
+        return cache.get(milestoneId) ?? null;
+      }
+
+      if (milestonesScanned.current) {
+        // Already scanned everything and this id wasn't found
+        return null;
+      }
+
+      try {
+        const projectsRes = await fetch(`/api/v1/projects/creative`, {
+          credentials: "include",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!projectsRes.ok) return null;
+
+        const projectsJson = await projectsRes.json();
+        const projects = Array.isArray(projectsJson.data) ? projectsJson.data : [];
+
+        await Promise.all(
+          projects.map(async (project: any) => {
+            try {
+              const milestonesRes = await fetch(
+                `/api/v1/projects/${project.id}/milestones`,
+                {
+                  credentials: "include",
+                  headers: { Authorization: `Bearer ${token}` },
+                }
+              );
+              if (!milestonesRes.ok) return;
+
+              const milestonesJson = await milestonesRes.json();
+              const milestones = Array.isArray(milestonesJson.data)
+                ? milestonesJson.data
+                : [];
+
+              milestones.forEach((m: any) => {
+                const mid = m.id ?? m.mid;
+                if (mid) {
+                  cache.set(mid, project.title);
+                }
+              });
+            } catch { }
+          })
+        );
+
+        milestonesScanned.current = true;
+        return cache.get(milestoneId) ?? null;
+      } catch {
+        return null;
+      }
+    },
+    []
+  );
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
@@ -97,15 +161,8 @@ const TransactionsContent: React.FC = () => {
           } else if (milestoneIdMatch) {
             const milestoneId = milestoneIdMatch[1];
             try {
-              const milestoneRes = await fetch(`/api/v1/projects/milestones/${milestoneId}`, {
-                credentials: "include",
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              if (milestoneRes.ok) {
-                const milestoneJson = await milestoneRes.json();
-                const title = milestoneJson.data?.projectTitle ?? milestoneJson.data?.title;
-                if (title) details = tx.reference.replace(milestoneId, title);
-              }
+              const title = await findProjectTitleByMilestoneId(milestoneId, token);
+              if (title) details = tx.reference.replace(milestoneId, title);
             } catch { }
           }
 
@@ -136,7 +193,7 @@ const TransactionsContent: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, perPage]);
+  }, [page, perPage, findProjectTitleByMilestoneId]);
 
   useEffect(() => {
     fetchTransactions();
