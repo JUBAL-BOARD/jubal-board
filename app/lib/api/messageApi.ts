@@ -27,8 +27,11 @@ export interface LastMessage {
 export interface Conversation {
   id: string;
   type: "DIRECT" | "GROUP";
-  topic: { id: string; name: string };
+  projectId: string;
+  project: { id: string; title: string } | null;
+  topic: { id: string; name: string } | null;
   otherParticipant: ConversationParticipant;
+  collaborators: ConversationParticipant[];
   lastMessage: LastMessage | null;
   unreadCount: number;
   createdAt: string;

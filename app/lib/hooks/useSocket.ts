@@ -1,64 +1,93 @@
 import { useEffect, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 
+let globalSocket: Socket | null = null;
+
 interface UseSocketOptions {
-  conversationId: string;
   token: string;
-  onNewMessage: (message: any) => void;
+  conversationId?: string;
+  onNewMessage?: (message: any) => void;
   onTyping?: (data: { userId: string; isTyping: boolean }) => void;
   onMessageRead?: (data: { messageId: string; readAt: string; readByUserId: string }) => void;
+  onChatList?: (data: any) => void;
+  onChatUpdate?: (data: any) => void;
 }
 
 export function useSocket({
-  conversationId,
   token,
+  conversationId,
   onNewMessage,
   onTyping,
   onMessageRead,
+  onChatList,
+  onChatUpdate,
 }: UseSocketOptions) {
-  const socketRef = useRef<Socket | null>(null);
+  const listenersAttached = useRef(false);
 
   useEffect(() => {
-    if (!token || !conversationId) return;
+    if (!token) return;
+    console.log("useSocket: token received, connecting...");
 
-    // Connect with JWT token in the auth object (exactly as Swagger docs say)
-    const socket = io("https://api.jubalboard.com", {
-      auth: { token },
-      transports: ["websocket"],
-    });
+    if (!globalSocket || !globalSocket.connected) {
+      console.log("useSocket: creating new socket");
+      globalSocket = io("https://api.jubalboard.com", {
+        auth: { token },
+        transports: ["websocket"],
+      });
+    } else {
+      console.log("useSocket: reusing existing socket, connected:", globalSocket.connected);
+    }
 
-    socketRef.current = socket;
+    const socket = globalSocket;
 
     socket.on("connect", () => {
-      console.log("Socket connected:", socket.id);
-
-      // Join the conversation room immediately after connecting
-      socket.emit("join", { conversationId });
+      console.log("useSocket: connected, emitting chats...");
+      socket.emit("chats", { page: 1, limit: 50 });
     });
+
+    if (socket.connected) {
+      console.log("useSocket: already connected, emitting chats immediately");
+      socket.emit("chats", { page: 1, limit: 50 });
+    }
 
     socket.on("connect_error", (err) => {
-      console.error("Socket connection error:", err.message);
+      console.error("useSocket: connect_error", err.message);
     });
 
-    // Server sends full history when you join — we can ignore this
-    // since we already loaded messages via REST API
-    socket.on("message:history", () => {
-      // already loaded via fetchConversationDetail, skip
+    socket.on("chat:list", (data) => {
+      console.log("chat:list full data:", JSON.stringify(data.data, null, 2));
+      onChatList?.(data);
     });
 
-    // This is the key one — fires when the other person sends a message
+    socket.on("chat:update", (data) => {
+      onChatUpdate?.(data);
+    });
+
     socket.on("message:receive", (msg) => {
-      onNewMessage(msg);
+      console.log("message:receive fired:", msg);
+      if (!conversationId || msg.conversationId === conversationId) {
+        onNewMessage?.(msg);
+      }
     });
 
-    // Optional: typing indicator
     socket.on("message:typing", (data) => {
       onTyping?.(data);
     });
 
-    // Optional: read receipts
     socket.on("message:read", (data) => {
       onMessageRead?.(data);
+    });
+
+    socket.on("error", (err) => {
+      console.error("Socket error:", err);
+    });
+
+    socket.on("exception", (err) => {
+      console.error("Socket exception:", err);
+    });
+
+    socket.on("message:error", (err) => {
+      console.error("Socket message error:", err);
     });
 
     socket.on("disconnect", () => {
@@ -66,20 +95,62 @@ export function useSocket({
     });
 
     return () => {
-      socket.emit("leave", { conversationId }); // leave the room cleanly
-      socket.disconnect();
+      socket.off("chat:list");
+      socket.off("chat:update");
+      socket.off("message:receive");
+      socket.off("message:typing");
+      socket.off("message:read");
+      socket.off("error");
+      socket.off("exception");
+      socket.off("message:error");
     };
-  }, [token, conversationId]); // reconnects when you switch conversations
+  }, [token, conversationId]);
 
-  // Call this to emit typing indicator
-  const emitTyping = useCallback((isTyping: boolean) => {
-    socketRef.current?.emit("message:typing", { conversationId, isTyping });
-  }, [conversationId]);
+  const emitMessage = useCallback(
+    (content: string, contentType: "TEXT" | "FILE" | "IMAGE" = "TEXT", fileUrl?: string) => {
+      console.log("emitMessage called:", { conversationId, content, connected: globalSocket?.connected });
+      if (!conversationId || !globalSocket) return;
+      globalSocket.emit("message:send", {
+        conversationId,
+        content,
+        contentType,
+        ...(fileUrl && { fileUrl }),
+      });
+    },
+    [conversationId]
+  );
 
-  // Call this to mark a message as read
-  const emitRead = useCallback((messageId: string) => {
-    socketRef.current?.emit("message:read", { conversationId, messageId });
-  }, [conversationId]);
+  const emitTyping = useCallback(
+    (isTyping: boolean) => {
+      if (!conversationId) return;
+      globalSocket?.emit("message:typing", { conversationId, isTyping });
+    },
+    [conversationId]
+  );
 
-  return { emitTyping, emitRead };
+  const emitRead = useCallback(
+    (messageId: string) => {
+      if (!conversationId) return;
+      globalSocket?.emit("message:read", { conversationId, messageId });
+    },
+    [conversationId]
+  );
+
+  const loadMessages = useCallback(
+    (page = 1, limit = 30) => {
+      if (!conversationId) return;
+      globalSocket?.emit("messages", { conversationId, page, limit });
+    },
+    [conversationId]
+  );
+
+  const emitChats = useCallback(() => {
+    globalSocket?.emit("chats", { page: 1, limit: 50 });
+  }, []);
+
+  return { emitMessage, emitTyping, emitRead, loadMessages, emitChats };
+}
+
+export function getGlobalSocket() {
+  return globalSocket;
 }

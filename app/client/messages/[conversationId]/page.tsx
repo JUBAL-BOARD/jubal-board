@@ -48,6 +48,9 @@ export default function ClientConversationPage() {
   const conversation = conversations.find((c) => c.id === conversationId);
   const currentUserId = profile?.id ?? "";
 
+  console.log("All conversation IDs:", conversations.map(c => c.id));
+  console.log("Looking for:", conversationId);
+
   const userName = profile?.clientProfile?.fullName || profile?.name || "Client";
   const userAvatar =
     profile?.clientProfile?.imageUrl ||
@@ -62,12 +65,19 @@ export default function ClientConversationPage() {
   }
 
   if (!conversation) {
+  if (convsLoading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-white">
-        <p className="text-sm text-gray-400">Conversation not found.</p>
+        <Loader2 className="animate-spin text-[#E2554F]" size={40} />
       </div>
     );
   }
+  return (
+    <div className="flex h-screen w-screen items-center justify-center bg-white">
+      <p className="text-sm text-gray-400">Conversation not found.</p>
+    </div>
+  );
+}
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-white">

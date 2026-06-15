@@ -1,4 +1,3 @@
-
 export type Topic = {
   id: string;
   label: string;
@@ -6,54 +5,47 @@ export type Topic = {
   subtopics?: Topic[];
 };
 
-// 👇 Creative → Client (you can expand later)
+export async function fetchTopicsFromBackend(): Promise<Topic[]> {
+  const tokenRes = await fetch("/api/auth/session/token", { credentials: "include" });
+  const { token } = await tokenRes.json();
+  const res = await fetch("/api/v1/chat/topics", {
+    headers: { Authorization: `Bearer ${token}` },
+    credentials: "include",
+  });
+  if (!res.ok) return [];
+  const json = await res.json();
+  const list = json.data?.data ?? json.data ?? [];
+  return list.map((t: any) => ({
+    id: t.id,
+    label: t.name,
+    response: t.description ?? undefined,
+  }));
+}
+
+// fallback local topics if backend fails
 export const topics: Topic[] = [
   {
     id: "job_details",
     label: "Job Details",
     subtopics: [
-      {
-        id: "clarification",
-        label: "Need clarification",
-        response: "Can you clarify the exact deliverables for this project?",
-      },
-      {
-        id: "scope",
-        label: "Scope of work",
-        response: "Does this include revisions or just one delivery?",
-      },
+      { id: "clarification", label: "Need clarification", response: "Can you clarify the exact deliverables for this project?" },
+      { id: "scope", label: "Scope of work", response: "Does this include revisions or just one delivery?" },
     ],
   },
   {
     id: "pricing",
     label: "Pricing",
     subtopics: [
-      {
-        id: "budget",
-        label: "Discuss budget",
-        response: "Is your budget flexible for higher quality work?",
-      },
-      {
-        id: "payment",
-        label: "Payment terms",
-        response: "Will payment be milestone-based or upfront?",
-      },
+      { id: "budget", label: "Discuss budget", response: "Is your budget flexible for higher quality work?" },
+      { id: "payment", label: "Payment terms", response: "Will payment be milestone-based or upfront?" },
     ],
   },
   {
     id: "deadline",
     label: "Deadline",
     subtopics: [
-      {
-        id: "extension",
-        label: "Request extension",
-        response: "Would it be possible to extend the deadline?",
-      },
-      {
-        id: "timeline",
-        label: "Clarify timeline",
-        response: "What’s your expected turnaround time?",
-      },
+      { id: "extension", label: "Request extension", response: "Would it be possible to extend the deadline?" },
+      { id: "timeline", label: "Clarify timeline", response: "What's your expected turnaround time?" },
     ],
   },
 ];
@@ -63,20 +55,20 @@ export const clientTopics: Topic[] = [
     id: "project",
     label: "📋 Project Brief",
     subtopics: [
-      { id: "project-start",    label: "When can you start?" },
+      { id: "project-start", label: "When can you start?" },
       { id: "project-timeline", label: "What's your timeline?" },
-      { id: "project-samples",  label: "Can I see samples?" },
-      { id: "project-process",  label: "Walk me through your process" },
+      { id: "project-samples", label: "Can I see samples?" },
+      { id: "project-process", label: "Walk me through your process" },
     ],
   },
   {
     id: "pricing",
     label: "💰 Pricing",
     subtopics: [
-      { id: "price-quote",     label: "Request a quote" },
+      { id: "price-quote", label: "Request a quote" },
       { id: "price-negotiate", label: "Negotiate price" },
-      { id: "price-deposit",   label: "How much is the deposit?" },
-      { id: "price-payment",   label: "Payment methods" },
+      { id: "price-deposit", label: "How much is the deposit?" },
+      { id: "price-payment", label: "Payment methods" },
     ],
   },
   {
@@ -84,7 +76,7 @@ export const clientTopics: Topic[] = [
     label: "✏️ Revisions",
     subtopics: [
       { id: "rev-how-many", label: "How many revisions?" },
-      { id: "rev-request",  label: "Request a revision" },
+      { id: "rev-request", label: "Request a revision" },
       { id: "rev-feedback", label: "Give feedback" },
     ],
   },
@@ -92,26 +84,26 @@ export const clientTopics: Topic[] = [
     id: "delivery",
     label: "📦 Delivery",
     subtopics: [
-      { id: "del-formats",  label: "What file formats?" },
+      { id: "del-formats", label: "What file formats?" },
       { id: "del-deadline", label: "Can you meet my deadline?" },
-      { id: "del-rush",     label: "Rush delivery" },
+      { id: "del-rush", label: "Rush delivery" },
     ],
   },
   {
     id: "status",
     label: "🔄 Project Status",
     subtopics: [
-      { id: "status-update",   label: "Any updates?" },
+      { id: "status-update", label: "Any updates?" },
       { id: "status-progress", label: "How far along are you?" },
-      { id: "status-stuck",    label: "Is anything blocking you?" },
+      { id: "status-stuck", label: "Is anything blocking you?" },
     ],
   },
   {
     id: "contract",
     label: "📝 Contract",
     subtopics: [
-      { id: "ct-nda",    label: "I need an NDA" },
-      { id: "ct-terms",  label: "Review contract terms" },
+      { id: "ct-nda", label: "I need an NDA" },
+      { id: "ct-terms", label: "Review contract terms" },
       { id: "ct-rights", label: "Who owns the rights?" },
     ],
   },

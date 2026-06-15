@@ -14,6 +14,7 @@ const ClientFamContent: React.FC = () => {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(5);
   const [clients, setClients] = useState<ClientFamMember[]>([]);
+  const [stats, setStats] = useState({ total: 0, thisMonth: 0, activePercent: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,43 +43,27 @@ const ClientFamContent: React.FC = () => {
       if (!res.ok) throw new Error(`Failed to fetch clients (${res.status})`);
 
       const json = await res.json();
-      const list = Array.isArray(json.data) ? json.data : [];
+      const list = Array.isArray(json.data?.clients) ? json.data.clients : [];
+      const statsData = json.data?.stats ?? {};
 
-      // Fetch detail for each client
-      const mapped: ClientFamMember[] = await Promise.all(
-        list.map(async (c: any) => {
-          try {
-            const detailRes = await fetch(`/api/v1/client-fam/${c.id}`, {
-              credentials: "include",
-              headers,
-            });
-
-            if (!detailRes.ok) throw new Error("Detail fetch failed");
-            const detailJson = await detailRes.json();
-            const detail = detailJson.data;
-
-            return {
-              id: c.id,
-              name: detail.companyName ?? c.name,
-              avatar: `https://i.pravatar.cc/150?u=${c.id}`,
-              totalProjects: detail.totalProjects ?? 0,
-              language: detail.language ?? "English",
-              preferredCommunication: detail.preferredCommunication ?? "Chat",
-            };
-          } catch {
-            return {
-              id: c.id,
-              name: c.name,
-              avatar: `https://i.pravatar.cc/150?u=${c.id}`,
-              totalProjects: 0,
-              language: "English",
-              preferredCommunication: "Chat",
-            };
-          }
-        })
-      );
+      const mapped: ClientFamMember[] = list.map((c: any) => ({
+        id: c.clientId,
+        name: c.name ?? "Unknown",
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name ?? "C")}&background=1a1a2e&color=fff&size=64`,
+        totalProjects: c.totalProjectsTogether ?? 0,
+        language: c.language ?? "English",
+        preferredCommunication: c.preferredCommunication ?? "Chat",
+        country: c.country ?? null,
+        lastProjectDate: c.lastProjectDate ?? null,
+      }));
+      console.log("mapped clients:", mapped.map(c => ({ id: c.id, name: c.name })));
 
       setClients(mapped);
+      setStats({
+        total: statsData.totalClientFam ?? 0,
+        thisMonth: statsData.thisMonthNew ?? 0,
+        activePercent: statsData.activeClientFamPercent ?? 0,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -90,17 +75,39 @@ const ClientFamContent: React.FC = () => {
     fetchClients();
   }, [fetchClients]);
 
+  const handleChat = async (clientId: string) => {
+    try {
+      const tokenRes = await fetch("/api/auth/session/token");
+      const { token } = await tokenRes.json();
+
+      const res = await fetch(`/api/v1/client-fam/${clientId}/chat`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!res.ok) throw new Error("Failed to open chat");
+      const json = await res.json();
+      console.log("chat response:", json);
+      const conversationId = json.data?.conversationId ?? json.data?.id ?? json.conversationId;
+
+      if (conversationId) {
+        router.push(`/creative/messages/${conversationId}`);
+      }
+    } catch (err) {
+      console.error("Chat failed:", err);
+    }
+  };
+
   const filtered = clients.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase())
   );
 
   const totalPages = Math.ceil(filtered.length / perPage);
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
-
-  // Stats — computed from data since API doesn't return them
-  const total = clients.length;
-  const thisMonth = 0; // API doesn't return this yet
-  const activePercent = 0; // API doesn't return this yet
 
   return (
     <div>
@@ -110,7 +117,6 @@ const ClientFamContent: React.FC = () => {
       ]} />
       <h1 className="text-2xl font-bold font-heading text-gray-900 mb-5">Client Fam</h1>
 
-      {/* Search */}
       <div className="relative mb-6 max-w-full">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
@@ -128,9 +134,9 @@ const ClientFamContent: React.FC = () => {
       {!loading && !error && (
         <>
           <ClientFamStats
-            total={total}
-            thisMonth={thisMonth}
-            activePercent={activePercent}
+            total={stats.total}
+            thisMonth={stats.thisMonth}
+            activePercent={stats.activePercent}
           />
 
           <div className="flex flex-col gap-4 overflow-hidden mt-6">
@@ -139,6 +145,7 @@ const ClientFamContent: React.FC = () => {
                 key={client.id}
                 client={client}
                 isLast={i === paginated.length - 1}
+                onChat={() => handleChat(client.id)}
               />
             ))}
             {filtered.length === 0 && (

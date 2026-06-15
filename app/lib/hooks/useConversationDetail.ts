@@ -5,6 +5,13 @@ import {
   ConversationDetail,
   Message,
 } from "@/app/lib/api/messageApi";
+import { useSocket } from "./useSocket";
+
+async function getToken(): Promise<string> {
+  const res = await fetch("/api/auth/session/token", { credentials: "include" });
+  const { token } = await res.json();
+  return token || "";
+}
 
 export function useConversationDetail(
   conversationId: string | null,
@@ -13,6 +20,11 @@ export function useConversationDetail(
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [token, setToken] = useState("");
+
+  useEffect(() => {
+    getToken().then(setToken);
+  }, []);
 
   const load = useCallback(async () => {
     if (!conversationId) return;
@@ -23,10 +35,7 @@ export function useConversationDetail(
         type === "GROUP"
           ? await fetchGroupConversationDetail(conversationId)
           : await fetchConversationDetail(conversationId);
-
       const data: any = (raw as any)?.data ?? raw;
-
-      // API returns messages as a plain array — normalize to { data: [] }
       if (Array.isArray(data?.messages)) {
         data.messages = {
           data: data.messages,
@@ -35,7 +44,6 @@ export function useConversationDetail(
           limit: data.limit ?? 30,
         };
       }
-
       setDetail(data);
     } catch (err: any) {
       console.error("useConversationDetail error:", err);

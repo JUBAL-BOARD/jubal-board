@@ -1,7 +1,7 @@
 "use client";
-import { useState } from "react";
-import { topics, Topic } from "../../../lib/topic";
-import { ChevronLeft } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Topic, fetchTopicsFromBackend } from "../../../lib/topic";
+import { ChevronLeft, Loader2 } from "lucide-react";
 
 type Props = {
   onSelect: (topic: Topic, breadcrumb: string) => void;
@@ -9,24 +9,38 @@ type Props = {
 
 export default function TopicChips({ onSelect }: Props) {
   const [history, setHistory] = useState<Topic[]>([]);
+  const [backendTopics, setBackendTopics] = useState<Topic[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTopicsFromBackend()
+      .then((topics) => setBackendTopics(topics))
+      .finally(() => setLoading(false));
+  }, []);
+
   const current = history[history.length - 1];
-  const visibleTopics = current?.subtopics ?? topics;
+  const visibleTopics = current?.subtopics ?? backendTopics;
 
   const handleChipClick = (topic: Topic) => {
     const breadcrumb = [...history.map((t) => t.label), topic.label].join(" > ");
-
-    // Always send as message first
     onSelect(topic, breadcrumb);
-
-    // Then drill down if it has subtopics
     if (topic.subtopics?.length) {
       setHistory((prev) => [...prev, topic]);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex justify-end py-2">
+        <Loader2 size={16} className="animate-spin text-orange-400" />
+      </div>
+    );
+  }
+
+  if (backendTopics.length === 0) return null;
+
   return (
     <div className="flex flex-col items-end gap-2 py-1">
-      {/* Back button */}
       {history.length > 0 && (
         <button
           onClick={() => setHistory((prev) => prev.slice(0, -1))}
@@ -36,8 +50,6 @@ export default function TopicChips({ onSelect }: Props) {
           Back
         </button>
       )}
-
-      {/* Chips — right aligned, orange */}
       <div className="flex flex-wrap justify-end gap-2 max-w-[85%]">
         {visibleTopics.map((topic) => (
           <button

@@ -4,8 +4,8 @@ import Image from "next/image";
 import { Clock, MessageSquare, Eye, Loader2 } from "lucide-react";
 import type { DeskProject, ProjectStatus } from "../../../data/myDeskData";
 import { useRouter } from "next/navigation";
-import { fetchConversations, createConversation, fetchChatTopics } from "@/app/lib/api/messageApi";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSocket, getGlobalSocket } from "@/app/lib/hooks/useSocket";
 
 interface Props {
   project: DeskProject;
@@ -22,41 +22,41 @@ const ProjectCard: React.FC<Props> = ({ project }) => {
   const { color, bar } = statusConfig[project.status];
   const router = useRouter();
   const [chatLoading, setChatLoading] = useState(false);
+  const [token, setToken] = useState("");
+
+  useEffect(() => {
+    fetch("/api/auth/session/token", { credentials: "include" })
+      .then((r) => r.json())
+      .then(({ token }) => setToken(token));
+  }, []);
+
+  useSocket({ token });
 
   const handleChat = async () => {
     try {
       setChatLoading(true);
 
-      // Use assignee.id (the real creativeId stored there by the hook)
-      const targetId = project.assignee.id;
-
-      if (!targetId) {
-        console.error("No target ID for chat");
+      const projectId = project.id;
+      if (!projectId) {
+        console.error("No project ID");
         return;
       }
 
-      const convRes = await fetchConversations({ limit: 50 });
-      const list = Array.isArray(convRes) ? convRes : convRes.data ?? [];
-      const existing = list.find((c) => c.otherParticipant.id === targetId);
-
-      if (existing) {
-        router.push(`/client/messages/${existing.id}`);
+      const socket = getGlobalSocket();
+      if (!socket || !socket.connected) {
+        console.error("Socket not connected");
         return;
       }
 
-      const topics = await fetchChatTopics();
-      if (!topics || topics.length === 0) {
-        console.error("No chat topics available");
-        return;
-      }
+      socket.emit("project:conversation", { projectId });
 
-      const newConv = await createConversation({
-        recipientId: targetId,
-        topicId: topics[0].id,
-        type: "DIRECT",
+      socket.once("conversation:created", (data: any) => {
+        const conversationId = data?.conversation?.id;
+        if (conversationId) {
+          router.push(`/client/messages/${conversationId}`);
+        }
       });
 
-      router.push(`/client/messages/${newConv.conversation.id}`);
     } catch (err) {
       console.error("Chat failed:", err);
     } finally {
@@ -139,7 +139,7 @@ const ProjectCard: React.FC<Props> = ({ project }) => {
       <div className="flex flex-row lg:flex-col gap-2 flex-shrink-0">
         <button
           onClick={handleChat}
-          disabled={chatLoading}
+          disabled={chatLoading || !token}
           className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 lg:gap-2 bg-[#1a1a2e] border-none rounded-lg px-3 lg:px-4 py-2 lg:py-2.5 cursor-pointer text-white text-xs lg:text-[13px] font-semibold whitespace-nowrap hover:opacity-90 transition-opacity disabled:opacity-60"
         >
           {chatLoading

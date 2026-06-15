@@ -3,8 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Smile, Paperclip, ArrowLeft, Mic, Loader2 } from "lucide-react";
 import { Conversation } from "@/app/lib/api/messageApi";
 import { useConversationDetail } from "@/app/lib/hooks/useConversationDetail";
-import { sendMessage } from "@/app/lib/api/messageApi";
-import { useSocket } from "@/app/lib/hooks/useSocket";
+import { useSocket, getGlobalSocket } from "@/app/lib/hooks/useSocket";
 import ClientTopicChips from "@/app/components/client/messages/topicChips";
 import { Topic } from "@/app/lib/topic";
 import { formatDistanceToNow } from "date-fns";
@@ -27,6 +26,7 @@ const ClientChatWindow: React.FC<Props> = ({ conversation, currentUserId, onBack
   const [showChips, setShowChips] = useState(true);
   const [token, setToken] = useState("");
   const [isOtherTyping, setIsOtherTyping] = useState(false);
+  const [currentTopic, setCurrentTopic] = useState(conversation.topic ?? null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -36,6 +36,10 @@ const ClientChatWindow: React.FC<Props> = ({ conversation, currentUserId, onBack
   );
 
   const messages = detail?.messages.data ?? [];
+  const hasTopic = !!currentTopic?.id;
+  const isClosed =
+    (conversation as any).projectStatus === "COMPLETED" ||
+    (conversation as any).projectStatus === "CANCELLED";
 
   useEffect(() => {
     getToken().then(setToken);
@@ -43,6 +47,7 @@ const ClientChatWindow: React.FC<Props> = ({ conversation, currentUserId, onBack
 
   useEffect(() => {
     setShowChips(true);
+    setCurrentTopic(conversation.topic ?? null);
   }, [conversation.id]);
 
   useEffect(() => {
@@ -68,35 +73,37 @@ const ClientChatWindow: React.FC<Props> = ({ conversation, currentUserId, onBack
     [currentUserId]
   );
 
-  const { emitTyping, emitRead } = useSocket({
-    conversationId: conversation.id,
+  const { emitMessage, emitTyping, emitRead } = useSocket({
     token,
+    conversationId: conversation.id,
     onNewMessage: handleNewMessage,
     onTyping: handleTyping,
   });
 
-  const handleSend = async (text?: string) => {
+  const handleSend = (text?: string) => {
     const content = (text ?? input).trim();
-    if (!content || sending) return;
-    try {
-      setSending(true);
-      setInput("");
-      emitTyping(false);
-      const newMsg = await sendMessage(conversation.id, {
-        content,
-        contentType: "TEXT",
-      });
-      appendMessage(newMsg);
-    } catch (err) {
-      console.error("Send failed:", err);
-    } finally {
-      setSending(false);
-    }
+    if (!content || sending || !hasTopic || isClosed) return;
+    setSending(true);
+    setInput("");
+    emitTyping(false);
+    emitMessage(content, "TEXT");
+    setSending(false);
   };
 
   const handleTopicSelect = (topic: Topic) => {
-    handleSend(topic.label);
-    if (!topic.subtopics?.length) setShowChips(false);
+    const socket = getGlobalSocket();
+    if (!socket || isClosed) return;
+
+    socket.emit("conversation:set-topic", {
+      conversationId: conversation.id,
+      topicId: topic.id,
+    });
+
+    socket.once("conversation:topic-set", (data: any) => {
+      console.log("Topic set:", data);
+      setCurrentTopic(data.topic);
+      setShowChips(false);
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -149,7 +156,7 @@ const ClientChatWindow: React.FC<Props> = ({ conversation, currentUserId, onBack
             {isOtherTyping ? (
               <span className="text-blue-400 italic">typing...</span>
             ) : (
-              conversation.topic.name
+              currentTopic?.name ?? "No topic set"
             )}
           </p>
         </div>
@@ -170,41 +177,40 @@ const ClientChatWindow: React.FC<Props> = ({ conversation, currentUserId, onBack
             messages.map((msg) => {
               const fromMe = msg.senderId === currentUserId;
               return (
-                <>
+                <div
+                  key={msg.id}
+                  className={`flex flex-col ${fromMe ? "items-end" : "items-start"}`}
+                >
                   <div
-                    key={msg.id}
-                    className={`flex flex-col ${fromMe ? "items-end" : "items-start"}`}
-                  >
-                    <div
-                      className={`max-w-[80%] lg:max-w-[65%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${fromMe
+                    className={`max-w-[80%] lg:max-w-[65%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                      fromMe
                         ? "bg-blue-500 text-white rounded-br-sm"
                         : "bg-gray-100 text-gray-800 rounded-bl-sm"
-                        }`}
-                    >
-                      {msg.contentType === "TEXT" && msg.content}
-                      {msg.contentType === "IMAGE" && (
-                        <img
-                          src={msg.fileUrl || ""}
-                          alt="image"
-                          className="rounded-lg max-w-full"
-                        />
-                      )}
-                      {msg.contentType === "FILE" && (
-                        <a
-                          href={msg.fileUrl || "#"}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline flex items-center gap-1"
-                        >
-                          <Paperclip size={12} /> {msg.content || "File"}
-                        </a>
-                      )}
-                    </div>
-                    <span className="text-[11px] text-gray-400 mt-1">
-                      {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
-                    </span>
-                  </div >
-                </>
+                    }`}
+                  >
+                    {msg.contentType === "TEXT" && msg.content}
+                    {msg.contentType === "IMAGE" && (
+                      <img
+                        src={msg.fileUrl || ""}
+                        alt="image"
+                        className="rounded-lg max-w-full"
+                      />
+                    )}
+                    {msg.contentType === "FILE" && (
+                      <a
+                        href={msg.fileUrl || "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline flex items-center gap-1"
+                      >
+                        <Paperclip size={12} /> {msg.content || "File"}
+                      </a>
+                    )}
+                  </div>
+                  <span className="text-[11px] text-gray-400 mt-1">
+                    {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
+                  </span>
+                </div>
               );
             })
           )}
@@ -220,7 +226,7 @@ const ClientChatWindow: React.FC<Props> = ({ conversation, currentUserId, onBack
             </div>
           )}
 
-          {showChips && messages.length === 0 && (
+          {showChips && messages.length === 0 && !hasTopic && (
             <ClientTopicChips onSelect={handleTopicSelect} />
           )}
 
@@ -228,21 +234,39 @@ const ClientChatWindow: React.FC<Props> = ({ conversation, currentUserId, onBack
         </div>
       </div>
 
+      {/* Closed chat banner */}
+      {isClosed && (
+        <div className="px-4 py-2 bg-gray-100 text-center text-xs text-gray-500 flex-shrink-0">
+          This project is closed. Messaging is disabled.
+        </div>
+      )}
+
       {/* Input */}
-      <div className="px-3 py-3 border-t border-gray-100 bg-white flex items-center gap-2 flex-shrink-0">
+      <div
+        className={`px-3 py-3 border-t border-gray-100 bg-white flex items-center gap-2 flex-shrink-0 ${
+          isClosed ? "opacity-50 pointer-events-none" : ""
+        }`}
+      >
         <button className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0">
           <Smile size={19} />
         </button>
         <input
           type="text"
-          placeholder="Send a message"
+          placeholder={
+            isClosed
+              ? "Chat is closed"
+              : !hasTopic
+              ? "Select a topic first..."
+              : "Send a message"
+          }
+          disabled={!hasTopic || isClosed}
           value={input}
           onChange={(e) => {
             setInput(e.target.value);
             emitTyping(e.target.value.length > 0);
           }}
           onKeyDown={handleKeyDown}
-          className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none min-w-0"
+          className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none min-w-0 disabled:cursor-not-allowed"
         />
         <button className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0">
           <Paperclip size={19} />
@@ -251,8 +275,8 @@ const ClientChatWindow: React.FC<Props> = ({ conversation, currentUserId, onBack
         {input.trim() ? (
           <button
             onClick={() => handleSend()}
-            disabled={sending}
-            className="w-8 h-8 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center transition-colors flex-shrink-0 disabled:opacity-50"
+            disabled={sending || !hasTopic || isClosed}
+            className="w-8 h-8 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {sending ? (
               <Loader2 size={14} className="animate-spin text-white" />
@@ -263,12 +287,15 @@ const ClientChatWindow: React.FC<Props> = ({ conversation, currentUserId, onBack
             )}
           </button>
         ) : (
-          <button className="w-8 h-8 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center transition-colors flex-shrink-0">
+          <button
+            disabled={isClosed}
+            className="w-8 h-8 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center transition-colors flex-shrink-0 disabled:opacity-50"
+          >
             <Mic size={15} className="text-white" />
           </button>
         )}
       </div>
-    </div >
+    </div>
   );
 };
 
