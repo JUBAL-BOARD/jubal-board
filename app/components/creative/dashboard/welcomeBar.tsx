@@ -20,48 +20,54 @@ const WelcomeBar: React.FC<Props> = ({ userName }) => {
   };
 
   useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const headers = await getHeaders();
-        const res = await fetch("/api/v1/creatives/me/online-status", {
-          method: "GET",
-          credentials: "include",
-          headers,
-        });
-        const data = await res.json();
-        const status = data?.data?.showOnlineStatus ?? data?.showOnlineStatus;
-        if (typeof status === "boolean") {
-          setIsOnline(status);
-        }
-      } catch (err) {
-        console.error("Failed to fetch online status:", err);
-      }
-    };
-    fetchStatus();
-  }, []);
-
-  const toggleOnlineStatus = async () => {
-    const newStatus = !isOnline;
-    setIsOnline(newStatus); // optimistic update
-    setLoading(true);
-
+  const fetchStatus = async () => {
     try {
       const headers = await getHeaders();
       const res = await fetch("/api/v1/creatives/me/online-status", {
-        method: "PATCH",
+        method: "GET",
         credentials: "include",
         headers,
-        body: JSON.stringify({ showOnlineStatus: newStatus }),
       });
-
-      if (!res.ok) throw new Error("Failed to update status");
+      const data = await res.json();
+      const status = data?.data?.showOnlineStatus ?? data?.showOnlineStatus;
+      if (typeof status === "boolean") {
+        setIsOnline(status);
+      }
     } catch (err) {
-      console.error("Failed to update online status:", err);
-      setIsOnline(!newStatus); // revert on failure
-    } finally {
-      setLoading(false);
+      console.error("Failed to fetch online status:", err);
     }
   };
+  fetchStatus();
+}, []);
+
+ const toggleOnlineStatus = async () => {
+  setIsOnline(prev => {
+    const newStatus = !prev;
+
+    // fire the API inside the setter using the correct value
+    (async () => {
+      setLoading(true);
+      try {
+        const headers = await getHeaders();
+        const res = await fetch("/api/v1/creatives/me/online-status", {
+          method: "PATCH",
+          credentials: "include",
+          headers,
+          body: JSON.stringify({ showOnlineStatus: newStatus }),
+        });
+        if (!res.ok) throw new Error("Failed to update status");
+      } catch (err) {
+        console.error("Failed to update online status:", err);
+        setIsOnline(!newStatus); // revert on failure
+        console.log("Payload being sent:", { showOnlineStatus: newStatus });
+      } finally {
+        setLoading(false);
+      }
+    })();
+
+    return newStatus;
+  });
+};
 
   return (
     <div className="lg:flex items-end justify-between mb-5">

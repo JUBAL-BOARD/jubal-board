@@ -302,8 +302,6 @@ const HelpSupportContent: React.FC = () => {
       const headers = await getHeaders();
       const res = await fetch("/api/v1/support/cases/me", { credentials: "include", headers });
       const json = await res.json();
-      console.log("support cases response:", json);
-      console.log(JSON.stringify(json.data[0], null, 2))
       setSupportCases(Array.isArray(json?.data) ? json.data : []);
       setCasesError(null);
     } catch (err) {

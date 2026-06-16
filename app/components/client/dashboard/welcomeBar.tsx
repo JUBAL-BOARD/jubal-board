@@ -41,27 +41,31 @@ const WelcomeBar: React.FC<Props> = ({ userName }) => {
   }, []);
 
   const toggleOnlineStatus = async () => {
-    const newStatus = !isOnline;
-    setIsOnline(newStatus); // optimistic update
-    setLoading(true);
+  setIsOnline(prev => {
+    const newStatus = !prev;
 
-    try {
-      const headers = await getHeaders();
-      const res = await fetch("/api/v1/clients/me/online-status", {
-        method: "PATCH",
-        credentials: "include",
-        headers,
-        body: JSON.stringify({ showOnlineStatus: newStatus }),
-      });
+    (async () => {
+      setLoading(true);
+      try {
+        const headers = await getHeaders();
+        const res = await fetch("/api/v1/clients/me/online-status", {
+          method: "PATCH",
+          credentials: "include",
+          headers,
+          body: JSON.stringify({ showOnlineStatus: newStatus }),
+        });
+        if (!res.ok) throw new Error("Failed to update status");
+      } catch (err) {
+        console.error("Failed to update online status:", err);
+        setIsOnline(!newStatus);
+      } finally {
+        setLoading(false);
+      }
+    })();
 
-      if (!res.ok) throw new Error("Failed to update status");
-    } catch (err) {
-      console.error("Failed to update online status:", err);
-      setIsOnline(!newStatus); // revert on failure
-    } finally {
-      setLoading(false);
-    }
-  };
+    return newStatus;
+  });
+};
 
   return (
     <div className="lg:flex items-end justify-between mb-5">
