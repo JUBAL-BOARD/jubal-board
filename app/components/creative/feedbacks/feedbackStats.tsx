@@ -1,10 +1,22 @@
-const stats = [
-  { value: "5.0", label: "Rating" },
-  { value: "35", label: "Reviews" },
-  { value: "95%", label: "Postive" },
-];
+interface FeedbackStatsProps {
+  averageRating: number;
+  totalReviews: number;
+  positivePercent: number;
+  loading: boolean;
+}
 
-const FeedbackStats: React.FC = () => {
+const FeedbackStats: React.FC<FeedbackStatsProps> = ({
+  averageRating,
+  totalReviews,
+  positivePercent,
+  loading,
+}) => {
+  const stats = [
+    { value: loading ? "…" : averageRating > 0 ? averageRating.toFixed(1) : "—", label: "Rating" },
+    { value: loading ? "…" : String(totalReviews), label: "Reviews" },
+    { value: loading ? "…" : `${positivePercent}%`, label: "Positive" },
+  ];
+
   return (
     <div className="grid grid-cols-3 gap-4 mb-6">
       {stats.map((s) => (
