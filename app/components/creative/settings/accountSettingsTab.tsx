@@ -1,8 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DeleteModal from "./deleteModal";
 import DeactivateModal from "./deactivateModal";
+import {
+  changePassword,
+  requestEmailChange,
+  getEmailChangeStatus,
+  getSecuritySettings,
+  updateSecuritySettings,
+  deactivateAccount,
+} from "@/app/lib/settingsService";
+import { ApiError } from "@/app/lib/api";
 
 const authMethods = [
   { label: "Email Code", desc: "Receive authentication codes via email", status: "Enabled", statusColor: "bg-green-500", action: "Manage" },
@@ -12,11 +21,13 @@ const authMethods = [
   { label: "Backup Codes", desc: "One-time backup codes for account recovery", status: "Recommended", statusColor: "bg-orange-400", action: "Generate" },
 ];
 
-const Toggle = ({ defaultOn = true }: { defaultOn?: boolean }) => {
-  const [on, setOn] = useState(defaultOn);
+const Toggle = ({ on, onChange }: { on: boolean; onChange: (next: boolean) => void }) => {
   return (
-    <button onClick={() => setOn(!on)} className={`relative flex-shrink-0 w-11 h-6 rounded-full cursor-pointer transition-colors duration-200 ${on ? "bg-[#E2554F]" : "bg-gray-300"}`}>
-      <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${on ? "left-[22]" : "left-[2]"}`} />
+    <button
+      onClick={() => onChange(!on)}
+      className={`relative flex-shrink-0 w-11 h-6 rounded-full cursor-pointer transition-colors duration-200 ${on ? "bg-[#E2554F]" : "bg-gray-300"}`}
+    >
+      <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${on ? "left-[22px]" : "left-[2px]"}`} />
     </button>
   );
 };
@@ -29,15 +40,129 @@ const AccountSettingsTab: React.FC = () => {
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+  // API-connected state
+  const [mfaOn, setMfaOn] = useState(true);
+  const [loginAlerts, setLoginAlerts] = useState(false);
+  const [sessionTimeout, setSessionTimeout] = useState(false);
+  const [emailPending, setEmailPending] = useState(false);
+  const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    getSecuritySettings()
+      .then(({ data }) => {
+        setLoginAlerts(data.data.loginAlertsEnabled);
+        setSessionTimeout(data.data.sessionTimeoutEnabled);
+      })
+      .catch(() => {});
+
+    getEmailChangeStatus()
+      .then(({ data }) => {
+        if (data.data.status === "PENDING") setEmailPending(true);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleUpdateEmail = async () => {
+    try {
+      setLoading("email");
+      setError(null);
+      setSuccess(null);
+      await requestEmailChange({ newEmail: email });
+      setEmailPending(true);
+      setSuccess("Verification email sent — check your inbox.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to update email.");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPw !== confirmPw) return setError("Passwords do not match.");
+    try {
+      setLoading("password");
+      setError(null);
+      setSuccess(null);
+      await changePassword({ currentPassword: currentPw, newPassword: newPw });
+      setCurrentPw("");
+      setNewPw("");
+      setConfirmPw("");
+      setSuccess("Password updated successfully.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to change password.");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleToggleLoginAlerts = async (next: boolean) => {
+    setLoginAlerts(next);
+    try {
+      await updateSecuritySettings({ loginAlertsEnabled: next });
+    } catch {
+      setLoginAlerts(!next);
+    }
+  };
+
+  const handleToggleSessionTimeout = async (next: boolean) => {
+    setSessionTimeout(next);
+    try {
+      await updateSecuritySettings({ sessionTimeoutEnabled: next });
+    } catch {
+      setSessionTimeout(!next);
+    }
+  };
+
+  const handleDeactivate = async () => {
+    try {
+      setLoading("deactivate");
+      setError(null);
+      await deactivateAccount();
+      setShowDeactivateModal(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to deactivate account.");
+    } finally {
+      setLoading(null);
+    }
+  };
+
   return (
     <div className="bg-white flex flex-col gap-6">
+
+      {/* Global error/success banners */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="bg-green-50 border border-green-200 text-green-700 text-sm px-4 py-3 rounded-lg">
+          {success}
+        </div>
+      )}
+
       {/* Email */}
       <div className="bg-[#fafafa] p-6 border border-gray-200 rounded-xl p-6">
         <h2 className="font-bold text-gray-900 text-2xl mb-1">Email Address</h2>
         <p className="text-xs text-black mb-4">Update your email address for account notifications and login</p>
+        {emailPending && (
+          <p className="text-xs text-orange-500 mb-3">A verification email was sent. Please check your inbox to confirm the change.</p>
+        )}
         <div className="flex items-center gap-3">
-          <input value={email} onChange={(e) => setEmail(e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-3 py-2.5 bg-white text-black text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-100" />
-          <button className="bg-[#E2554F] hover:bg-red-600 text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition-colors">Update Email</button>
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="flex-1 border border-gray-200 rounded-lg px-3 py-2.5 bg-white text-black text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-100"
+          />
+          <button
+            onClick={handleUpdateEmail}
+            disabled={loading === "email"}
+            className="bg-[#E2554F] hover:bg-red-600 disabled:opacity-60 text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition-colors"
+          >
+            {loading === "email" ? "Sending..." : "Update Email"}
+          </button>
         </div>
       </div>
 
@@ -49,7 +174,13 @@ const AccountSettingsTab: React.FC = () => {
           <input type="password" placeholder="Current Password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} className="bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-black text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-100" />
           <input type="password" placeholder="New Password" value={newPw} onChange={(e) => setNewPw(e.target.value)} className="bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-black text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-100" />
           <input type="password" placeholder="Confirm new password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-black text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-100" />
-          <button className="bg-[#E2554F] hover:bg-red-600 text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition-colors w-fit">Change Password</button>
+          <button
+            onClick={handleChangePassword}
+            disabled={loading === "password"}
+            className="bg-[#E2554F] hover:bg-red-600 disabled:opacity-60 text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition-colors w-fit"
+          >
+            {loading === "password" ? "Saving..." : "Change Password"}
+          </button>
         </div>
       </div>
 
@@ -60,10 +191,11 @@ const AccountSettingsTab: React.FC = () => {
             <h2 className="font-bold text-gray-900 text-2xl">Multi-Factor Authentication</h2>
             <p className="text-xs text-black">Change your password to keep your account secure</p>
           </div>
-          <Toggle defaultOn={true} />
+          <Toggle on={mfaOn} onChange={setMfaOn} />
         </div>
       </div>
 
+      {/* Authentication Methods — untouched */}
       <div className="bg-[#fafafa] p-6 border border-gray-200 rounded-xl p-6">
         <h3 className="font-semibold text-black text-2xl mb-3">Authentication Methods</h3>
         <div className="border border-gray-200 rounded-xl overflow-hidden">
@@ -86,27 +218,39 @@ const AccountSettingsTab: React.FC = () => {
       <div className="bg-[#fafafa] p-6 border border-gray-200 rounded-xl p-6">
         <h2 className="font-bold text-black text-2xl mb-4">Additional Security</h2>
         <div className="border border-gray-200 rounded-xl overflow-hidden">
-          {[
-            { label: "Login Alerts", desc: "Get notified for new login attempts!" },
-            { label: "Session Timeout", desc: "Automatically log out after 30 minutes of inactivity" },
-          ].map((item, i) => (
-            <div key={item.label} className={`flex items-center justify-between px-4 py-3.5 ${i === 0 ? "border-b border-gray-100" : ""}`}>
-              <div>
-                <p className="text-sm font-medium text-gray-900">{item.label}</p>
-                <p className="text-xs text-gray-500">{item.desc}</p>
-              </div>
-              <Toggle />
+          <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Login Alerts</p>
+              <p className="text-xs text-gray-500">Get notified for new login attempts!</p>
             </div>
-          ))}
+            <Toggle on={loginAlerts} onChange={handleToggleLoginAlerts} />
+          </div>
+          <div className="flex items-center justify-between px-4 py-3.5">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Session Timeout</p>
+              <p className="text-xs text-gray-500">Automatically log out after 30 minutes of inactivity</p>
+            </div>
+            <Toggle on={sessionTimeout} onChange={handleToggleSessionTimeout} />
+          </div>
         </div>
       </div>
 
       {/* Account Actions */}
-      <div className=" rounded-xl p-6">
+      <div className="rounded-xl p-6">
         <h2 className="font-bold text-black text-2xl mb-4">Account Actions</h2>
         <div className="flex items-center justify-between">
-          <button onClick={() => setShowDeactivateModal(true)} className="bg-[#E2554F] hover:bg-red-600 text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition-colors">Deactivate Account</button>
-          <button onClick={() => setShowDeleteModal(true)} className="bg-[#E2554F] hover:bg-red-600 text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition-colors">Delete Account</button>
+          <button
+            onClick={() => setShowDeactivateModal(true)}
+            className="bg-[#E2554F] hover:bg-red-600 text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition-colors"
+          >
+            Deactivate Account
+          </button>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="bg-[#E2554F] hover:bg-red-600 text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition-colors"
+          >
+            Delete Account
+          </button>
         </div>
       </div>
 
@@ -120,7 +264,7 @@ const AccountSettingsTab: React.FC = () => {
         <DeleteModal onGoToDashboard={() => setShowDeleteModal(false)} />
       )}
 
-      {/* Device */}
+      {/* Device — untouched */}
       <div className="bg-[#fafafa] p-6 border border-gray-200 rounded-xl p-6">
         <h2 className="font-bold text-black text-2xl mb-4">Device</h2>
         <div className="grid grid-cols-2 gap-4 mb-4">
@@ -135,6 +279,7 @@ const AccountSettingsTab: React.FC = () => {
           <button className="bg-[#E2554F] hover:bg-red-600 text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition-colors">Sign Out from all Devices</button>
         </div>
       </div>
+
       <ActionButtons />
     </div>
   );

@@ -16,6 +16,8 @@ export function useTodos() {
           credentials: "include",
         });
         const data = await res.json();
+        console.log("Todo response status:", res.status); // 👈
+        console.log("Todo response data:", data); // 👈
         setTodos(Array.isArray(data) ? data : data.data ?? []);
       } catch {
         setError("Failed to load todos.");

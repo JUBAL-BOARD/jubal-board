@@ -13,6 +13,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { WhatsApp } from "@/app/icons";
+import LiveChatModal from "./liveChatModal";
 
 interface FaqItem {
   question: string;
@@ -105,6 +106,9 @@ const HelpSupportContent: React.FC = () => {
   const [supportCases, setSupportCases] = useState<SupportCaseSummary[]>([]);
   const [casesLoading, setCasesLoading] = useState(true);
   const [casesError, setCasesError] = useState<string | null>(null);
+
+  // Live Chat modal state
+  const [liveChatOpen, setLiveChatOpen] = useState(false);
 
   const getHeaders = async () => {
     const tokenRes = await fetch("/api/auth/session/token");
@@ -340,7 +344,7 @@ const HelpSupportContent: React.FC = () => {
         <h2 className="text-xl font-bold font-heading text-black mb-3">Quick Actions</h2>
         <div className="bg-[#fafafa] rounded-2xl p-8 grid grid-cols-3 gap-3">
           <button
-            onClick={() => { }}
+            onClick={() => setLiveChatOpen(true)}
             className="bg-white h-[200px] rounded-xl py-5 flex flex-col items-center justify-center gap-2 shadow-sm hover:shadow-md transition-shadow"
           >
             <MessageCircle size={22} className="text-[#E05C5C]" />
@@ -614,6 +618,17 @@ const HelpSupportContent: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Floating Live Chat Bubble (this page only) */}
+      <button
+        onClick={() => setLiveChatOpen(true)}
+        className="fixed bottom-6 right-6 z-40 bg-[#E05C5C] text-white rounded-full p-4 shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center"
+        aria-label="Open live chat"
+      >
+        <MessageCircle size={24} />
+      </button>
+
+      <LiveChatModal isOpen={liveChatOpen} onClose={() => setLiveChatOpen(false)} />
     </div>
   );
 };
