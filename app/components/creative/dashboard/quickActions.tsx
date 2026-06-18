@@ -41,7 +41,7 @@ const QuickActions: React.FC = () => {
             <div>
               <p className="m-0 font-bold font-heading text-2xl text-black">Earnings this week:</p>
               <p className="m-0 font-body mt-1 text-2xl lg:text-3xl font-extrabold text-black">
-                {loading ? "—" : `$${weeklyEarnings.toLocaleString()}.00`}
+                {loading ? "—" : `$${weeklyEarnings.toLocaleString()}`}
               </p>
             </div>
           </div>

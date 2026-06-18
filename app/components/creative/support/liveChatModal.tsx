@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
-import { X, Send, Loader2 } from "lucide-react";
+import { X, Send, Loader2, Paperclip, FileText, Headphones } from "lucide-react";
 
 interface Topic {
     id: string;
@@ -27,19 +27,25 @@ interface Props {
     onClose: () => void;
 }
 
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB
+
 const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
     const socketRef = useRef<Socket | null>(null);
     const panelRef = useRef<HTMLDivElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const [connecting, setConnecting] = useState(true);
     const [connectError, setConnectError] = useState<string | null>(null);
     const [conversationId, setConversationId] = useState<string | null>(null);
     const [topicName, setTopicName] = useState<string | null>(null);
+    const [slaHours, setSlaHours] = useState<number | null>(null); // NEW
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
     const [closed, setClosed] = useState<{ reason: string } | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
 
     const [allTopics, setAllTopics] = useState<Topic[]>([]);
     const [activePills, setActivePills] = useState<Topic[]>([]);
@@ -78,7 +84,6 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 });
 
                 socket.on("support:topics:list", (payload: { data: Topic[] }) => {
-                    console.log("[LiveChat] topics:list", payload);
                     const topics = payload?.data ?? [];
                     setAllTopics(topics);
                     setActivePills(topics);
@@ -114,6 +119,13 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
                         setConversationId(payload.conversation.id);
                         setTopicName(payload.conversation.topic?.name ?? null);
                         setConnecting(false);
+
+                        // Pick up slaThresholdHours from the matched topic
+                        const matchedTopic = pendingTopics.find(
+                            (t) => t.id === payload.conversation.topic?.id
+                        );
+                        setSlaHours(matchedTopic?.slaThresholdHours ?? null);
+
                         socket.emit("support:messages", { supportConversationId: payload.conversation.id, page: 1, limit: 50 });
                     }
                 );
@@ -126,8 +138,6 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     }
                 );
 
-                // Deduplicate: replace optimistic temp message with real one if it matches,
-                // otherwise append. Prevents doubles when server echoes back your own send.
                 socket.on("support:message:receive", (msg: ChatMessage) => {
                     console.log("[LiveChat] message:receive", msg);
                     setMessages((prev) => {
@@ -135,12 +145,10 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
                             (m) => m.id.startsWith("temp-") && m.content === msg.content && !m.senderIsAdmin
                         );
                         if (tempIndex !== -1) {
-                            // Swap the optimistic placeholder for the confirmed message
                             const updated = [...prev];
                             updated[tempIndex] = msg;
                             return updated;
                         }
-                        // Message from the other side — just append
                         return [...prev, msg];
                     });
                 });
@@ -173,12 +181,15 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
             setConnectError(null);
             setConversationId(null);
             setTopicName(null);
+            setSlaHours(null); // NEW
             setMessages([]);
             setInput("");
             setClosed(null);
             setAllTopics([]);
             setActivePills([]);
             setPickedTopicIds(new Set());
+            setUploadError(null);
+            setUploading(false);
         }
     }, [isOpen]);
 
@@ -201,6 +212,7 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
     // Shared helper: optimistically append then emit to server
     const appendAndSend = useCallback(
         (content: string) => {
+            console.log("[appendAndSend] called, conversationId:", conversationId, "closed:", closed);
             if (!conversationId || closed) return;
 
             const optimisticMsg: ChatMessage = {
@@ -220,6 +232,73 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 content,
                 contentType: "TEXT",
             });
+        },
+        [conversationId, closed]
+    );
+
+    // Handle file upload then send via socket
+    const handleFileChange = useCallback(
+        async (e: React.ChangeEvent<HTMLInputElement>) => {
+            const file = e.target.files?.[0];
+            if (!file || !conversationId || closed) return;
+            e.target.value = "";
+
+            if (file.size > MAX_FILE_BYTES) {
+                setUploadError("File must be smaller than 10MB.");
+                return;
+            }
+
+            setUploadError(null);
+            setUploading(true);
+
+            try {
+                const tokenRes = await fetch("/api/auth/session/token");
+                const { token } = await tokenRes.json();
+
+                const formData = new FormData();
+                formData.append("files", file);
+
+                const res = await fetch("/api/v1/support/uploads", {
+                    method: "POST",
+                    credentials: "include",
+                    headers: { Authorization: `Bearer ${token}` },
+                    body: formData,
+                });
+
+                const json = await res.json();
+                if (!res.ok) throw new Error(json?.message || "Upload failed.");
+
+                const url: string = json?.urls?.[0];
+                if (!url) throw new Error("No URL returned from upload.");
+
+                const isImage = file.type.startsWith("image/");
+                const contentType: ChatMessage["contentType"] = isImage ? "IMAGE" : "FILE";
+                const content = isImage ? "" : file.name;
+
+                const optimisticMsg: ChatMessage = {
+                    id: `temp-${Date.now()}`,
+                    supportConversationId: conversationId,
+                    content,
+                    contentType,
+                    fileUrl: url,
+                    senderId: "me",
+                    senderIsAdmin: false,
+                    createdAt: new Date().toISOString(),
+                };
+                setMessages((prev) => [...prev, optimisticMsg]);
+
+                socketRef.current?.emit("support:send", {
+                    supportConversationId: conversationId,
+                    content,
+                    contentType,
+                    fileUrl: url,
+                });
+            } catch (err: any) {
+                console.error("[LiveChat] upload failed:", err);
+                setUploadError(err?.message || "Upload failed. Please try again.");
+            } finally {
+                setUploading(false);
+            }
         },
         [conversationId, closed]
     );
@@ -247,7 +326,7 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
         setSending(true);
         appendAndSend(input.trim());
         setInput("");
-        setSending(false); // optimistic — server ack isn't strictly needed for UX here
+        setSending(false);
     }, [input, conversationId, closed, appendAndSend]);
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -266,10 +345,23 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 className="bg-white rounded-2xl w-[380px] h-[560px] max-h-[75vh] flex flex-col overflow-hidden shadow-2xl border border-gray-100"
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                    <h2 className="text-lg font-bold font-heading text-black">
-                        {topicName ?? "Live Chat"}
-                    </h2>
+                <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+                    {/* Avatar */}
+                    <div className="w-10 h-10 rounded-full bg-[#E05C5C] flex items-center justify-center flex-shrink-0">
+                        <Headphones size={18} className="text-white" />
+                    </div>
+                    {/* Name + SLA */}
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-black leading-tight">Support Team</p>
+                        {slaHours != null ? (
+                            <p className="text-xs text-gray-400 leading-tight">
+                                Typically replies within {slaHours} {slaHours === 1 ? "hour" : "hours"}
+                            </p>
+                        ) : (
+                            <p className="text-xs text-green-500 leading-tight">Online</p>
+                        )}
+                    </div>
+                    {/* Close */}
                     <button onClick={onClose} aria-label="Close">
                         <X size={20} className="text-black" />
                     </button>
@@ -299,7 +391,22 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
                                         }`}
                                 >
                                     {msg.contentType === "IMAGE" && msg.fileUrl ? (
-                                        <img src={msg.fileUrl} alt="attachment" className="rounded-lg max-w-full" />
+                                        <img
+                                            src={msg.fileUrl}
+                                            alt="attachment"
+                                            className="rounded-lg max-w-full cursor-pointer"
+                                            onClick={() => window.open(msg.fileUrl, "_blank")}
+                                        />
+                                    ) : msg.contentType === "FILE" && msg.fileUrl ? (
+                                        <a
+                                            href={msg.fileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 underline underline-offset-2"
+                                        >
+                                            <FileText size={14} />
+                                            {msg.content || "Download file"}
+                                        </a>
                                     ) : (
                                         msg.content
                                     )}
@@ -328,6 +435,22 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     )}
                 </div>
 
+                {/* Upload error */}
+                {uploadError && (
+                    <div className="px-4 py-2 bg-red-50 border-t border-red-100">
+                        <p className="text-xs text-red-600">{uploadError}</p>
+                    </div>
+                )}
+
+                {/* Hidden file input — always mounted outside footer so ref is never null */}
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,.pdf,.doc,.docx,.txt,.zip"
+                    className="hidden"
+                    onChange={handleFileChange}
+                />
+
                 {/* Footer */}
                 {closed ? (
                     <div className="px-5 py-4 border-t border-gray-100 text-center">
@@ -338,6 +461,20 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     </div>
                 ) : (
                     <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-100">
+                        {/* Paperclip button */}
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={!conversationId || uploading}
+                            className="text-gray-400 hover:text-[#E05C5C] disabled:opacity-40 transition-colors flex-shrink-0"
+                            aria-label="Attach file"
+                        >
+                            {uploading ? (
+                                <Loader2 size={18} className="animate-spin text-[#E05C5C]" />
+                            ) : (
+                                <Paperclip size={18} />
+                            )}
+                        </button>
+
                         <input
                             value={input}
                             onChange={(e) => setInput(e.target.value)}

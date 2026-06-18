@@ -8,6 +8,21 @@ interface Breakdown {
   netPay: number;
 }
 
+// This matches what /api/v1/earnings/breakdown actually returns: a list of
+// transaction-like records, NOT a pre-aggregated { gross, fees, netPay } object.
+interface Transaction {
+  id: string;
+  walletId: string;
+  amount: number;
+  currency: string;
+  amountUsd: number;
+  type?: string;
+  category?: string;
+  kind?: string;
+  direction?: string;
+  [key: string]: unknown;
+}
+
 const periods = ["This month", "Last month", "Last 3 months", "This year"];
 
 const periodToDateRange: Record<string, string> = {
@@ -17,7 +32,35 @@ const periodToDateRange: Record<string, string> = {
   "This year": "thisYear",
 };
 
+// FIXME: Verify against the real API response. Right now this guesses which
+// transactions are "fees" by checking a few likely field names/values.
+// Inspect a full transaction object (all fields, not just the first 5) and
+// adjust this function to match the actual field that distinguishes fees
+// from earnings.
+const isFee = (t: Transaction): boolean => {
+  const candidates = [t.type, t.category, t.kind, t.direction]
+    .filter(Boolean)
+    .map((v) => String(v).toLowerCase());
 
+  return candidates.some((v) =>
+    ["fee", "fees", "charge", "deduction", "platform_fee"].includes(v)
+  );
+};
+
+const aggregateBreakdown = (transactions: Transaction[]): Breakdown => {
+  let gross = 0;
+  let fees = 0;
+
+  for (const t of transactions) {
+    if (isFee(t)) {
+      fees += t.amount ?? 0;
+    } else {
+      gross += t.amount ?? 0;
+    }
+  }
+
+  return { gross, fees, netPay: gross - fees };
+};
 
 const EarningsBreakdown: React.FC = () => {
   const [period, setPeriod] = useState("This month");
@@ -26,47 +69,58 @@ const EarningsBreakdown: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currency, setCurrency] = useState("USD");
-  const fmt = (n: number) =>
-  `${currency} ${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+
+  // Defensive: never crash on undefined/null, even if a field is missing.
+  const fmt = (n: number | undefined | null) =>
+    `${currency} ${(n ?? 0).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+    })}`;
 
   const fetchBreakdown = useCallback(async (selectedPeriod: string) => {
-  setLoading(true);
-  setError(null);
-  try {
-    const tokenRes = await fetch("/api/auth/session/token");
-    const { token } = await tokenRes.json();
-    const headers = {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    };
+    setLoading(true);
+    setError(null);
+    try {
+      const tokenRes = await fetch("/api/auth/session/token");
+      const { token } = await tokenRes.json();
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
 
-    const dateRange = periodToDateRange[selectedPeriod] ?? "thisMonth";
+      const dateRange = periodToDateRange[selectedPeriod] ?? "thisMonth";
 
-    const [breakdownRes, earningsRes] = await Promise.all([
-      fetch(`/api/v1/earnings/breakdown?dateRange=${dateRange}`, {
-        credentials: "include",
-        headers,
-      }),
-      fetch(`/api/v1/earnings`, {
-        credentials: "include",
-        headers,
-      }),
-    ]);
+      const [breakdownRes, earningsRes] = await Promise.all([
+        fetch(`/api/v1/earnings/breakdown?dateRange=${dateRange}`, {
+          credentials: "include",
+          headers,
+        }),
+        fetch(`/api/v1/earnings`, {
+          credentials: "include",
+          headers,
+        }),
+      ]);
 
-    if (!breakdownRes.ok) throw new Error(`Breakdown fetch failed (${breakdownRes.status})`);
-    const json = await breakdownRes.json();
-    setBreakdown(json.data);
+      if (!breakdownRes.ok)
+        throw new Error(`Breakdown fetch failed (${breakdownRes.status})`);
+      const json = await breakdownRes.json();
 
-    if (earningsRes.ok) {
-      const earningsJson = await earningsRes.json();
-      setCurrency(earningsJson.data?.currency ?? "USD");
+      // json.data is an array of transactions, so aggregate it into the
+      // summary shape the UI expects instead of setting it directly.
+      const transactions: Transaction[] = Array.isArray(json.data)
+        ? json.data
+        : [];
+      setBreakdown(aggregateBreakdown(transactions));
+
+      if (earningsRes.ok) {
+        const earningsJson = await earningsRes.json();
+        setCurrency(earningsJson.data?.currency ?? "USD");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    setError(err instanceof Error ? err.message : "Something went wrong");
-  } finally {
-    setLoading(false);
-  }
-}, []);
+  }, []);
 
   useEffect(() => {
     fetchBreakdown(period);
