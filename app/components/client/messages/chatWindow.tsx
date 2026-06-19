@@ -20,6 +20,11 @@ async function getToken(): Promise<string> {
   return token || "";
 }
 
+// Works whether the name came from history (msg.sender.name)
+// or a live socket push (msg.senderName) — the two payload shapes differ.
+const getSenderName = (msg: any): string =>
+  msg.sender?.name ?? msg.senderName ?? "Unknown";
+
 const ClientChatWindow: React.FC<Props> = ({ conversation, currentUserId, onBack }) => {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -183,13 +188,24 @@ const ClientChatWindow: React.FC<Props> = ({ conversation, currentUserId, onBack
               <p className="text-sm text-gray-400">No messages yet. Say hello!</p>
             </div>
           ) : (
-            messages.map((msg) => {
+            messages.map((msg, index) => {
               const fromMe = msg.senderId === currentUserId;
+              const prevMsg = messages[index - 1];
+              const showSenderName =
+                conversation.type === "GROUP" &&
+                !fromMe &&
+                msg.senderId !== prevMsg?.senderId;
+
               return (
                 <div
                   key={msg.id}
                   className={`flex flex-col ${fromMe ? "items-end" : "items-start"}`}
                 >
+                  {showSenderName && (
+                    <span className="text-xs font-medium text-gray-500 mb-1 px-1">
+                      {getSenderName(msg)}
+                    </span>
+                  )}
                   <div
                     className={`max-w-[80%] lg:max-w-[65%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                       fromMe
