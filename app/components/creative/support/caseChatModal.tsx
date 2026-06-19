@@ -1,15 +1,8 @@
+// app/components/client/support/caseChatModal.tsx
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import { X, Send, Loader2, Paperclip, FileText, Headphones } from "lucide-react";
-
-interface Topic {
-    id: string;
-    name: string;
-    description?: string;
-    slaThresholdHours?: number;
-    children?: Topic[];
-}
 
 interface ChatMessage {
     id: string;
@@ -25,22 +18,21 @@ interface ChatMessage {
 interface Props {
     isOpen: boolean;
     onClose: () => void;
+    supportCaseId: string;
+    caseNumber: string;
 }
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB
 
-const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
+const CaseChatModal: React.FC<Props> = ({ isOpen, onClose, supportCaseId, caseNumber }) => {
     const socketRef = useRef<Socket | null>(null);
     const panelRef = useRef<HTMLDivElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
-    const hasTopicRef = useRef(false); // NEW: tracks whether the resumed conversation already has a topic picked
 
     const [connecting, setConnecting] = useState(true);
     const [connectError, setConnectError] = useState<string | null>(null);
     const [conversationId, setConversationId] = useState<string | null>(null);
-    const [topicName, setTopicName] = useState<string | null>(null);
-    const [slaHours, setSlaHours] = useState<number | null>(null); // NEW
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
@@ -48,19 +40,12 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
     const [uploading, setUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
 
-    const [allTopics, setAllTopics] = useState<Topic[]>([]);
-    const [activePills, setActivePills] = useState<Topic[]>([]);
-    const [pickedTopicIds, setPickedTopicIds] = useState<Set<string>>(new Set());
-
     // Establish socket connection when modal opens
     useEffect(() => {
         if (!isOpen) return;
-        console.log("[LiveChat] modal opened, connecting...");
+        console.log("[CaseChat] modal opened, connecting...");
 
         let socket: Socket;
-        let hasOpened = false;
-        let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
-        let pendingTopics: Topic[] = [];
 
         const connect = async () => {
             try {
@@ -73,120 +58,51 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 socketRef.current = socket;
 
                 socket.on("connect", () => {
-                    console.log("[LiveChat] socket connected:", socket.id);
+                    console.log("[CaseChat] socket connected:", socket.id);
                     setConnectError(null);
-                    socket.emit("support:active-live", {});
-                    socket.emit("support:topics", {});
+                    socket.emit("support:case-chat", { supportCaseId });
                 });
 
                 socket.on("error", (e: { message: string }) => {
-                    console.error("[LiveChat] socket error:", e.message);
+                    console.error("[CaseChat] socket error:", e.message);
                     setConnectError(e.message);
                     setConnecting(false);
                 });
 
-                socket.on(
-                    "support:active-live",
-                    (payload: {
-                        conversation: {
-                            id: string;
-                            kind: "LIVE";
-                            status: string;
-                            isActive: boolean;
-                            isClosed: boolean;
-                            topic?: { id: string; name: string };
-                            lastActivityAt: string;
-                            createdAt: string;
-                        } | null;
-                    }) => {
-                        console.log("[LiveChat] support:active-live", payload);
-
-                        if (payload.conversation) {
-                            // Resume the existing live chat
-                            hasOpened = true;
-                            setConversationId(payload.conversation.id);
-                            setTopicName(payload.conversation.topic?.name ?? null);
-                            setConnecting(false);
-
-                            // Topic already picked for this conversation — don't show pills again
-                            if (payload.conversation.topic) {
-                                hasTopicRef.current = true;
-                                setActivePills([]);
-                            }
-
-                            socket.emit("support:messages", {
-                                supportConversationId: payload.conversation.id,
-                                page: 1,
-                                limit: 50,
-                            });
-                        }
-                    }
-                );
-
-                socket.on("support:topics:list", (payload: { data: Topic[] }) => {
-                    const topics = payload?.data ?? [];
-                    setAllTopics(topics);
-                    pendingTopics = topics;
-
-                    if (hasTopicRef.current) {
-                        // Already resumed into a conversation with a topic — don't show the picker
-                        setConnecting(false);
-                        return;
-                    }
-
-                    setActivePills(topics);
-
-                    if (topics.length === 0) {
-                        setConnecting(false);
-                        return;
-                    }
-
-                    fallbackTimer = setTimeout(() => {
-                        if (!hasOpened) {
-                            console.log("[LiveChat] no auto-pushed conversation, falling back to open-live for topicId:", pendingTopics[0].id);
-                            hasOpened = true;
-                            socket.emit("support:open-live", { topicId: pendingTopics[0].id });
-                        }
-                    }, 5000);
-                });
-
                 socket.onAny((eventName, ...args) => {
-                    console.log("[LiveChat] ← server:", eventName, JSON.stringify(args));
+                    console.log("[CaseChat] ← server:", eventName, JSON.stringify(args));
                 });
 
                 socket.on(
                     "support:opened",
-                    (payload: { conversation: { id: string; kind: string; topic?: { id: string; name: string } } }) => {
-                        console.log("[LiveChat] support:opened", payload);
-                        if (fallbackTimer) {
-                            clearTimeout(fallbackTimer);
-                            fallbackTimer = null;
-                        }
-                        hasOpened = true;
+                    (payload: {
+                        conversation: {
+                            id: string;
+                            kind: string;
+                            supportCase?: { id: string; caseNumber: string; caseType: string };
+                        };
+                    }) => {
+                        console.log("[CaseChat] support:opened", payload);
                         setConversationId(payload.conversation.id);
-                        setTopicName(payload.conversation.topic?.name ?? null);
                         setConnecting(false);
-
-                        // Pick up slaThresholdHours from the matched topic
-                        const matchedTopic = pendingTopics.find(
-                            (t) => t.id === payload.conversation.topic?.id
-                        );
-                        setSlaHours(matchedTopic?.slaThresholdHours ?? null);
-
-                        socket.emit("support:messages", { supportConversationId: payload.conversation.id, page: 1, limit: 50 });
+                        socket.emit("support:messages", {
+                            supportConversationId: payload.conversation.id,
+                            page: 1,
+                            limit: 50,
+                        });
                     }
                 );
 
                 socket.on(
                     "support:history",
                     (payload: { supportConversationId: string; messages: { data: ChatMessage[] } }) => {
-                        console.log("[LiveChat] support:history", payload);
+                        console.log("[CaseChat] support:history", payload);
                         setMessages(payload.messages.data.slice().reverse());
                     }
                 );
 
                 socket.on("support:message:receive", (msg: ChatMessage) => {
-                    console.log("[LiveChat] message:receive", msg);
+                    console.log("[CaseChat] message:receive", msg);
                     setMessages((prev) => {
                         const tempIndex = prev.findIndex(
                             (m) => m.id.startsWith("temp-") && m.content === msg.content && !m.senderIsAdmin
@@ -200,12 +116,20 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     });
                 });
 
-                socket.on("support:closed", (payload: { conversationId: string; reason: string; reopenable: boolean }) => {
-                    console.log("[LiveChat] support:closed", payload);
-                    setClosed({ reason: payload.reason });
+                socket.on(
+                    "support:closed",
+                    (payload: { conversationId: string; kind: string; reason: string; reopenable: boolean }) => {
+                        console.log("[CaseChat] support:closed", payload);
+                        setClosed({ reason: payload.reason });
+                    }
+                );
+
+                socket.on("support:reopened", (payload: { conversationId: string }) => {
+                    console.log("[CaseChat] support:reopened", payload);
+                    setClosed(null);
                 });
             } catch (err) {
-                console.error("[LiveChat] connect failed:", err);
+                console.error("[CaseChat] connect failed:", err);
                 setConnectError("Could not connect to support chat.");
                 setConnecting(false);
             }
@@ -214,12 +138,11 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
         connect();
 
         return () => {
-            console.log("[LiveChat] cleanup: disconnecting socket");
-            if (fallbackTimer) clearTimeout(fallbackTimer);
+            console.log("[CaseChat] cleanup: disconnecting socket");
             socket?.disconnect();
             socketRef.current = null;
         };
-    }, [isOpen]);
+    }, [isOpen, supportCaseId]);
 
     // Reset state whenever modal closes so reopening starts fresh
     useEffect(() => {
@@ -227,23 +150,17 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
             setConnecting(true);
             setConnectError(null);
             setConversationId(null);
-            setTopicName(null);
-            setSlaHours(null); // NEW
             setMessages([]);
             setInput("");
             setClosed(null);
-            setAllTopics([]);
-            setActivePills([]);
-            setPickedTopicIds(new Set());
             setUploadError(null);
             setUploading(false);
-            hasTopicRef.current = false; // NEW
         }
     }, [isOpen]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, activePills]);
+    }, [messages]);
 
     // Close when clicking outside the panel
     useEffect(() => {
@@ -260,7 +177,6 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
     // Shared helper: optimistically append then emit to server
     const appendAndSend = useCallback(
         (content: string) => {
-            console.log("[appendAndSend] called, conversationId:", conversationId, "closed:", closed);
             if (!conversationId || closed) return;
 
             const optimisticMsg: ChatMessage = {
@@ -342,32 +258,13 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     fileUrl: url,
                 });
             } catch (err: any) {
-                console.error("[LiveChat] upload failed:", err);
+                console.error("[CaseChat] upload failed:", err);
                 setUploadError(err?.message || "Upload failed. Please try again.");
             } finally {
                 setUploading(false);
             }
         },
         [conversationId, closed]
-    );
-
-    // Clicking a topic pill: send it as a message, then drill into children if any
-    const handlePickPill = useCallback(
-        (topic: Topic) => {
-            if (!conversationId || closed) return;
-
-            setPickedTopicIds((prev) => new Set(prev).add(topic.id));
-            appendAndSend(topic.name);
-
-            if (topic.children && topic.children.length > 0) {
-                setActivePills(topic.children);
-                setPickedTopicIds(new Set());
-            } else {
-                setActivePills([]);
-                hasTopicRef.current = true; // NEW: a top-level (leaf) topic was just picked
-            }
-        },
-        [conversationId, closed, appendAndSend]
     );
 
     const handleSend = useCallback(() => {
@@ -395,22 +292,13 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
             >
                 {/* Header */}
                 <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
-                    {/* Avatar */}
                     <div className="w-10 h-10 rounded-full bg-[#E05C5C] flex items-center justify-center flex-shrink-0">
                         <Headphones size={18} className="text-white" />
                     </div>
-                    {/* Name + SLA */}
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-black leading-tight">Support Team</p>
-                        {slaHours != null ? (
-                            <p className="text-xs text-gray-400 leading-tight">
-                                Typically replies within {slaHours} {slaHours === 1 ? "hour" : "hours"}
-                            </p>
-                        ) : (
-                            <p className="text-xs text-green-500 leading-tight">Online</p>
-                        )}
+                        <p className="text-xs text-gray-400 leading-tight">Case #{caseNumber}</p>
                     </div>
-                    {/* Close */}
                     <button onClick={onClose} aria-label="Close">
                         <X size={20} className="text-black" />
                     </button>
@@ -461,24 +349,6 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
                                     )}
                                 </div>
                             ))}
-
-                            {/* Topic pills (quick replies) */}
-                            {activePills.length > 0 && !closed && (
-                                <div className="flex flex-wrap gap-2 self-end justify-end">
-                                    {activePills
-                                        .filter((t) => !pickedTopicIds.has(t.id))
-                                        .map((topic) => (
-                                            <button
-                                                key={topic.id}
-                                                onClick={() => handlePickPill(topic)}
-                                                className="border border-[#E05C5C] text-[#E05C5C] rounded-full px-4 py-1.5 text-sm font-medium hover:bg-[#E05C5C] hover:text-white transition-colors"
-                                            >
-                                                {topic.name}
-                                            </button>
-                                        ))}
-                                </div>
-                            )}
-
                             <div ref={messagesEndRef} />
                         </>
                     )}
@@ -491,7 +361,7 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     </div>
                 )}
 
-                {/* Hidden file input — always mounted outside footer so ref is never null */}
+                {/* Hidden file input */}
                 <input
                     ref={fileInputRef}
                     type="file"
@@ -504,13 +374,12 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 {closed ? (
                     <div className="px-5 py-4 border-t border-gray-100 text-center">
                         <p className="text-sm text-gray-500">
-                            This chat has been closed
-                            {closed.reason === "INACTIVITY_24H" ? " due to inactivity." : "."}
+                            This case chat has been closed
+                            {closed.reason === "RESOLVED" ? " — the case was resolved." : "."}
                         </p>
                     </div>
                 ) : (
                     <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-100">
-                        {/* Paperclip button */}
                         <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={!conversationId || uploading}
@@ -547,4 +416,4 @@ const LiveChatModal: React.FC<Props> = ({ isOpen, onClose }) => {
     );
 };
 
-export default LiveChatModal;
+export default CaseChatModal;

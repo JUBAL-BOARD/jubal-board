@@ -411,6 +411,12 @@ const HelpSupportContent: React.FC = () => {
                   >
                     {formatCaseStatus(c.status)}
                   </span>
+                  <button
+                    onClick={() => router.push(`/creative/support/${c.id}`)}
+                    className="bg-[#E05C5C] text-white text-xs font-semibold px-3 py-1.5 rounded-lg"
+                  >
+                    View Details
+                  </button>
                 </div>
               </div>
             ))}
