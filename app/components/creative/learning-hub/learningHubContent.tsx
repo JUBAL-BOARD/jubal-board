@@ -6,6 +6,7 @@ import LearningStats from "./learningHubStats";
 import ActiveCourseBanner from "./activeCourseBanner";
 import { useCourseStore } from "../../../lib/stores/courseStore";
 import CourseSection from "./courseSection";
+import ResourceSection from "./resourceSection";
 import { useLearningHub } from "../../../lib/hooks/useLearningHub";
 
 const filterChips = [
@@ -27,6 +28,7 @@ const LearningHubContent: React.FC = () => {
     beginnerCourses,
     advancedCourses,
     myCourses,
+    resources,
     loading,
     error,
   } = useLearningHub();
@@ -145,6 +147,9 @@ const LearningHubContent: React.FC = () => {
           activeChip={activeChip}
         />
       ))}
+
+      {/* Resources section */}
+      {!loading && <ResourceSection resources={resources} search={search} />}
 
       {/* Load More */}
       {!loading && visibleSections < allSections.length && (

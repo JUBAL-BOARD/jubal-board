@@ -15,6 +15,22 @@ export interface Course {
   [key: string]: unknown;
 }
 
+export interface Resource {
+  id: string;
+  title: string;
+  resourceType?: string; // "YOUTUBE" | "BLOG" | "QUICK_READ" | "VIDEO"
+  resourceUrl?: string;
+  thumbnailUrl?: string | null;
+  level?: string;
+  skillTags?: string[];
+  duration?: string;
+  sourceName?: string;
+  descriptionPreview?: string;
+  isFeatured?: boolean;
+  createdAt?: string;
+  [key: string]: unknown;
+}
+
 export interface MyCourses {
   active: Course[];
   completed: Course[];
@@ -30,6 +46,12 @@ interface FetchCoursesParams {
   limit?: number;
 }
 
+interface FetchResourcesParams {
+  level?: string;
+  type?: string; // YOUTUBE | BLOG | QUICK_READ | VIDEO
+  skillTag?: string;
+}
+
 const getToken = async (): Promise<string | null> => {
   try {
     const res = await fetch("/api/auth/session/token", { credentials: "include" });
@@ -40,7 +62,7 @@ const getToken = async (): Promise<string | null> => {
   }
 };
 
-const toArray = (val: unknown): Course[] => {
+const toArray = <T,>(val: unknown): T[] => {
   if (Array.isArray(val)) return val;
   return [];
 };
@@ -54,6 +76,7 @@ export const useLearningHub = () => {
     completed: [],
     certifications: [],
   });
+  const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,7 +99,7 @@ export const useLearningHub = () => {
         { method: "GET", headers }
       );
       // Handle all possible response shapes
-      return toArray(res.data?.data ?? res.data?.courses ?? res.data);
+      return toArray<Course>(res.data?.data ?? res.data?.courses ?? res.data);
     } catch {
       return [];
     }
@@ -95,12 +118,37 @@ export const useLearningHub = () => {
 
       const d = res.data?.data ?? res.data ?? {};
       return {
-        active: toArray(d.active),
-        completed: toArray(d.completed),
-        certifications: toArray(d.certifications),
+        active: toArray<Course>(d.active),
+        completed: toArray<Course>(d.completed),
+        certifications: toArray<Course>(d.certifications),
       };
     } catch {
       return empty;
+    }
+  }, []);
+
+  // Mirrors fetchCourses: same defensive token handling, same nested
+  // `data.data` response shape (`{ success, data: { data: [...], meta } }`).
+  // NOTE: this endpoint does NOT accept page/limit — sending them causes
+  // a "property limit should not exist" validation error from the backend.
+  const fetchResources = useCallback(async (params: FetchResourcesParams = {}): Promise<Resource[]> => {
+    const token = await getToken();
+    const query = new URLSearchParams();
+    if (params.level) query.set("level", params.level);
+    if (params.type) query.set("type", params.type);
+    if (params.skillTag) query.set("skillTag", params.skillTag);
+
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    try {
+      const res = await apiRequest<any>(
+        `/api/v1/learning/resources?${query.toString()}`,
+        { method: "GET", headers }
+      );
+      return toArray<Resource>(res.data?.data ?? res.data?.resources ?? res.data);
+    } catch {
+      return [];
     }
   }, []);
 
@@ -108,23 +156,25 @@ export const useLearningHub = () => {
     setLoading(true);
     setError(null);
     try {
-      const [all, beginner, advanced, my] = await Promise.all([
+      const [all, beginner, advanced, my, resourceList] = await Promise.all([
         fetchCourses({ limit: 20 }),
         fetchCourses({ level: "BEGINNER", limit: 10 }),
         fetchCourses({ level: "ADVANCED", limit: 10 }),
         fetchMyCourses(),
+        fetchResources(),
       ]);
       setAllCourses(all);
       setBeginnerCourses(beginner);
       setAdvancedCourses(advanced);
       setMyCourses(my);
+      setResources(resourceList);
     } catch (err) {
       console.error("Learning hub fetch error:", err);
       setError("Failed to load courses. Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [fetchCourses, fetchMyCourses]);
+  }, [fetchCourses, fetchMyCourses, fetchResources]);
 
   useEffect(() => {
     loadAll();
@@ -135,9 +185,11 @@ export const useLearningHub = () => {
     beginnerCourses,
     advancedCourses,
     myCourses,
+    resources,
     loading,
     error,
     refetch: loadAll,
     fetchCourses,
+    fetchResources,
   };
 };
