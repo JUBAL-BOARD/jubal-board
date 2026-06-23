@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useCollabStore } from "@/app/lib/stores/collabStore";
 import { useState } from "react";
 import { fetchConversations, createConversation, fetchChatTopics } from "@/app/lib/api/messageApi";
+import Image from "next/image";
+import logo from "@/app/assets/icononly.png";
 
 interface Props {
   gig: MyGig;
@@ -32,12 +34,12 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
   };
 
   const handleUploadDeliverables = () => {
-  if (gig.isCollabMember && gig.collabId) {
-    router.push(`/creative/collab-hub/briefs/${gig.collabId}/upload-deliverables`);
-  } else {
-    router.push(`/creative/my-gigs/${gig.id}/upload-deliverables`);
-  }
-};
+    if (gig.isCollabMember && gig.collabId) {
+      router.push(`/creative/collab-hub/briefs/${gig.collabId}/upload-deliverables`);
+    } else {
+      router.push(`/creative/my-gigs/${gig.id}/upload-deliverables`);
+    }
+  };
 
   const handleInvite = () => {
     router.push(`/creative/collab-hub/${gig.id}/collaborate`);
@@ -85,7 +87,13 @@ const GigListItem: React.FC<Props> = ({ gig }) => {
       <div className="flex items-start gap-3 flex-1 min-w-0">
         {/* Thumbnail */}
         <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-          <img src={gig.thumbnail} alt={gig.title} className="w-full h-full object-cover" />
+          {gig.thumbnail ? (
+            <img src={gig.thumbnail} alt={gig.title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Image src={logo} alt={gig.title} width={28} height={28} className="opacity-40 object-contain" />
+            </div>
+          )}
         </div>
 
         {/* Info */}

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useGigStore } from "../../../lib/stores/gigStore";
 import { useFreshGigs } from "../../../lib/hooks/useFreshGigs";
 import { FreshGig } from "@/app/types";
+import logo from "@/app/assets/icononly.png";
 
 export default function FreshGigs() {
   const router = useRouter();
@@ -41,7 +42,7 @@ export default function FreshGigs() {
               key={gig.id}
               className="flex-shrink-0 w-[70vw] sm:w-[45vw] lg:w-auto snap-start bg-white border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group"
             >
-              <div className="relative h-32 bg-gray-100 overflow-hidden">
+              <div className="relative h-32 bg-white overflow-hidden">
                 {gig.image ? (
                   <img
                     src={gig.image}
@@ -49,8 +50,14 @@ export default function FreshGigs() {
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-                    <span className="text-gray-400 text-xs">{gig.category}</span>
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Image
+                      src={logo}
+                      alt={gig.title}
+                      width={48}
+                      height={48}
+                      className="object-contain"
+                    />
                   </div>
                 )}
                 {gig.isPremium && (

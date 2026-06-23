@@ -1,11 +1,10 @@
 "use client";
-
 import { useRouter } from "next/navigation";
-import { Course } from "@/app/types";
+import { CourseSummary } from "@/app/lib/hooks/useLearningHub";
 import { useCourseStore } from "../../../lib/stores/courseStore";
 
 interface Props {
-  course: Course;
+  course: CourseSummary;
 }
 
 const ActiveCourseBanner: React.FC<Props> = ({ course }) => {

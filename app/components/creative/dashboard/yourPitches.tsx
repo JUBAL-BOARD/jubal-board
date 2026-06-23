@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BadgeCheck, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { useMyPitches } from "@/app/lib/hooks/useMyPitches";
+import logo from "@/app/assets/icononly.png";
 
 const statusColors: Record<string, string> = {
   approved: "bg-green-100 text-green-700",
@@ -44,12 +45,20 @@ export default function YourPitches() {
               key={pitch.id}
               className="flex-shrink-0 w-[70vw] sm:w-[45vw] lg:w-auto snap-start bg-white border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group"
             >
-              <div className="h-32 bg-gray-100 overflow-hidden">
-                {pitch.image && (
+              <div className="h-32 bg-white overflow-hidden flex items-center justify-center">
+                {pitch.image ? (
                   <img
                     src={pitch.image}
                     alt={pitch.gigTitle}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <Image
+                    src={logo}
+                    alt={pitch.gigTitle}
+                    width={48}
+                    height={48}
+                    className="object-contain"
                   />
                 )}
               </div>

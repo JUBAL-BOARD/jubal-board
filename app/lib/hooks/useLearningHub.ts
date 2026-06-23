@@ -1,7 +1,8 @@
+// app/lib/hooks/useLearningHub.ts
 import { useState, useEffect, useCallback } from "react";
 import { apiRequest } from "../api";
 
-export interface Course {
+export interface CourseSummary {
   id: string;
   title: string;
   level?: string;
@@ -32,9 +33,9 @@ export interface Resource {
 }
 
 export interface MyCourses {
-  active: Course[];
-  completed: Course[];
-  certifications: Course[];
+  active: CourseSummary[];
+  completed: CourseSummary[];
+  certifications: CourseSummary[];
 }
 
 interface FetchCoursesParams {
@@ -68,9 +69,9 @@ const toArray = <T,>(val: unknown): T[] => {
 };
 
 export const useLearningHub = () => {
-  const [allCourses, setAllCourses] = useState<Course[]>([]);
-  const [beginnerCourses, setBeginnerCourses] = useState<Course[]>([]);
-  const [advancedCourses, setAdvancedCourses] = useState<Course[]>([]);
+  const [allCourses, setAllCourses] = useState<CourseSummary[]>([]);
+  const [beginnerCourses, setBeginnerCourses] = useState<CourseSummary[]>([]);
+  const [advancedCourses, setAdvancedCourses] = useState<CourseSummary[]>([]);
   const [myCourses, setMyCourses] = useState<MyCourses>({
     active: [],
     completed: [],
@@ -80,7 +81,7 @@ export const useLearningHub = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchCourses = useCallback(async (params: FetchCoursesParams = {}): Promise<Course[]> => {
+  const fetchCourses = useCallback(async (params: FetchCoursesParams = {}): Promise<CourseSummary[]> => {
     const token = await getToken();
     const query = new URLSearchParams();
     if (params.level) query.set("level", params.level);
@@ -99,7 +100,7 @@ export const useLearningHub = () => {
         { method: "GET", headers }
       );
       // Handle all possible response shapes
-      return toArray<Course>(res.data?.data ?? res.data?.courses ?? res.data);
+      return toArray<CourseSummary>(res.data?.data ?? res.data?.courses ?? res.data);
     } catch {
       return [];
     }
@@ -118,9 +119,9 @@ export const useLearningHub = () => {
 
       const d = res.data?.data ?? res.data ?? {};
       return {
-        active: toArray<Course>(d.active),
-        completed: toArray<Course>(d.completed),
-        certifications: toArray<Course>(d.certifications),
+        active: toArray<CourseSummary>(d.active),
+        completed: toArray<CourseSummary>(d.completed),
+        certifications: toArray<CourseSummary>(d.certifications),
       };
     } catch {
       return empty;

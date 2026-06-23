@@ -1,9 +1,9 @@
 import { create } from "zustand";
-import { Course } from "@/app/types";
+import { CourseSummary } from "@/app/lib/hooks/useLearningHub";
 
 type CourseStore = {
-  selectedCourse: Course | null;
-  setSelectedCourse: (course: Course) => void;
+  selectedCourse: CourseSummary | null;
+  setSelectedCourse: (course: CourseSummary) => void;
 };
 
 export const useCourseStore = create<CourseStore>((set) => ({

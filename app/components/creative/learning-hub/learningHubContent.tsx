@@ -47,23 +47,23 @@ const LearningHubContent: React.FC = () => {
     ...section,
     courses: Array.isArray(section.courses)
       ? section.courses
-          .filter((c) =>
-            c.title?.toLowerCase().includes(search.toLowerCase())
-          )
-          .map((c) => ({
-            ...c,
-            rating: typeof c.rating === "number" ? c.rating : 0,
-            price: typeof c.price === "number" ? c.price : 0,
-            description: typeof c.description === "string" ? c.description : "",
-            image: typeof c.image === "string" ? c.image : "",
-            level: typeof c.level === "string" ? c.level : "",
-            format: typeof c.format === "string" ? c.format : "",
-            skillTag: typeof c.skillTag === "string" ? c.skillTag : "",
-            thumbnail: typeof c.thumbnail === "string" ? c.thumbnail : "",
-            duration: typeof c.duration === "string" ? c.duration : "",
-            instructor: typeof c.instructor === "string" ? c.instructor : "",
-            progress: typeof c.progress === "number" ? c.progress : 0,
-          }))
+        .filter((c) =>
+          c.title?.toLowerCase().includes(search.toLowerCase())
+        )
+        .map((c) => ({
+          ...c,
+          rating: typeof c.rating === "number" ? c.rating : 0,
+          price: typeof c.cost === "number" ? c.cost : 0,
+          description: typeof c.shortDescription === "string" ? c.shortDescription : "",
+          image: typeof c.thumbnailUrl === "string" ? c.thumbnailUrl : "", // alias, same value as thumbnail
+          level: typeof c.level === "string" ? c.level : "",
+          format: typeof c.format === "string" ? c.format : "",
+          skillTag: Array.isArray(c.skillTags) ? c.skillTags[0] ?? "" : "",
+          thumbnail: typeof c.thumbnailUrl === "string" ? c.thumbnailUrl : "",
+          duration: typeof c.duration === "string" ? c.duration : "",
+          instructor: typeof c.instructor === "string" ? c.instructor : "",
+          progress: typeof c.progressPercentage === "number" ? c.progressPercentage : 0,
+        }))
       : [],
   }));
 
@@ -101,11 +101,10 @@ const LearningHubContent: React.FC = () => {
           <button
             key={chip.label}
             onClick={() => handleChipClick(chip)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              activeChip === chip.label
-                ? "bg-[#E2554F] text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeChip === chip.label
+              ? "bg-[#E2554F] text-white"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
           >
             {chip.label}
           </button>
