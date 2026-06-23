@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Star, Clock, Loader2 } from "lucide-react";
-import { Course, Resource } from "@/app/lib/hooks/useLearningHub";
+import { CourseSummary, Resource } from "@/app/lib/hooks/useLearningHub";
 import { useRouter } from "next/navigation";
 import { useCourseStore } from "@/app/lib/stores/courseStore";
 import { useLearningHub } from "@/app/lib/hooks/useLearningHub";
@@ -19,7 +19,7 @@ const typeColors: Record<string, string> = {
 };
 
 type FeedItem =
-  | { kind: "course"; data: Course }
+  | { kind: "course"; data: CourseSummary }
   | { kind: "resource"; data: Resource };
 
 // A Resource never has a "level" badge keyed off course-style values, so
@@ -39,8 +39,8 @@ export default function LearningHub() {
     ...resources.map((r): FeedItem => ({ kind: "resource", data: r })),
   ].slice(0, 4);
 
-  const handleStartCourse = (course: Course) => {
-    setSelectedCourse(course as any);
+  const handleStartCourse = (course: CourseSummary) => {
+    setSelectedCourse(course);
     router.push(`/creative/learning-hub/${course.id}`);
   };
 
@@ -138,7 +138,7 @@ export default function LearningHub() {
                 </div>
               </div>
             ) : (
-              // ----- Course card (unchanged) -----
+              // ----- Course card -----
               <div
                 key={`course-${item.data.id}`}
                 className="flex-shrink-0 w-[70vw] sm:w-[45vw] lg:w-auto snap-start bg-white border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group"

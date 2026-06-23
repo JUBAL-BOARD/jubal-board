@@ -152,19 +152,52 @@ export type CourseOutlineSection = {
   lessons: CourseLesson[];
 };
 
+export type CourseResource = {
+  id: string;
+  resourceType: "VIDEO" | "ARTICLE" | "QUIZ" | string;
+  title: string;
+  resourceUrl: string;
+  duration: string;
+  thumbnailUrl?: string;
+  order: number;
+};
+
+export type CourseModule = {
+  id: string;
+  moduleNumber: number;
+  title: string;
+  description: string;
+  resources: CourseResource[];
+};
+
+export type CourseEnrollment = {
+  courseId: string;
+  enrolled: boolean;
+  status: string; // e.g. "IN_PROGRESS", "NOT_ENROLLED", "COMPLETED"
+  progressPercentage: number;
+  completedSections: string[];
+  certificateIncluded: boolean;
+  certificateReady: boolean;
+  certificatePending: boolean;
+};
+
 export type Course = {
   id: string;
   title: string;
+  thumbnailUrl: string;
+  provider: string;
+  description: string;
   level: string;
   format: string;
-  rating: number;
   duration: string;
-  price: number | string;
-  description: string;
-  image: string;
-  progress?: number;
-  videoUrl?: string;
-  outline?: CourseOutlineSection[]; 
+  cost: number;
+  isFree: boolean;
+  certificateIncluded: boolean;
+  skillTags: string[];
+  isFeatured: boolean;
+  rating: number;
+  enrollment?: CourseEnrollment;
+  modules?: CourseModule[];
 };
 export interface MyGig {
   id: string;
