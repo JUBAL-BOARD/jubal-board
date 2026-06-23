@@ -199,6 +199,7 @@ export type Course = {
   enrollment?: CourseEnrollment;
   modules?: CourseModule[];
 };
+
 export interface MyGig {
   id: string;
   title: string;
