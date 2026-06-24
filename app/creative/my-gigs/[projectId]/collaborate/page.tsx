@@ -9,6 +9,9 @@ import { useParams, useRouter } from "next/navigation";
 import { X, ChevronDown, Search, Loader2 } from "lucide-react";
 import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
 import { useGigDetail } from "@/app/lib/hooks/useGigDetail";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 const StarIcon = () => (
     <svg viewBox="0 0 20 20" fill="#F5A623" className="w-4 h-4">
@@ -70,6 +73,27 @@ const statusLabelMap: Record<string, string> = {
 
 const filterTabs = ["All", "Verified", "Premium", "Recommended", "Logo Design"];
 
+// Skeleton card for the creatives grid, shown while collabsLoading is true
+const CollabCardSkeleton = () => (
+    <div className="bg-white border border-gray-100 rounded-lg overflow-hidden animate-pulse">
+        <div className="w-full h-36 bg-gray-200" />
+        <div className="p-4">
+            <div className="flex items-start gap-2 mb-2">
+                <div className="w-10 h-10 rounded-full bg-gray-200 shrink-0" />
+                <div className="flex-1 min-w-0 space-y-2">
+                    <div className="h-3.5 bg-gray-200 rounded w-3/4" />
+                    <div className="h-3 bg-gray-200 rounded w-1/2" />
+                    <div className="h-3 bg-gray-200 rounded w-1/4" />
+                </div>
+            </div>
+            <div className="flex items-center justify-between mt-3">
+                <div className="h-3 bg-gray-200 rounded w-16" />
+                <div className="h-7 bg-gray-200 rounded-md w-16" />
+            </div>
+        </div>
+    </div>
+);
+
 export default function CreativeCollaboratePage() {
     const params = useParams();
     const router = useRouter();
@@ -91,11 +115,13 @@ export default function CreativeCollaboratePage() {
         jobDescription?: string;
         specificSkills?: string;
         timeline?: string;
-        deliveryDate?: string;
+        deliveryDate?: string | null;
     } | null>(null);
 
     const { profile, loading: profileLoading } = useCreativeProfile();
     const { detail, loading: gigLoading } = useGigDetail(projectId);
+
+    const isReady = usePageReady(profileLoading, gigLoading);
 
     const getAuthToken = async () => {
         const tokenRes = await fetch("/api/auth/session/token");
@@ -174,35 +200,11 @@ export default function CreativeCollaboratePage() {
         }
     };
 
-    // const handleInvite = async (collab: Collab) => {
-    //     setInvitingId(collab.id);
-    //     try {
-    //         const token = await getAuthToken();
-    //         const res = await fetch(`/api/v1/collabs/invite`, {
-    //             method: "POST",
-    //             headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    //             credentials: "include",
-    //             body: JSON.stringify({ projectId, invitedCreativeId: collab.id, role: "COLLABORATOR", description: "", deliverables: [], }),
-    //         });
-    //         if (!res.ok) {
-    //             const errData = await res.json().catch(() => null);
-    //             throw new Error(errData?.message || `Failed with status ${res.status}`);
-    //         }
-    //         setInvitedIds((prev) => new Set(prev).add(collab.id));
-    //     } catch (err) {
-    //         console.error("Invite error:", err);
-    //     } finally {
-    //         setInvitingId(null);
-    //     }
-    // };
-
     const filteredCollabs = collabs.filter((c) => {
         if (!searchQuery.trim()) return true;
         const q = searchQuery.toLowerCase();
         return c.name?.toLowerCase().includes(q) || c.professionalRole?.toLowerCase().includes(q);
     });
-
-    const loading = profileLoading || gigLoading;
 
     const userName = profile?.fullName ?? "Creative";
     const userAvatar =
@@ -225,14 +227,6 @@ export default function CreativeCollaboratePage() {
             },
         ]
         : [];
-
-    if (loading) {
-        return (
-            <div className="flex h-screen w-screen items-center justify-center bg-white">
-                <Loader2 className="animate-spin text-[#E2554F]" size={40} />
-            </div>
-        );
-    }
 
     return (
         <div className="flex flex-col min-h-screen bg-white">
@@ -264,311 +258,326 @@ export default function CreativeCollaboratePage() {
                 </div>
 
                 <main className="flex-1 w-full px-6 lg:px-8 py-6 overflow-y-auto bg-white">
-                    <Breadcrumb
-                        crumbs={[
-                            { label: "Dashboard", path: "/creative/dashboard" },
-                            { label: "My Gigs", path: "/creative/my-gigs" },
-                            { label: "View Project", path: `/creative/my-gigs/${projectId}` },
-                            { label: "Collaborate",  },
-                        ]}
-                    />
+                    <WithPageTransition isReady={isReady} variant="generic">
+                        <>
+                            <FadeInSection delay={0}>
+                                <Breadcrumb
+                                    crumbs={[
+                                        { label: "Dashboard", path: "/creative/dashboard" },
+                                        { label: "My Gigs", path: "/creative/my-gigs" },
+                                        { label: "View Project", path: `/creative/my-gigs/${projectId}` },
+                                        { label: "Collaborate" },
+                                    ]}
+                                />
+                            </FadeInSection>
 
-                    {/* Page title */}
-                    <div className="mb-5">
-                        <h1 className="text-2xl font-bold text-black">Collaborate</h1>
-                        <p className="text-sm text-gray-500 mt-1">
-                            Invite another creative to collaborate with{" "}
-                            <span className="font-medium text-black">{userName}</span> on this project
-                        </p>
-                    </div>
-
-                    {/* Two-column layout */}
-                    <div className="flex flex-col lg:flex-row gap-5">
-
-                        {/* LEFT COLUMN */}
-                        <div className="w-full lg:w-[300px] shrink-0 flex flex-col gap-4">
-
-                            {/* Project card */}
-                            <div className="bg-[#f9f9f9] p-5 rounded-sm border border-gray-100 text-center">
-                                <h2 className="text-base font-bold text-black mb-3 leading-snug">
-                                    {detail?.title ?? "Logo Design for Luxury Boutique"}
-                                </h2>
-                                <div className="flex justify-center mb-4">
-                                    <span
-                                        className={`inline-block px-5 py-1 text-xs font-semibold rounded-full ${statusColorMap[detail?.status ?? "IN_PROGRESS"] ?? "bg-yellow-100 text-yellow-700"
-                                            }`}
-                                    >
-                                        {statusLabelMap[detail?.status ?? "IN_PROGRESS"] ?? "In Progress"}
-                                    </span>
+                            {/* Page title */}
+                            <FadeInSection delay={80}>
+                                <div className="mb-5">
+                                    <h1 className="text-2xl font-bold text-black">Collaborate</h1>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        Invite another creative to collaborate with{" "}
+                                        <span className="font-medium text-black">{userName}</span> on this project
+                                    </p>
                                 </div>
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full bg-[#e84545] rounded-full"
-                                            style={{ width: `${detail?.progressPercentage ?? 60}%` }}
-                                        />
-                                    </div>
-                                    <span className="text-xs font-semibold text-black shrink-0">
-                                        {detail?.progressPercentage ?? 60}%
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-center gap-2 text-sm text-black mt-1">
-                                    <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={1.5}>
-                                        <circle cx="10" cy="10" r="8" />
-                                        <path strokeLinecap="round" d="M10 6v4l2.5 2.5" />
-                                    </svg>
-                                    <span className="text-xs">Due in {detail?.dueDate ? getDueIn(detail.dueDate) : "2 days  23 hrs  30 mins"}</span>
-                                </div>
-                            </div>
+                            </FadeInSection>
 
-                            {/* Current Creative card */}
-                            <div className="bg-[#f9f9f9] p-5 rounded-sm border border-gray-100">
-                                <h2 className="text-sm font-bold text-black mb-3">Current Creative</h2>
-                                <div className="flex items-center gap-3">
-                                    <div className="relative shrink-0">
-                                        <Image
-                                            src={userAvatar}
-                                            alt={userName}
-                                            width={48}
-                                            height={48}
-                                            className="rounded-full object-cover"
-                                        />
-                                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-1">
-                                            <p className="font-semibold text-black text-sm truncate">{userName}</p>
-                                            <VerifiedIcon />
-                                        </div>
-                                        <p className="text-xs text-gray-500 truncate">
-                                            {(profile as any)?.professionalRole ?? "Graphic Designer"}
-                                        </p>
-                                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                            <div className="flex items-center gap-0.5">
-                                                <StarIcon />
-                                                <span className="text-xs font-semibold text-black">
-                                                    {(profile as any)?.overallRating?.toFixed(1) ?? "5.0"}
+                            {/* Two-column layout */}
+                            <div className="flex flex-col lg:flex-row gap-5">
+
+                                {/* LEFT COLUMN */}
+                                <div className="w-full lg:w-[300px] shrink-0 flex flex-col gap-4">
+
+                                    {/* Project card */}
+                                    <FadeInSection delay={0}>
+                                        <div className="bg-[#f9f9f9] p-5 rounded-sm border border-gray-100 text-center">
+                                            <h2 className="text-base font-bold text-black mb-3 leading-snug">
+                                                {detail?.title ?? "Logo Design for Luxury Boutique"}
+                                            </h2>
+                                            <div className="flex justify-center mb-4">
+                                                <span
+                                                    className={`inline-block px-5 py-1 text-xs font-semibold rounded-full ${statusColorMap[detail?.status ?? "IN_PROGRESS"] ?? "bg-yellow-100 text-yellow-700"
+                                                        }`}
+                                                >
+                                                    {statusLabelMap[detail?.status ?? "IN_PROGRESS"] ?? "In Progress"}
                                                 </span>
                                             </div>
-                                            {(profile as any)?.rate && (
-                                                <span className="text-xs text-black font-medium">${(profile as any).rate}</span>
-                                            )}
-                                            {(profile as any)?.completedProjects && (
-                                                <span className="text-xs text-gray-500">
-                                                    {(profile as any).completedProjects} Completed Projects
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-[#e84545] rounded-full"
+                                                        style={{ width: `${detail?.progressPercentage ?? 60}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-xs font-semibold text-black shrink-0">
+                                                    {detail?.progressPercentage ?? 60}%
                                                 </span>
+                                            </div>
+                                            <div className="flex items-center justify-center gap-2 text-sm text-black mt-1">
+                                                <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={1.5}>
+                                                    <circle cx="10" cy="10" r="8" />
+                                                    <path strokeLinecap="round" d="M10 6v4l2.5 2.5" />
+                                                </svg>
+                                                <span className="text-xs">Due in {detail?.dueDate ? getDueIn(detail.dueDate) : "2 days  23 hrs  30 mins"}</span>
+                                            </div>
+                                        </div>
+                                    </FadeInSection>
+
+                                    {/* Current Creative card */}
+                                    <FadeInSection delay={0}>
+                                        <div className="bg-[#f9f9f9] p-5 rounded-sm border border-gray-100">
+                                            <h2 className="text-sm font-bold text-black mb-3">Current Creative</h2>
+                                            <div className="flex items-center gap-3">
+                                                <div className="relative shrink-0">
+                                                    <Image
+                                                        src={userAvatar}
+                                                        alt={userName}
+                                                        width={48}
+                                                        height={48}
+                                                        className="rounded-full object-cover"
+                                                    />
+                                                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-1">
+                                                        <p className="font-semibold text-black text-sm truncate">{userName}</p>
+                                                        <VerifiedIcon />
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 truncate">
+                                                        {(profile as any)?.professionalRole ?? "Graphic Designer"}
+                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                        <div className="flex items-center gap-0.5">
+                                                            <StarIcon />
+                                                            <span className="text-xs font-semibold text-black">
+                                                                {(profile as any)?.overallRating?.toFixed(1) ?? "5.0"}
+                                                            </span>
+                                                        </div>
+                                                        {(profile as any)?.rate && (
+                                                            <span className="text-xs text-black font-medium">${(profile as any).rate}</span>
+                                                        )}
+                                                        {(profile as any)?.completedProjects && (
+                                                            <span className="text-xs text-gray-500">
+                                                                {(profile as any).completedProjects} Completed Projects
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <MessageIcon />
+                                            </div>
+                                            <button className="mt-3 text-xs text-[#e84545] font-medium hover:underline">
+                                                View Profile
+                                            </button>
+                                        </div>
+                                    </FadeInSection>
+
+                                    {/* Brief Summary card */}
+                                    <FadeInSection delay={0}>
+                                        <div className="bg-[#f9f9f9] rounded-sm border border-gray-100 overflow-hidden">
+                                            <button
+                                                onClick={() => setBriefOpen(!briefOpen)}
+                                                className="w-full flex items-center justify-between px-5 py-4"
+                                            >
+                                                <h2 className="text-sm font-bold text-black">Brief Summary</h2>
+                                                <ChevronDown
+                                                    size={18}
+                                                    className={`text-black transition-transform ${briefOpen ? "rotate-180" : ""}`}
+                                                />
+                                            </button>
+                                            {briefOpen && (
+                                                <div className="px-5 pb-5">
+                                                    <table className="w-full text-xs">
+                                                        <tbody>
+                                                            {briefRows.map((row) => (
+                                                                <tr key={row.label} className="border-b border-gray-100 last:border-0">
+                                                                    <td className="py-2 pr-4 text-gray-500 font-medium w-28 align-top whitespace-nowrap">
+                                                                        {row.label}
+                                                                    </td>
+                                                                    <td className="py-2 text-black">{row.value}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </FadeInSection>
+                                </div>
+
+                                {/* RIGHT COLUMN — Find Creative */}
+                                <FadeInSection delay={120}>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="bg-[#f9f9f9] p-5 rounded-sm border border-gray-100">
+                                            <h2 className="text-base font-bold text-black mb-4">Find Creative</h2>
+
+                                            {/* Search + Filter row */}
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <div className="flex-1 relative">
+                                                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                                    <input
+                                                        type="text"
+                                                        value={searchQuery}
+                                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                                        placeholder="Search creative or services"
+                                                        className="w-full pl-9 pr-4 py-2.5 border border-gray-200 bg-white rounded-lg text-sm text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 focus:border-[#e84545]/40 transition-all"
+                                                    />
+                                                </div>
+                                                <button className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 bg-white rounded-lg text-sm text-black font-medium hover:bg-gray-50 transition-colors shrink-0">
+                                                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-[#e84545]">
+                                                        <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.553.894l-4 2A1 1 0 016 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
+                                                    </svg>
+                                                    Filter By
+                                                    <ChevronDown size={14} className="text-gray-400" />
+                                                </button>
+                                            </div>
+
+                                            {/* Filter tabs */}
+                                            <div className="flex items-center gap-2 mb-5 flex-wrap">
+                                                {filterTabs.map((tab) => (
+                                                    <button
+                                                        key={tab}
+                                                        onClick={() => setActiveFilter(tab)}
+                                                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeFilter === tab
+                                                            ? "bg-[#e84545] text-white"
+                                                            : "bg-white border border-gray-200 text-black hover:bg-gray-50"
+                                                            }`}
+                                                    >
+                                                        {tab}
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            {/* Creatives grid */}
+                                            {collabsLoading ? (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                    {Array.from({ length: 6 }).map((_, i) => (
+                                                        <CollabCardSkeleton key={i} />
+                                                    ))}
+                                                </div>
+                                            ) : filteredCollabs.length === 0 ? (
+                                                <div className="flex items-center justify-center py-16">
+                                                    <p className="text-sm text-gray-400">No creatives found.</p>
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                    {filteredCollabs.map((collab, i) => {
+                                                        const avatar =
+                                                            collab.imageUrl ??
+                                                            `https://ui-avatars.com/api/?name=${encodeURIComponent(collab.name)}&background=1a1a2e&color=fff&size=128`;
+                                                        const thumbnail = collab.portfolioImages?.[0] ?? null;
+
+                                                        return (
+                                                            <FadeInSection key={collab.id} delay={i * 40}>
+                                                                <div className="bg-white border border-gray-100 rounded-lg overflow-hidden">
+                                                                    {/* Portfolio thumbnail */}
+                                                                    <div className="w-full h-36 bg-gray-100 overflow-hidden">
+                                                                        {thumbnail ? (
+                                                                            <img
+                                                                                src={thumbnail}
+                                                                                alt={`${collab.name} portfolio`}
+                                                                                className="w-full h-full object-cover"
+                                                                                onError={(e) => {
+                                                                                    (e.target as HTMLImageElement).style.display = "none";
+                                                                                }}
+                                                                            />
+                                                                        ) : (
+                                                                            <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+                                                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} className="w-10 h-10 text-gray-400">
+                                                                                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                                                                                    <circle cx="8.5" cy="8.5" r="1.5" />
+                                                                                    <path d="M21 15l-5-5L5 21" />
+                                                                                </svg>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+
+                                                                    {/* Card body */}
+                                                                    <div className="p-4">
+                                                                        <div className="flex items-start gap-2 mb-2">
+                                                                            <div className="relative shrink-0">
+                                                                                <Image
+                                                                                    src={avatar}
+                                                                                    alt={collab.name}
+                                                                                    width={40}
+                                                                                    height={40}
+                                                                                    className="rounded-full object-cover"
+                                                                                />
+                                                                                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white" />
+                                                                            </div>
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <p className="font-semibold text-black text-sm truncate">
+                                                                                        {collab.name}
+                                                                                    </p>
+                                                                                    {collab.isVerified && <VerifiedIcon />}
+                                                                                </div>
+                                                                                <p className="text-xs text-gray-500 truncate">
+                                                                                    {collab.professionalRole}
+                                                                                </p>
+                                                                                <div className="flex items-center gap-0.5 mt-1">
+                                                                                    <StarIcon />
+                                                                                    <span className="text-xs font-semibold text-black">
+                                                                                        {collab.overallRating?.toFixed(1) ?? "5.0"}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                            <MessageIcon />
+                                                                        </div>
+
+                                                                        <div className="flex items-center justify-between mt-3">
+                                                                            <button
+                                                                                onClick={() => router.push(`/creative/my-gigs/${projectId}`)}
+                                                                                className="text-xs text-[#e84545] font-medium hover:underline"
+                                                                            >
+                                                                                View Profile
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    const collabData = encodeURIComponent(JSON.stringify({
+                                                                                        id: collab.id,
+                                                                                        name: collab.name,
+                                                                                        imageUrl: collab.imageUrl,
+                                                                                        professionalRole: collab.professionalRole,
+                                                                                        overallRating: collab.overallRating,
+                                                                                        rate: collab.rate,
+                                                                                        isVerified: collab.isVerified,
+                                                                                    }));
+                                                                                    router.push(`/creative/my-gigs/${projectId}/collaborate/invite?collab=${collabData}`);
+                                                                                }}
+                                                                                className="flex items-center gap-1.5 px-5 py-1.5 rounded-md text-xs font-semibold bg-[#e84545] hover:bg-[#d03535] text-white transition-colors"
+                                                                            >
+                                                                                Invite
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </FadeInSection>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+
+                                            {/* Load More */}
+                                            {!collabsLoading && hasMore && (
+                                                <div className="flex justify-center mt-6">
+                                                    <button
+                                                        onClick={handleLoadMore}
+                                                        disabled={loadingMore}
+                                                        className="flex items-center gap-2 px-10 py-2.5 bg-[#e84545] hover:bg-[#d03535] text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60"
+                                                    >
+                                                        {loadingMore && <Loader2 size={14} className="animate-spin" />}
+                                                        {loadingMore ? "Loading..." : "Load More"}
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
-                                    <MessageIcon />
-                                </div>
-                                <button className="mt-3 text-xs text-[#e84545] font-medium hover:underline">
-                                    View Profile
-                                </button>
+                                </FadeInSection>
                             </div>
 
-                            {/* Brief Summary card */}
-                            <div className="bg-[#f9f9f9] rounded-sm border border-gray-100 overflow-hidden">
-                                <button
-                                    onClick={() => setBriefOpen(!briefOpen)}
-                                    className="w-full flex items-center justify-between px-5 py-4"
-                                >
-                                    <h2 className="text-sm font-bold text-black">Brief Summary</h2>
-                                    <ChevronDown
-                                        size={18}
-                                        className={`text-black transition-transform ${briefOpen ? "rotate-180" : ""}`}
-                                    />
-                                </button>
-                                {briefOpen && (
-                                    <div className="px-5 pb-5">
-                                        <table className="w-full text-xs">
-                                            <tbody>
-                                                {briefRows.map((row) => (
-                                                    <tr key={row.label} className="border-b border-gray-100 last:border-0">
-                                                        <td className="py-2 pr-4 text-gray-500 font-medium w-28 align-top whitespace-nowrap">
-                                                            {row.label}
-                                                        </td>
-                                                        <td className="py-2 text-black">{row.value}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* RIGHT COLUMN — Find Creative */}
-                        <div className="flex-1 min-w-0">
-                            <div className="bg-[#f9f9f9] p-5 rounded-sm border border-gray-100">
-                                <h2 className="text-base font-bold text-black mb-4">Find Creative</h2>
-
-                                {/* Search + Filter row */}
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="flex-1 relative">
-                                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                        <input
-                                            type="text"
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            placeholder="Search creative or services"
-                                            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 bg-white rounded-lg text-sm text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 focus:border-[#e84545]/40 transition-all"
-                                        />
-                                    </div>
-                                    <button className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 bg-white rounded-lg text-sm text-black font-medium hover:bg-gray-50 transition-colors shrink-0">
-                                        <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-[#e84545]">
-                                            <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.553.894l-4 2A1 1 0 016 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
-                                        </svg>
-                                        Filter By
-                                        <ChevronDown size={14} className="text-gray-400" />
-                                    </button>
-                                </div>
-
-                                {/* Filter tabs */}
-                                <div className="flex items-center gap-2 mb-5 flex-wrap">
-                                    {filterTabs.map((tab) => (
-                                        <button
-                                            key={tab}
-                                            onClick={() => setActiveFilter(tab)}
-                                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeFilter === tab
-                                                ? "bg-[#e84545] text-white"
-                                                : "bg-white border border-gray-200 text-black hover:bg-gray-50"
-                                                }`}
-                                        >
-                                            {tab}
-                                        </button>
-                                    ))}
-                                </div>
-
-                                {/* Creatives grid */}
-                                {collabsLoading ? (
-                                    <div className="flex items-center justify-center py-16">
-                                        <Loader2 className="animate-spin text-[#E2554F]" size={32} />
-                                    </div>
-                                ) : filteredCollabs.length === 0 ? (
-                                    <div className="flex items-center justify-center py-16">
-                                        <p className="text-sm text-gray-400">No creatives found.</p>
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        {filteredCollabs.map((collab) => {
-                                            const avatar =
-                                                collab.imageUrl ??
-                                                `https://ui-avatars.com/api/?name=${encodeURIComponent(collab.name)}&background=1a1a2e&color=fff&size=128`;
-                                            const isInvited = invitedIds.has(collab.id);
-                                            const isInviting = invitingId === collab.id;
-                                            const thumbnail = collab.portfolioImages?.[0] ?? null;
-
-                                            return (
-                                                <div
-                                                    key={collab.id}
-                                                    className="bg-white border border-gray-100 rounded-lg overflow-hidden"
-                                                >
-                                                    {/* Portfolio thumbnail */}
-                                                    <div className="w-full h-36 bg-gray-100 overflow-hidden">
-                                                        {thumbnail ? (
-                                                            <img
-                                                                src={thumbnail}
-                                                                alt={`${collab.name} portfolio`}
-                                                                className="w-full h-full object-cover"
-                                                                onError={(e) => {
-                                                                    (e.target as HTMLImageElement).style.display = "none";
-                                                                }}
-                                                            />
-                                                        ) : (
-                                                            <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-                                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} className="w-10 h-10 text-gray-400">
-                                                                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                                                                    <circle cx="8.5" cy="8.5" r="1.5" />
-                                                                    <path d="M21 15l-5-5L5 21" />
-                                                                </svg>
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Card body */}
-                                                    <div className="p-4">
-                                                        <div className="flex items-start gap-2 mb-2">
-                                                            <div className="relative shrink-0">
-                                                                <Image
-                                                                    src={avatar}
-                                                                    alt={collab.name}
-                                                                    width={40}
-                                                                    height={40}
-                                                                    className="rounded-full object-cover"
-                                                                />
-                                                                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white" />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex items-center gap-1">
-                                                                    <p className="font-semibold text-black text-sm truncate">
-                                                                        {collab.name}
-                                                                    </p>
-                                                                    {collab.isVerified && <VerifiedIcon />}
-                                                                </div>
-                                                                <p className="text-xs text-gray-500 truncate">
-                                                                    {collab.professionalRole}
-                                                                </p>
-                                                                <div className="flex items-center gap-0.5 mt-1">
-                                                                    <StarIcon />
-                                                                    <span className="text-xs font-semibold text-black">
-                                                                        {collab.overallRating?.toFixed(1) ?? "5.0"}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                            <MessageIcon />
-                                                        </div>
-
-                                                        <div className="flex items-center justify-between mt-3">
-                                                            <button
-                                                                onClick={() => router.push(`/creative/my-gigs/${projectId}`)}
-                                                                className="text-xs text-[#e84545] font-medium hover:underline"
-                                                            >
-                                                                View Profile
-                                                            </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    const collabData = encodeURIComponent(JSON.stringify({
-                                                                        id: collab.id,
-                                                                        name: collab.name,
-                                                                        imageUrl: collab.imageUrl,
-                                                                        professionalRole: collab.professionalRole,
-                                                                        overallRating: collab.overallRating,
-                                                                        rate: collab.rate,
-                                                                        isVerified: collab.isVerified,
-                                                                    }));
-                                                                    router.push(`/creative/my-gigs/${projectId}/collaborate/invite?collab=${collabData}`);
-                                                                }}
-                                                                className="flex items-center gap-1.5 px-5 py-1.5 rounded-md text-xs font-semibold bg-[#e84545] hover:bg-[#d03535] text-white transition-colors"
-                                                            >
-                                                                Invite
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-
-                                {/* Load More */}
-                                {!collabsLoading && hasMore && (
-                                    <div className="flex justify-center mt-6">
-                                        <button
-                                            onClick={handleLoadMore}
-                                            disabled={loadingMore}
-                                            className="flex items-center gap-2 px-10 py-2.5 bg-[#e84545] hover:bg-[#d03535] text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60"
-                                        >
-                                            {loadingMore && <Loader2 size={14} className="animate-spin" />}
-                                            {loadingMore ? "Loading..." : "Load More"}
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="pb-10" />
+                            <div className="pb-10" />
+                        </>
+                    </WithPageTransition>
                 </main>
             </div>
         </div>

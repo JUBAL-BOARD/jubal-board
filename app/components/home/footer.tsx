@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import logo from "../../assets/logo.png";
+import logo from "../../assets/icononly.png";
 import { FacebookIcon, InstagramIcon, XIcon, YoutubeIcon } from "../../icons";
 import { MapPin, Phone, Mail } from "lucide-react";
 import { footerColumns, contactItems } from "../../data";
@@ -67,10 +67,11 @@ const Footer: React.FC = () => {
           <Image
             src={logo}
             alt="Jubal Board logo"
-            width={200}
-            height={200}
-            className="object-contain"
+            width={120}
+            height={120}
+            className="object-contain w-[80px] lg:w-[100px]"
           />
+          <h1 className="hidden lg:block font-heading font-bold text-white text-2xl">JUBALBOARD</h1>
         </div>
         <span className="text-[#E2554F] text-[13px] text-center">
           Copyright © Jubal Board 2025. All rights reserved.

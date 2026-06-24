@@ -5,26 +5,15 @@ import MyEarningsContent from "@/app/components/creative/my-earnings/myEarningsC
 import { useState } from "react";
 import { X, Loader2 } from "lucide-react";
 import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 const MyEarningsPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { profile, loading: profileLoading, error } = useCreativeProfile();
+  const { profile, loading: profileLoading } = useCreativeProfile();
 
-  if (profileLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 size={48} className="animate-spin text-gray-500" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-red-500">Error loading profile: {error}</p>
-      </div>
-    );
-  }
+  const isReady = usePageReady(profileLoading);
 
   const userName = profile?.fullName || "Creative";
   const userAvatar =
@@ -67,11 +56,15 @@ const MyEarningsPage: React.FC = () => {
           <Sidebar activeItem="My Earnings" />
         </div>
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <MyEarningsContent />
+           <WithPageTransition isReady={isReady} variant="gigs">
+            <FadeInSection delay={0}>
+              <MyEarningsContent />
+            </FadeInSection>
+          </WithPageTransition>
         </main>
       </div>
     </div>
   );
-};
+}  
 
 export default MyEarningsPage;

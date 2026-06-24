@@ -2,43 +2,41 @@
 import Sidebar from "@/app/components/creative/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/creative/dashboard/dashboardTopbar";
 import MyGigsContent from "@/app/components/creative/my-gigs/myGigsContent";
-import { Loader2, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useState } from "react";
 import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 const MyGigsPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { profile, loading: profileLoading, error } = useCreativeProfile();
-  
-    if (profileLoading) {
-      return (
-        <div className="flex h-screen w-screen items-center justify-center bg-white">
-          <Loader2 className="animate-spin text-[#E2554F]" size={40} />
-        </div>
-      );
-    }
-    const userName = profile?.fullName || "Creative";
-    const userAvatar =
-      profile?.avatar ||
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
-  
-    return (
-      <div className="flex flex-col min-h-screen bg-white">
-        <DashboardTopbar
-          userName={userName}
-          userAvatar={userAvatar}
-          sidebarOpen={sidebarOpen}
-          onMenuClick={() => setSidebarOpen(!sidebarOpen)}
-        />
+  const { profile, loading: profileLoading } = useCreativeProfile();
+
+  const isReady = usePageReady(profileLoading);
+
+  const userName = profile?.fullName || "Creative";
+  const userAvatar =
+    profile?.avatar ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
+
+  return (
+    <div className="flex flex-col min-h-screen bg-white">
+      <DashboardTopbar
+        userName={userName}
+        userAvatar={userAvatar}
+        sidebarOpen={sidebarOpen}
+        onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+      />
+
       <div className="flex flex-1">
-       {/* Dark overlay — mobile only, shows when sidebar is open */}
         {sidebarOpen && (
           <div
             className="fixed inset-0 bg-black/40 z-30 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
-        {/* Sidebar — slides in on mobile, always visible on desktop */}
+
         <div
           className={`
             fixed top-0 left-0 h-full z-40
@@ -47,18 +45,21 @@ const MyGigsPage: React.FC = () => {
             lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:z-10
           `}
         >
-          {/* Close button inside sidebar on mobile */}
           <button
             className="absolute top-4 right-4 z-50 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           >
             <X size={22} />
           </button>
-
           <Sidebar activeItem="My Gigs" />
         </div>
+
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <MyGigsContent />
+          <WithPageTransition isReady={isReady} variant="gigs">
+            <FadeInSection delay={0}>
+              <MyGigsContent />
+            </FadeInSection>
+          </WithPageTransition>
         </main>
       </div>
     </div>

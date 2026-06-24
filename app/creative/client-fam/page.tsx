@@ -5,32 +5,21 @@ import ClientFamContent from "@/app/components/creative/client-fam/clientFamCont
 import { useState } from "react";
 import { Loader2, X } from "lucide-react";
 import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 const ClientFamPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { profile, loading: profileLoading, error } = useCreativeProfile();
+  const { profile, loading: profileLoading } = useCreativeProfile();
 
-  if (profileLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 size={48} className="animate-spin text-gray-500" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-red-500">Error loading profile: {error}</p>
-      </div>
-    );
-  }
+  const isReady = usePageReady(profileLoading);
 
   const userName = profile?.fullName || "Creative";
   const userAvatar =
     profile?.avatar ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
-    
+
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <DashboardTopbar
@@ -67,7 +56,11 @@ const ClientFamPage: React.FC = () => {
           <Sidebar activeItem="Client Fam" />
         </div>
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <ClientFamContent />
+          <WithPageTransition isReady={isReady} variant="generic">
+            <FadeInSection delay={0}>
+              <ClientFamContent />
+            </FadeInSection>
+          </WithPageTransition>
         </main>
       </div>
     </div>

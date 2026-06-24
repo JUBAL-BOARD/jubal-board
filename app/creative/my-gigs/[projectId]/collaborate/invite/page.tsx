@@ -8,6 +8,10 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { X, ChevronDown, Loader2 } from "lucide-react";
 import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
 import { useGigDetail } from "@/app/lib/hooks/useGigDetail";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
+
 const StarIcon = () => (
 <svg viewBox="0 0 20 20" fill="#F5A623" className="w-4 h-4">
 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -55,6 +59,8 @@ const [error, setError] = useState<string | null>(null);
 
 const { profile, loading: profileLoading } = useCreativeProfile();
 const { detail, loading: gigLoading } = useGigDetail(projectId);
+
+const isReady = usePageReady(profileLoading, gigLoading);
 
 const userName = profile?.fullName ?? "Creative";
 const userAvatar =
@@ -172,14 +178,6 @@ const handleSendBrief = async () => {
     }
 };
 
-if (profileLoading || gigLoading) {
-    return (
-        <div className="flex h-screen w-screen items-center justify-center bg-white">
-            <Loader2 className="animate-spin text-[#E2554F]" size={40} />
-        </div>
-    );
-}
-
 return (
     <div className="flex flex-col min-h-screen bg-white">
         <DashboardTopbar
@@ -211,211 +209,222 @@ return (
             </div>
 
             <main className="flex-1 w-full px-6 lg:px-8 py-6 overflow-y-auto bg-white">
-                <Breadcrumb
-                    crumbs={[
-                        { label: "Dashboard", path: "/creative/dashboard" },
-                        { label: "My Desk", path: "/creative/my-gigs" },
-                        { label: "Collaborate", path: `/creative/my-gigs/${projectId}/collaborate` },
-                        { label: "Invite", path: `/creative/my-gigs/${projectId}/collaborate/invite` },
-                    ]}
-                />
+                <WithPageTransition isReady={isReady} variant="generic">
+                    <>
+                        <FadeInSection delay={0}>
+                            <Breadcrumb
+                                crumbs={[
+                                    { label: "Dashboard", path: "/creative/dashboard" },
+                                    { label: "My Desk", path: "/creative/my-gigs" },
+                                    { label: "Collaborate", path: `/creative/my-gigs/${projectId}/collaborate` },
+                                    { label: "Invite", path: `/creative/my-gigs/${projectId}/collaborate/invite` },
+                                ]}
+                            />
+                        </FadeInSection>
 
-                <div className="mb-6">
-                    <h1 className="text-2xl font-bold text-black">Invite Collaborators</h1>
-                </div>
+                        <FadeInSection delay={80}>
+                            <div className="mb-6">
+                                <h1 className="text-2xl font-bold text-black">Invite Collaborators</h1>
+                            </div>
+                        </FadeInSection>
 
-                <div className="flex flex-col lg:flex-row gap-6">
+                        <div className="flex flex-col lg:flex-row gap-6">
 
-                    {/* LEFT — Selected Creatives */}
-                    <div className="w-full lg:w-[380px] shrink-0">
-                        <div className="bg-[#f9f9f9] rounded-sm border border-gray-100 p-5">
-                            <h2 className="text-base font-bold text-black mb-4">Selected Creatives</h2>
+                            {/* LEFT — Selected Creatives */}
+                            <FadeInSection delay={0}>
+                                <div className="w-full lg:w-[380px] shrink-0">
+                                    <div className="bg-[#f9f9f9] rounded-sm border border-gray-100 p-5">
+                                        <h2 className="text-base font-bold text-black mb-4">Selected Creatives</h2>
 
-                            {selectedCollabs.length === 0 ? (
-                                <p className="text-sm text-gray-400 text-center py-8">
-                                    No creatives selected.{" "}
-                                    <button
-                                        onClick={() =>
-                                            router.push(`/creative/my-gigs/${projectId}/collaborate`)
-                                        }
-                                        className="text-[#e84545] hover:underline font-medium"
-                                    >
-                                        Go back to add some.
-                                    </button>
-                                </p>
-                            ) : (
-                                <div className="flex flex-col gap-3">
-                                    {selectedCollabs.map((collab) => {
-                                        const avatar =
-                                            collab.imageUrl ??
-                                            `https://ui-avatars.com/api/?name=${encodeURIComponent(collab.name)}&background=1a1a2e&color=fff&size=128`;
-
-                                        return (
-                                            <div
-                                                key={collab.id}
-                                                className="flex items-center gap-3 bg-white border border-gray-100 rounded-lg px-4 py-3"
-                                            >
-                                                <div className="relative shrink-0">
-                                                    <Image
-                                                        src={avatar}
-                                                        alt={collab.name}
-                                                        width={48}
-                                                        height={48}
-                                                        className="rounded-full object-cover"
-                                                    />
-                                                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white" />
-                                                </div>
-
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-1">
-                                                        <p className="font-semibold text-black text-sm truncate">
-                                                            {collab.name}
-                                                        </p>
-                                                        {collab.isVerified && <VerifiedIcon />}
-                                                    </div>
-                                                    <p className="text-xs text-gray-500 truncate">
-                                                        {collab.professionalRole}
-                                                    </p>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <div className="flex items-center gap-0.5">
-                                                            <StarIcon />
-                                                            <span className="text-xs font-semibold text-black">
-                                                                {collab.overallRating?.toFixed(1) ?? "5.0"}
-                                                            </span>
-                                                        </div>
-                                                        {collab.rate && (
-                                                            <span className="text-xs text-black font-medium">
-                                                                ${collab.rate}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-
+                                        {selectedCollabs.length === 0 ? (
+                                            <p className="text-sm text-gray-400 text-center py-8">
+                                                No creatives selected.{" "}
                                                 <button
-                                                    onClick={() => handleRemove(collab.id)}
-                                                    className="text-gray-400 hover:text-gray-700 transition-colors shrink-0"
-                                                    aria-label="Remove"
+                                                    onClick={() =>
+                                                        router.push(`/creative/my-gigs/${projectId}/collaborate`)
+                                                    }
+                                                    className="text-[#e84545] hover:underline font-medium"
                                                 >
-                                                    <X size={18} />
+                                                    Go back to add some.
                                                 </button>
+                                            </p>
+                                        ) : (
+                                            <div className="flex flex-col gap-3">
+                                                {selectedCollabs.map((collab, i) => {
+                                                    const avatar =
+                                                        collab.imageUrl ??
+                                                        `https://ui-avatars.com/api/?name=${encodeURIComponent(collab.name)}&background=1a1a2e&color=fff&size=128`;
+
+                                                    return (
+                                                        <FadeInSection key={collab.id} delay={i * 40}>
+                                                            <div className="flex items-center gap-3 bg-white border border-gray-100 rounded-lg px-4 py-3">
+                                                                <div className="relative shrink-0">
+                                                                    <Image
+                                                                        src={avatar}
+                                                                        alt={collab.name}
+                                                                        width={48}
+                                                                        height={48}
+                                                                        className="rounded-full object-cover"
+                                                                    />
+                                                                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white" />
+                                                                </div>
+
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <p className="font-semibold text-black text-sm truncate">
+                                                                            {collab.name}
+                                                                        </p>
+                                                                        {collab.isVerified && <VerifiedIcon />}
+                                                                    </div>
+                                                                    <p className="text-xs text-gray-500 truncate">
+                                                                        {collab.professionalRole}
+                                                                    </p>
+                                                                    <div className="flex items-center gap-2 mt-1">
+                                                                        <div className="flex items-center gap-0.5">
+                                                                            <StarIcon />
+                                                                            <span className="text-xs font-semibold text-black">
+                                                                                {collab.overallRating?.toFixed(1) ?? "5.0"}
+                                                                            </span>
+                                                                        </div>
+                                                                        {collab.rate && (
+                                                                            <span className="text-xs text-black font-medium">
+                                                                                ${collab.rate}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                <button
+                                                                    onClick={() => handleRemove(collab.id)}
+                                                                    className="text-gray-400 hover:text-gray-700 transition-colors shrink-0"
+                                                                    aria-label="Remove"
+                                                                >
+                                                                    <X size={18} />
+                                                                </button>
+                                                            </div>
+                                                        </FadeInSection>
+                                                    );
+                                                })}
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* RIGHT — Send Brief form */}
-                    <div className="flex-1 min-w-0">
-                        <div className="bg-[#f9f9f9] rounded-sm border border-gray-100 p-5">
-                            <h2 className="text-base font-bold text-black mb-5">Send Brief</h2>
-
-                            <div className="flex flex-col gap-4">
-                                {/* Project Title */}
-                                <div>
-                                    <label className="block text-sm font-medium text-black mb-1.5">
-                                        Project Title
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={projectTitle}
-                                        onChange={(e) => setProjectTitle(e.target.value)}
-                                        placeholder="Type here"
-                                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 focus:border-[#e84545]/40 transition-all"
-                                    />
-                                </div>
-
-                                {/* Project Description */}
-                                <div>
-                                    <label className="block text-sm font-medium text-black mb-1.5">
-                                        Project Description
-                                    </label>
-                                    <textarea
-                                        value={projectDescription}
-                                        onChange={(e) => setProjectDescription(e.target.value)}
-                                        placeholder="Describe your project in detail"
-                                        rows={5}
-                                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 focus:border-[#e84545]/40 transition-all resize-none"
-                                    />
-                                </div>
-
-                                {/* Budget */}
-                                <div>
-                                    <label className="block text-sm font-medium text-black mb-1.5">
-                                        Budget
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={budget}
-                                        onChange={(e) => setBudget(e.target.value)}
-                                        placeholder="Enter amount e.g. 500"
-                                        min={0}
-                                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 focus:border-[#e84545]/40 transition-all"
-                                    />
-                                </div>
-
-                                {/* Timeline */}
-                                <div>
-                                    <label className="block text-sm font-medium text-black mb-1.5">
-                                        Timeline
-                                    </label>
-                                    <div className="relative">
-                                        <select
-                                            value={timeline}
-                                            onChange={(e) => setTimeline(e.target.value)}
-                                            className="w-full appearance-none px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 focus:border-[#e84545]/40 transition-all pr-10"
-                                        >
-                                            {timelineOptions.map((opt) => (
-                                                <option key={opt} value={opt}>
-                                                    {opt}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown
-                                            size={16}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                                        />
+                                        )}
                                     </div>
                                 </div>
+                            </FadeInSection>
 
-                                {/* Start Date */}
-                                <div>
-                                    <label className="block text-sm font-medium text-black mb-1.5">
-                                        Start Date
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={startDate}
-                                        onChange={(e) => setStartDate(e.target.value)}
-                                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 focus:border-[#e84545]/40 transition-all"
-                                    />
+                            {/* RIGHT — Send Brief form */}
+                            <FadeInSection delay={120}>
+                                <div className="flex-1 min-w-0">
+                                    <div className="bg-[#f9f9f9] rounded-sm border border-gray-100 p-5">
+                                        <h2 className="text-base font-bold text-black mb-5">Send Brief</h2>
+
+                                        <div className="flex flex-col gap-4">
+                                            {/* Project Title */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-black mb-1.5">
+                                                    Project Title
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={projectTitle}
+                                                    onChange={(e) => setProjectTitle(e.target.value)}
+                                                    placeholder="Type here"
+                                                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 focus:border-[#e84545]/40 transition-all"
+                                                />
+                                            </div>
+
+                                            {/* Project Description */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-black mb-1.5">
+                                                    Project Description
+                                                </label>
+                                                <textarea
+                                                    value={projectDescription}
+                                                    onChange={(e) => setProjectDescription(e.target.value)}
+                                                    placeholder="Describe your project in detail"
+                                                    rows={5}
+                                                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 focus:border-[#e84545]/40 transition-all resize-none"
+                                                />
+                                            </div>
+
+                                            {/* Budget */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-black mb-1.5">
+                                                    Budget
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    value={budget}
+                                                    onChange={(e) => setBudget(e.target.value)}
+                                                    placeholder="Enter amount e.g. 500"
+                                                    min={0}
+                                                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 focus:border-[#e84545]/40 transition-all"
+                                                />
+                                            </div>
+
+                                            {/* Timeline */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-black mb-1.5">
+                                                    Timeline
+                                                </label>
+                                                <div className="relative">
+                                                    <select
+                                                        value={timeline}
+                                                        onChange={(e) => setTimeline(e.target.value)}
+                                                        className="w-full appearance-none px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 focus:border-[#e84545]/40 transition-all pr-10"
+                                                    >
+                                                        {timelineOptions.map((opt) => (
+                                                            <option key={opt} value={opt}>
+                                                                {opt}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <ChevronDown
+                                                        size={16}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Start Date */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-black mb-1.5">
+                                                    Start Date
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    value={startDate}
+                                                    onChange={(e) => setStartDate(e.target.value)}
+                                                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 focus:border-[#e84545]/40 transition-all"
+                                                />
+                                            </div>
+
+                                            {/* Error message */}
+                                            {error && (
+                                                <p className="text-xs text-red-500 font-medium">{error}</p>
+                                            )}
+
+                                            {/* Send Brief button */}
+                                            <button
+                                                onClick={handleSendBrief}
+                                                disabled={sending || sentSuccess}
+                                                className={`w-full py-3 rounded-lg text-sm font-bold transition-colors mt-2 flex items-center justify-center gap-2 ${
+                                                    sentSuccess
+                                                        ? "bg-green-500 text-white cursor-default"
+                                                        : "bg-[#e84545] hover:bg-[#d03535] text-white disabled:opacity-60"
+                                                }`}
+                                            >
+                                                {sending && <Loader2 size={15} className="animate-spin" />}
+                                                {sentSuccess ? "Brief Sent ✓" : sending ? "Sending..." : "Send Brief"}
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-
-                                {/* Error message */}
-                                {error && (
-                                    <p className="text-xs text-red-500 font-medium">{error}</p>
-                                )}
-
-                                {/* Send Brief button */}
-                                <button
-                                    onClick={handleSendBrief}
-                                    disabled={sending || sentSuccess}
-                                    className={`w-full py-3 rounded-lg text-sm font-bold transition-colors mt-2 flex items-center justify-center gap-2 ${
-                                        sentSuccess
-                                            ? "bg-green-500 text-white cursor-default"
-                                            : "bg-[#e84545] hover:bg-[#d03535] text-white disabled:opacity-60"
-                                    }`}
-                                >
-                                    {sending && <Loader2 size={15} className="animate-spin" />}
-                                    {sentSuccess ? "Brief Sent ✓" : sending ? "Sending..." : "Send Brief"}
-                                </button>
-                            </div>
+                            </FadeInSection>
                         </div>
-                    </div>
-                </div>
 
-                <div className="pb-10" />
+                        <div className="pb-10" />
+                    </>
+                </WithPageTransition>
             </main>
         </div>
     </div>

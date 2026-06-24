@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { X, Loader2 } from "lucide-react";
+import { X } from "lucide-react";
 import Sidebar from "@/app/components/creative/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/creative/dashboard/dashboardTopbar";
 import UpdateBanner from "@/app/components/creative/dashboard/updateBanner";
@@ -14,9 +14,11 @@ import LearningHub from "@/app/components/creative/dashboard/learningHub";
 import QuickActions from "@/app/components/creative/dashboard/quickActions";
 import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
 import { useMyPitches } from "@/app/lib/hooks/useMyPitches";
-import { freshGigs, todoItems, ongoingGigs, creativePitches, courses } from "../../data";
 import { useKycStatus } from "../../lib/hooks/useKycStatus";
 import KycModal from "../../components/verification/kycModal";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 const CreativeDashboard: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -25,20 +27,13 @@ const CreativeDashboard: React.FC = () => {
   const { kycStatus, loading: kycLoading } = useKycStatus();
   const [showKycModal, setShowKycModal] = useState(false);
 
+  const isReady = usePageReady(profileLoading, kycLoading);
+
   useEffect(() => {
     if (!kycLoading && kycStatus !== null && kycStatus !== "PROVIDER_APPROVED") {
       setShowKycModal(true);
     }
   }, [kycStatus, kycLoading]);
-  console.log("kycStatus:", kycStatus, "kycLoading:", kycLoading);
-
-  if (profileLoading || kycLoading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-white">
-        <Loader2 className="animate-spin text-[#E2554F]" size={40} />
-      </div>
-    );
-  }
 
   const userName = profile?.fullName || "Creative";
   const userAvatar =
@@ -53,6 +48,7 @@ const CreativeDashboard: React.FC = () => {
         sidebarOpen={sidebarOpen}
         onMenuClick={() => setSidebarOpen(!sidebarOpen)}
       />
+
       <div className="flex flex-1 relative">
         {showKycModal && (
           <KycModal
@@ -70,11 +66,11 @@ const CreativeDashboard: React.FC = () => {
 
         <div
           className={`
-    fixed top-16 left-0 h-full z-40
-    transition-transform duration-300 ease-in-out
-    ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-    lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:z-10
-  `}
+            fixed top-16 left-0 h-full z-40
+            transition-transform duration-300 ease-in-out
+            ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+            lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:z-10
+          `}
         >
           <button
             className="absolute top-4 right-4 z-50 lg:hidden"
@@ -91,15 +87,46 @@ const CreativeDashboard: React.FC = () => {
               Note: Could not sync latest profile data.
             </div>
           )}
-          <UpdateBanner />
-          <WelcomeBar userName={userName} />
-          <SearchBar />
-          <QuickActions />
-          <FreshGigs />
-          <TodoList />
-          <OngoingGigs />
-          <YourPitches />
-          <LearningHub />
+
+          <WithPageTransition isReady={isReady} variant="dashboard">
+            <>
+              <FadeInSection delay={0}>
+                <UpdateBanner />
+              </FadeInSection>
+
+              <FadeInSection delay={80}>
+                <WelcomeBar userName={userName} />
+              </FadeInSection>
+
+              <FadeInSection delay={160}>
+                <SearchBar />
+              </FadeInSection>
+
+              <FadeInSection delay={240}>
+                <QuickActions />
+              </FadeInSection>
+
+              <FadeInSection delay={0}>
+                <FreshGigs />
+              </FadeInSection>
+
+              <FadeInSection delay={0}>
+                <TodoList />
+              </FadeInSection>
+
+              <FadeInSection delay={0}>
+                <OngoingGigs />
+              </FadeInSection>
+
+              <FadeInSection delay={0}>
+                <YourPitches />
+              </FadeInSection>
+
+              <FadeInSection delay={0}>
+                <LearningHub />
+              </FadeInSection>
+            </>
+          </WithPageTransition>
         </main>
       </div>
     </div>

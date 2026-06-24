@@ -5,18 +5,16 @@ import MyPitchesContent from "@/app/components/creative/my-pitches/myPitchesCont
 import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
 import { Loader2, X } from "lucide-react";
 import { useState } from "react";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 const MyPitchesPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { profile, loading: profileLoading, error } = useCreativeProfile();
+  const { profile, loading: profileLoading } = useCreativeProfile();
 
-  if (profileLoading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-white">
-        <Loader2 className="animate-spin text-[#E2554F]" size={40} />
-      </div>
-    );
-  }
+  const isReady = usePageReady(profileLoading);
+
   const userName = profile?.fullName || "Creative";
   const userAvatar =
     profile?.avatar ||
@@ -58,7 +56,11 @@ const MyPitchesPage: React.FC = () => {
           <Sidebar activeItem="My Pitches" />
         </div>
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <MyPitchesContent />
+           <WithPageTransition isReady={isReady} variant="pitches">
+            <FadeInSection delay={0}>
+              <MyPitchesContent />
+            </FadeInSection>
+          </WithPageTransition>
         </main>
       </div>
     </div>

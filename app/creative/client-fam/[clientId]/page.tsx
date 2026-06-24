@@ -9,6 +9,9 @@ import ProfileHeader from "@/app/components/creative/client-fam/client-profile/p
 import ProfileInfoSection from "@/app/components/creative/client-fam/client-profile/profileInfoSection";
 import { Loader2, X } from "lucide-react";
 import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import FadeInSection from "@/app/components/shared/fadeInSection";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
 
 interface ClientDetail {
   clientId: string;
@@ -27,7 +30,10 @@ const ClientProfilePage: React.FC = () => {
   const [detailLoading, setDetailLoading] = useState(true);
   const [detailError, setDetailError] = useState<string | null>(null);
 
-  const { profile: creativeProfile, loading: profileLoading } = useCreativeProfile();
+  const { profile, loading: profileLoading } = useCreativeProfile();
+
+  const isReady = usePageReady(profileLoading);
+
 
   useEffect(() => {
     if (!clientId) return;
@@ -76,13 +82,10 @@ const ClientProfilePage: React.FC = () => {
     );
   }
 
-  const userName = creativeProfile?.fullName || "Creative";
+  const userName = profile?.fullName || "Creative";
   const userAvatar =
-    creativeProfile?.avatar ||
+    profile?.avatar ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
-
-  const avatar = clientDetail?.photo ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(clientDetail?.name ?? "C")}&background=1a1a2e&color=fff&size=128`;
 
   const profileForHeader = {
     fullName: clientDetail?.name ?? "—",
@@ -90,7 +93,11 @@ const ClientProfilePage: React.FC = () => {
     email: "—",
     contactNumber: "—",
     location: "—",
-    avatar,
+    avatar:
+      clientDetail?.photo ??
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+        clientDetail?.name ?? "Client"
+      )}&background=1a1a2e&color=fff&size=128`,
     country: "—",
     city: "—",
     state: "—",
@@ -107,10 +114,10 @@ const ClientProfilePage: React.FC = () => {
       label: "Last Project Date",
       value: clientDetail?.lastProjectDate
         ? new Date(clientDetail.lastProjectDate).toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          })
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
         : "—",
     },
   ];
@@ -148,22 +155,26 @@ const ClientProfilePage: React.FC = () => {
         </div>
 
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <Breadcrumb crumbs={[
-            { label: "Dashboard", path: "/creative/dashboard" },
-            { label: "Client Fam", path: "/creative/client-fam" },
-            { label: clientDetail?.name ?? "Client Profile" },
-          ]} />
+          <WithPageTransition isReady={isReady} variant="generic">
+            <FadeInSection delay={0}>
+              <Breadcrumb crumbs={[
+                { label: "Dashboard", path: "/creative/dashboard" },
+                { label: "Client Fam", path: "/creative/client-fam" },
+                { label: clientDetail?.name ?? "Client Profile" },
+              ]} />
 
-          <h1 className="text-[26px] font-extrabold text-[#1a1a2e] m-0 mb-6">
-            Client Profile
-          </h1>
+              <h1 className="text-[26px] font-extrabold text-[#1a1a2e] m-0 mb-6">
+                Client Profile
+              </h1>
 
-          <ProfileHeader profile={profileForHeader} />
+              <ProfileHeader profile={profileForHeader} />
 
-          <ProfileInfoSection
-            title="Client Information"
-            fields={infoFields}
-          />
+              <ProfileInfoSection
+                title="Client Information"
+                fields={infoFields}
+              />
+            </FadeInSection>
+          </WithPageTransition>
         </main>
       </div>
     </div>

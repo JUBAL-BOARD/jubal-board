@@ -5,10 +5,14 @@ import MyProfileContent from "@/app/components/creative/my-profile/myProfileCont
 import { useState } from "react";
 import { X } from "lucide-react";
 import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 const MyProfilePage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { profile, loading, error } = useCreativeProfile();
+  const isReady = usePageReady(loading);
 
   // Fallback values if profile is not loaded
   const userName = profile?.fullName || "User";
@@ -50,11 +54,15 @@ const MyProfilePage: React.FC = () => {
           <Sidebar activeItem="My Profile" />
         </div>
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <MyProfileContent profile={profile} loading={loading} error={error} />
+          <WithPageTransition isReady={isReady} variant="profile">
+            <FadeInSection delay={0}>
+              <MyProfileContent profile={profile} loading={loading} error={error} />
+            </FadeInSection>
+          </WithPageTransition>
         </main>
       </div>
     </div>
   );
-};
+}
 
 export default MyProfilePage;
