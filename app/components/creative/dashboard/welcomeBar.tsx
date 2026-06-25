@@ -20,61 +20,59 @@ const WelcomeBar: React.FC<Props> = ({ userName }) => {
   };
 
   useEffect(() => {
-  const fetchStatus = async () => {
-    try {
-      const headers = await getHeaders();
-      const res = await fetch("/api/v1/creatives/me/online-status", {
-        method: "GET",
-        credentials: "include",
-        headers,
-      });
-      const data = await res.json();
-      const status = data?.data?.showOnlineStatus ?? data?.showOnlineStatus;
-      if (typeof status === "boolean") {
-        setIsOnline(status);
-      }
-    } catch (err) {
-      console.error("Failed to fetch online status:", err);
-    }
-  };
-  fetchStatus();
-}, []);
-
- const toggleOnlineStatus = async () => {
-  setIsOnline(prev => {
-    const newStatus = !prev;
-
-    // fire the API inside the setter using the correct value
-    (async () => {
-      setLoading(true);
+    const fetchStatus = async () => {
       try {
         const headers = await getHeaders();
         const res = await fetch("/api/v1/creatives/me/online-status", {
-          method: "PATCH",
+          method: "GET",
           credentials: "include",
           headers,
-          body: JSON.stringify({ showOnlineStatus: newStatus }),
         });
-        if (!res.ok) throw new Error("Failed to update status");
+        const data = await res.json();
+        const status = data?.data?.showOnlineStatus ?? data?.showOnlineStatus;
+        if (typeof status === "boolean") {
+          setIsOnline(status);
+        }
       } catch (err) {
-        console.error("Failed to update online status:", err);
-        setIsOnline(!newStatus); // revert on failure
-        console.log("Payload being sent:", { showOnlineStatus: newStatus });
-      } finally {
-        setLoading(false);
+        console.error("Failed to fetch online status:", err);
       }
-    })();
+    };
+    fetchStatus();
+  }, []);
 
-    return newStatus;
-  });
-};
+  const toggleOnlineStatus = async () => {
+    setIsOnline((prev) => {
+      const newStatus = !prev;
+      (async () => {
+        setLoading(true);
+        try {
+          const headers = await getHeaders();
+          const res = await fetch("/api/v1/creatives/me/online-status", {
+            method: "PATCH",
+            credentials: "include",
+            headers,
+            body: JSON.stringify({ showOnlineStatus: newStatus }),
+          });
+          if (!res.ok) throw new Error("Failed to update status");
+        } catch (err) {
+          console.error("Failed to update online status:", err);
+          setIsOnline(!newStatus);
+          console.log("Payload being sent:", { showOnlineStatus: newStatus });
+        } finally {
+          setLoading(false);
+        }
+      })();
+      return newStatus;
+    });
+  };
 
   return (
     <div className="lg:flex items-end justify-between mb-5">
       {/* Left — Welcome text */}
       <div className="flex lg:block gap-3">
         <h2 className="font-heading m-0 lg:mt-1 text-lg lg:text-[28px] font-extrabold text-black">
-          Hey, {userName} 👋
+          Hey, {userName}{" "}
+          <span className="wave-emoji inline-block">👋</span>
         </h2>
         <p className="font-body m-0 text-lg lg:text-lg text-black">Ready to create today?</p>
       </div>
@@ -110,16 +108,39 @@ const WelcomeBar: React.FC<Props> = ({ userName }) => {
               key={type}
               onClick={() => setAccountType(type)}
               className={`px-3 py-1 rounded-full text-[12px] lg:text-[13px] font-semibold transition-all duration-200
-                ${accountType === type
+              ${
+                accountType === type
                   ? "bg-[#22C55E] text-black shadow-sm"
                   : "text-gray-400"
-                }`}
+              }`}
             >
               {type}
             </button>
           ))}
         </div>
       </div>
+
+      <style jsx global>{`
+        @keyframes wave {
+          0% { transform: rotate(0deg); }
+          10% { transform: rotate(14deg); }
+          20% { transform: rotate(-8deg); }
+          30% { transform: rotate(14deg); }
+          40% { transform: rotate(-4deg); }
+          50% { transform: rotate(10deg); }
+          60% { transform: rotate(0deg); }
+          100% { transform: rotate(0deg); }
+        }
+        .wave-emoji {
+          transform-origin: 70% 70%;
+          animation: wave 1s ease-in-out 2; /* runs twice, ~2s total, then stops */
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .wave-emoji {
+            animation: none;
+          }
+        }
+      `}</style>
     </div>
   );
 };

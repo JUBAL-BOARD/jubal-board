@@ -2,7 +2,7 @@ import Image from "next/image";
 import logo from "../../../assets/icononly.png";
 import { Bell, Menu, Settings, X } from "lucide-react";
 import Link from "next/link";
-
+import { useUnreadNotifications } from "@/app/lib/hooks/useUnreadNotifications"
 interface Props {
   userName: string;
   userAvatar: string;
@@ -11,12 +11,13 @@ interface Props {
 }
 
 const DashboardTopbar: React.FC<Props> = ({ userName, userAvatar, sidebarOpen, onMenuClick }) => {
+  const { count } = useUnreadNotifications();
+  const displayCount = count > 9 ? "9+" : count;
+
   return (
     <div className="flex items-center justify-between px-4 lg:px-7 h-[120px] lg:h-[90px] bg-white border-b border-[#f0f0f0] sticky top-0 z-[100]">
-
       {/* Left — Hamburger/X toggle (mobile only) + Logo */}
       <div className="flex items-center">
-
         <Image
           src={logo}
           alt="Jubal Board logo"
@@ -31,8 +32,17 @@ const DashboardTopbar: React.FC<Props> = ({ userName, userAvatar, sidebarOpen, o
       <div className="flex items-center gap-4">
         <div className="hidden lg:flex items-center gap-4">
           <Link href="/creative/notifications">
-            <div className="cursor-pointer">
+            <div className="relative cursor-pointer">
               <Bell size={20} stroke="#374151" />
+              {count > 0 && (
+                <span
+                  className="absolute -top-1.5 -right-1.5 flex items-center justify-center
+                  min-w-[16px] h-[16px] px-[3px] rounded-full bg-[#E2554F]
+                  text-white text-[10px] font-bold leading-none"
+                >
+                  {displayCount}
+                </span>
+              )}
             </div>
           </Link>
           <Link href="/creative/settings">
@@ -44,14 +54,14 @@ const DashboardTopbar: React.FC<Props> = ({ userName, userAvatar, sidebarOpen, o
 
         <div className="flex items-center gap-2.5 cursor-pointer">
           <Link href="/creative/my-profile">
-            {userAvatar.startsWith('data:') ? (
+            {userAvatar.startsWith("data:") ? (
               <img
                 src={userAvatar}
                 alt={userName}
                 width={50}
                 height={50}
                 className="rounded-full object-cover"
-                style={{ width: '50px', height: '50px', minWidth: '50px' }}  // add this
+                style={{ width: "50px", height: "50px", minWidth: "50px" }}
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = "none";
                 }}
@@ -63,7 +73,7 @@ const DashboardTopbar: React.FC<Props> = ({ userName, userAvatar, sidebarOpen, o
                 width={50}
                 height={50}
                 className="rounded-full object-cover"
-                style={{ width: '50px', height: '50px', minWidth: '50px' }}  // add this
+                style={{ width: "50px", height: "50px", minWidth: "50px" }}
               />
             )}
           </Link>
@@ -75,7 +85,6 @@ const DashboardTopbar: React.FC<Props> = ({ userName, userAvatar, sidebarOpen, o
           </button>
         </div>
       </div>
-
     </div>
   );
 };
