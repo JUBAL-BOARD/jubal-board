@@ -8,6 +8,9 @@ import {
 import Sidebar from "@/app/components/creative/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/creative/dashboard/dashboardTopbar";
 import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 import { formatDistanceToNow } from "date-fns";
 
 interface DisputeSummary {
@@ -146,11 +149,10 @@ const DisputesContent: React.FC = () => {
           <button
             key={tab}
             onClick={() => handleTabChange(tab)}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              activeTab === tab
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === tab
                 ? "bg-[#E05C5C] text-white"
                 : "bg-white border border-gray-200 text-black"
-            }`}
+              }`}
           >
             {tab === "All Disputes" ? "All Disputes" : STATUS_LABEL[tab] ?? formatStatus(tab)}
           </button>
@@ -200,9 +202,8 @@ const DisputesContent: React.FC = () => {
               </div>
               <div className="flex flex-col items-end gap-3 ml-4">
                 <span
-                  className={`text-sm font-medium px-3 py-1 rounded-full ${
-                    STATUS_STYLES[dispute.status] ?? "bg-gray-100 text-gray-700"
-                  }`}
+                  className={`text-sm font-medium px-3 py-1 rounded-full ${STATUS_STYLES[dispute.status] ?? "bg-gray-100 text-gray-700"
+                    }`}
                 >
                   {STATUS_LABEL[dispute.status] ?? formatStatus(dispute.status)}
                 </span>
@@ -256,11 +257,10 @@ const DisputesContent: React.FC = () => {
                   <button
                     key={item}
                     onClick={() => setPage(item as number)}
-                    className={`w-8 h-8 flex items-center justify-center rounded text-sm font-medium ${
-                      page === item
+                    className={`w-8 h-8 flex items-center justify-center rounded text-sm font-medium ${page === item
                         ? "bg-[#1E2A3B] text-white"
                         : "border border-gray-200 text-gray-600"
-                    }`}
+                      }`}
                   >
                     {item}
                   </button>
@@ -285,28 +285,12 @@ const DisputesContent: React.FC = () => {
 // ── page with layout ───────────────────────────────────────────────────────────
 const CreativeDisputesPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { profile, loading: profileLoading, error } = useCreativeProfile();
+  const { profile, loading, error } = useCreativeProfile();
+  const isReady = usePageReady(loading);
 
-  if (profileLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 size={48} className="animate-spin text-gray-500" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-red-500">Error loading profile: {error}</p>
-      </div>
-    );
-  }
-
-  const userName = profile?.fullName || "Creative";
-  const userAvatar =
-    profile?.avatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
+  // Fallback values if profile is not loaded
+  const userName = profile?.fullName || "User";
+  const userAvatar = profile?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
@@ -340,7 +324,11 @@ const CreativeDisputesPage: React.FC = () => {
           <Sidebar activeItem="Help & Support" />
         </div>
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <DisputesContent />
+          <WithPageTransition isReady={true} variant="generic">
+            <FadeInSection delay={0}>
+              <DisputesContent />
+            </FadeInSection>
+          </WithPageTransition>
         </main>
       </div>
     </div>

@@ -8,6 +8,9 @@ import Breadcrumb from "@/app/components/creative/dashboard/breadcrumb";
 import { useParams, useRouter } from "next/navigation";
 import { X, ChevronDown, CloudUpload, BadgeCheck, Loader2 } from "lucide-react";
 import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 const getDueIn = (deadline: string): string => {
   const diff = new Date(deadline).getTime() - Date.now();
@@ -76,7 +79,6 @@ export default function CollabUploadDeliverablesPage() {
   const [detailLoading, setDetailLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { profile, loading: profileLoading } = useCreativeProfile();
 
   useEffect(() => {
     if (!id) return;
@@ -117,20 +119,12 @@ export default function CollabUploadDeliverablesPage() {
     fetchDetail();
   }, [id]);
 
-  const loading = profileLoading || detailLoading;
+  const { profile, loading } = useCreativeProfile();
+  const isReady = usePageReady(loading);
 
-  if (loading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-white">
-        <Loader2 className="animate-spin text-[#E2554F]" size={40} />
-      </div>
-    );
-  }
-
-  const userName = profile?.fullName ?? "Creative";
-  const userAvatar =
-    profile?.avatar ??
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
+  // Fallback values if profile is not loaded
+  const userName = profile?.fullName || "User";
+  const userAvatar = profile?.avatar || "https://i.pravatar.cc/150?img=47";
 
   const projectTitle = collabDetail?.projectTitle ?? "—";
   const dueIn = collabDetail?.deliveryDate ? getDueIn(collabDetail.deliveryDate) : "No deadline";
@@ -222,147 +216,152 @@ export default function CollabUploadDeliverablesPage() {
         </div>
 
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <Breadcrumb
-            crumbs={[
-              { label: "Dashboard", path: "/creative/dashboard" },
-              { label: "My Gigs", path: "/creative/my-gigs" },
-              { label: projectTitle },
-              { label: "Upload Deliverables" },
-            ]}
-          />
+          <WithPageTransition isReady={isReady} variant="generic">
+            <FadeInSection delay={0}>
+              <Breadcrumb
+                crumbs={[
+                  { label: "Dashboard", path: "/creative/dashboard" },
+                  { label: "My Gigs", path: "/creative/my-gigs" },
+                  { label: projectTitle },
+                  { label: "Upload Deliverables" },
+                ]}
+              />
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-5">Upload Deliverables</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-5">Upload Deliverables</h1>
 
-          {/* Project card */}
-          <div className="bg-[#fafafa] border border-gray-100 rounded-xl p-5 mb-4 text-center">
-            <h2 className="text-xl font-bold text-gray-900 mb-2">{projectTitle}</h2>
-            <span className="inline-block px-4 py-1 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-full mb-4">
-              {collabDetail?.role ?? "Collaborator"}
-            </span>
-            <div className="flex items-center justify-center gap-2 text-sm text-black">
-              <svg
-                viewBox="0 0 20 20"
-                fill="none"
-                className="w-4 h-4"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <circle cx="10" cy="10" r="8" />
-                <path strokeLinecap="round" d="M10 6v4l2.5 2.5" />
-              </svg>
-              <span>Due in {dueIn}</span>
-            </div>
-          </div>
-
-          {/* About the lead creative */}
-          <div className="bg-[#fafafa] border border-gray-100 rounded-xl p-5 mb-4">
-            <h2 className="text-base font-bold text-black text-xl mb-4">Lead Creative</h2>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Image
-                  src={leadAvatar}
-                  alt={leadName}
-                  width={56}
-                  height={56}
-                  className="rounded-full object-cover"
-                />
-                <div>
-                  <p className="font-semibold text-black text-lg mb-0.5">{leadName}</p>
-                  <p className="text-xs text-gray-400">Lead Creative</p>
+              {/* Project card */}
+              <div className="bg-[#fafafa] border border-gray-100 rounded-xl p-5 mb-4 text-center">
+                <h2 className="text-xl font-bold text-gray-900 mb-2">{projectTitle}</h2>
+                <span className="inline-block px-4 py-1 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-full mb-4">
+                  {collabDetail?.role ?? "Collaborator"}
+                </span>
+                <div className="flex items-center justify-center gap-2 text-sm text-black">
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    className="w-4 h-4"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <circle cx="10" cy="10" r="8" />
+                    <path strokeLinecap="round" d="M10 6v4l2.5 2.5" />
+                  </svg>
+                  <span>Due in {dueIn}</span>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Upload Files */}
-          <Section title="Upload Files">
-            <div
-              onDrop={handleDrop}
-              onDragOver={(e) => e.preventDefault()}
-              onClick={() => fileInputRef.current?.click()}
-              className="bg-white border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center py-12 cursor-pointer hover:bg-gray-50 transition-colors mb-4"
-            >
-              <CloudUpload size={52} className="text-[#e84545] mb-3" />
-              <p className="font-semibold text-gray-700 text-sm mb-1">
-                Drag your files here or tap to upload
-              </p>
-              <p className="text-xs text-gray-400">PNG, JPG, PDF, MP4, ZIP</p>
-              <p className="text-xs text-gray-400">Maximum file size 500mb. Multiple files allowed.</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                onChange={handleFileChange}
-                accept=".png,.jpg,.jpeg,.pdf,.mp4,.zip"
-              />
-            </div>
-            {files.length > 0 && (
-              <div className="border border-gray-100 rounded-xl p-4 flex items-center gap-4 relative">
-                {files.map((file, i) => (
-                  <div key={i} className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 shrink-0">
-                    {file.type.startsWith("image/") ? (
-                      <img
-                        src={URL.createObjectURL(file)}
-                        alt={file.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-500 font-medium">
-                        {file.name.split(".").pop()?.toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                ))}
-                <button
-                  onClick={removeFiles}
-                  className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
-                >
-                  <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                      clipRule="evenodd"
+              {/* About the lead creative */}
+              <div className="bg-[#fafafa] border border-gray-100 rounded-xl p-5 mb-4">
+                <h2 className="text-base font-bold text-black text-xl mb-4">Lead Creative</h2>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Image
+                      src={leadAvatar}
+                      alt={leadName}
+                      width={56}
+                      height={56}
+                      className="rounded-full object-cover"
                     />
-                  </svg>
+                    <div>
+                      <p className="font-semibold text-black text-lg mb-0.5">{leadName}</p>
+                      <p className="text-xs text-gray-400">Lead Creative</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Upload Files */}
+              <Section title="Upload Files">
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={(e) => e.preventDefault()}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="bg-white border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center py-12 cursor-pointer hover:bg-gray-50 transition-colors mb-4"
+                >
+                  <CloudUpload size={52} className="text-[#e84545] mb-3" />
+                  <p className="font-semibold text-gray-700 text-sm mb-1">
+                    Drag your files here or tap to upload
+                  </p>
+                  <p className="text-xs text-gray-400">PNG, JPG, PDF, MP4, ZIP</p>
+                  <p className="text-xs text-gray-400">Maximum file size 500mb. Multiple files allowed.</p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={handleFileChange}
+                    accept=".png,.jpg,.jpeg,.pdf,.mp4,.zip"
+                  />
+                </div>
+                {files.length > 0 && (
+                  <div className="border border-gray-100 rounded-xl p-4 flex items-center gap-4 relative">
+                    {files.map((file, i) => (
+                      <div key={i} className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+                        {file.type.startsWith("image/") ? (
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt={file.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-xs text-gray-500 font-medium">
+                            {file.name.split(".").pop()?.toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      onClick={removeFiles}
+                      className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+                    >
+                      <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </Section>
+
+              {/* Note to Lead Creative */}
+              <Section title="Note to Lead Creative">
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Add a short message to explain your delivery"
+                  className="w-full h-28 px-4 py-3 text-sm bg-white text-black placeholder-black border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 focus:border-[#e84545]/40 transition-all"
+                />
+              </Section>
+
+              {/* Error */}
+              {submitError && (
+                <p className="text-sm text-red-500 mb-4 text-right">{submitError}</p>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3 mt-6 pb-10">
+                <button
+                  onClick={() => router.back()}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-[#1c1c3a] text-white text-sm font-medium rounded-lg hover:bg-[#2a2a50] transition-colors"
+                >
+                  <X size={15} />
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting || files.length === 0}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-[#e84545] text-white text-sm font-medium rounded-lg hover:bg-[#d03535] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitting && <Loader2 size={14} className="animate-spin" />}
+                  {submitting ? "Uploading..." : "Submit Now"}
                 </button>
               </div>
-            )}
-          </Section>
+            </FadeInSection>
+          </WithPageTransition>
 
-          {/* Note to Lead Creative */}
-          <Section title="Note to Lead Creative">
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Add a short message to explain your delivery"
-              className="w-full h-28 px-4 py-3 text-sm bg-white text-black placeholder-black border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-[#e84545]/20 focus:border-[#e84545]/40 transition-all"
-            />
-          </Section>
-
-          {/* Error */}
-          {submitError && (
-            <p className="text-sm text-red-500 mb-4 text-right">{submitError}</p>
-          )}
-
-          {/* Actions */}
-          <div className="flex justify-end gap-3 mt-6 pb-10">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center gap-2 px-6 py-2.5 bg-[#1c1c3a] text-white text-sm font-medium rounded-lg hover:bg-[#2a2a50] transition-colors"
-            >
-              <X size={15} />
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={submitting || files.length === 0}
-              className="flex items-center gap-2 px-6 py-2.5 bg-[#e84545] text-white text-sm font-medium rounded-lg hover:bg-[#d03535] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {submitting && <Loader2 size={14} className="animate-spin" />}
-              {submitting ? "Uploading..." : "Submit Now"}
-            </button>
-          </div>
         </main>
       </div>
     </div>

@@ -6,26 +6,21 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Loader2, X } from "lucide-react";
 import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 const CreativeDisputeDetailsPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const params = useParams();
   const id = params.id as string;
 
-  const { profile, loading: profileLoading, error } = useCreativeProfile();
+  const { profile, loading, error } = useCreativeProfile();
+  const isReady = usePageReady(loading);
 
-  const userName = profile?.fullName || "Creative";
-  const userAvatar =
-    profile?.avatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
-
-  if (profileLoading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-white">
-        <Loader2 className="animate-spin text-[#E2554F]" size={40} />
-      </div>
-    );
-  }
+  // Fallback values if profile is not loaded
+  const userName = profile?.fullName || "User";
+  const userAvatar = profile?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
 
   if (error) {
     return (
@@ -67,7 +62,11 @@ const CreativeDisputeDetailsPage = () => {
           <Sidebar activeItem="Help & Support" />
         </div>
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <DisputeDetailsContent id={id} />
+          <WithPageTransition isReady={true} variant="generic">
+            <FadeInSection delay={0}>
+              <DisputeDetailsContent id={id} />
+            </FadeInSection>
+          </WithPageTransition>
         </main>
       </div>
     </div>

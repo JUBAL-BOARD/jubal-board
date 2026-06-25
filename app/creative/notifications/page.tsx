@@ -5,31 +5,18 @@ import NotificationsContent from "@/app/components/creative/notifications/notifi
 import { useState } from "react";
 import { Loader2, X } from "lucide-react";
 import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 const NotificationsPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { profile, loading: profileLoading, error } = useCreativeProfile();
+  const { profile, loading, error } = useCreativeProfile();
+  const isReady = usePageReady(loading);
 
-  if (profileLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 size={48} className="animate-spin text-gray-500" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-red-500">Error loading profile: {error}</p>
-      </div>
-    );
-  }
-
-  const userName = profile?.fullName || "Creative";
-  const userAvatar =
-    profile?.avatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
+  // Fallback values if profile is not loaded
+  const userName = profile?.fullName || "User";
+  const userAvatar = profile?.avatar || "https://i.pravatar.cc/150?img=47";
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
@@ -67,7 +54,11 @@ const NotificationsPage: React.FC = () => {
           <Sidebar activeItem="Notifications" />
         </div>
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <NotificationsContent />
+          <WithPageTransition isReady={true} variant="generic">
+            <FadeInSection delay={0}>
+              <NotificationsContent />
+            </FadeInSection>
+          </WithPageTransition>
         </main>
       </div>
     </div>
