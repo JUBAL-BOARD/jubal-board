@@ -5,6 +5,9 @@ import DisputeDetailsContent from "@/app/components/client/dispute/disputeDetail
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Loader2, X } from "lucide-react";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 type ClientProfile = {
   name: string;
@@ -20,6 +23,7 @@ const DisputeDetailsPage = () => {
   const id = params.id as string;
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const isReady = usePageReady(profileLoading);
 
 
   useEffect(() => {
@@ -88,7 +92,13 @@ const DisputeDetailsPage = () => {
           <Sidebar activeItem="My Disputes" />
         </div>
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <DisputeDetailsContent id={id} />
+          <WithPageTransition isReady={isReady} variant="generic">
+            <>
+              <FadeInSection delay={0}>
+                <DisputeDetailsContent id={id} />
+              </FadeInSection>
+            </>
+          </WithPageTransition>
         </main>
       </div>
     </div>

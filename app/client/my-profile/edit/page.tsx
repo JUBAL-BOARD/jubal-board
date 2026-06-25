@@ -8,6 +8,9 @@ import {
   Camera, User, ChevronDown, Check, Loader2, ArrowLeft,
 } from "lucide-react";
 import { ApiError } from "../../../lib/api";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 const languages = ["English", "French", "Spanish", "Arabic", "Yoruba"];
 const commOptions = ["Chat only", "Email only", "Phone", "Any"];
@@ -71,6 +74,7 @@ const EditClientProfile: React.FC = () => {
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const isReady = usePageReady(loading);
 
   // Country / state
   const [countries, setCountries] = useState<CountryOption[]>([]);
@@ -297,236 +301,244 @@ const EditClientProfile: React.FC = () => {
   }
 
   return (
+
     <div className="min-h-screen w-screen pb-5 bg-white font-sans">
-      {/* Navbar */}
-      <div className="flex items-center gap-2.5 px-[42px] bg-[#fafafa] h-[100px] border-b border-gray-200">
-        <Image src={logo} alt="Jubal Board logo" width={120} height={120} className="object-contain" />
-      </div>
-
-      {/* Back button */}
-      <div className="max-w-[760px] mx-auto mt-6">
-        <button
-          onClick={() => router.push("/client/my-profile")}
-          className="flex items-center gap-2 text-[13px] text-gray-500 hover:text-[#1a1a2e] transition-colors"
-        >
-          <ArrowLeft size={16} /> Back to Profile
-        </button>
-      </div>
-
-      <h1 className="text-center text-[28px] font-black text-[#1a1a2e] mt-6 mb-6">Edit Profile</h1>
-
-      <div className="max-w-[760px] mx-auto mb-[60px] bg-[#fafafa] rounded-2xl px-12 py-10">
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-6 text-sm text-red-600">{error}</div>
-        )}
-        {success && (
-          <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-6 text-sm text-green-600">
-            Profile updated successfully! Redirecting...
-          </div>
-        )}
-
-        {/* Avatar Upload */}
-        <div className="flex flex-col items-center mb-9">
-          <div className="relative mb-2.5">
-            <div className="w-[90px] h-[90px] rounded-full bg-gray-200 overflow-hidden flex items-center justify-center">
-              {avatar
-                ? <img src={avatar} alt="avatar" className="w-full h-full object-cover" />
-                : <User size={48} fill="#1a1a2e" stroke="none" />
-              }
+      <WithPageTransition isReady={isReady} variant="profile">
+        <>
+          <FadeInSection delay={0}>
+            {/* Navbar */}
+            <div className="flex items-center gap-2.5 px-[42px] bg-[#fafafa] h-[100px] border-b border-gray-200">
+              <Image src={logo} alt="Jubal Board logo" width={120} height={120} className="object-contain" />
             </div>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="absolute bottom-0.5 right-0.5 w-7 h-7 rounded-full bg-white border-2 border-white cursor-pointer flex items-center justify-center shadow-sm"
-            >
-              <Camera size={18} stroke="black" />
-            </button>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
-          </div>
-          <p className="m-0 text-[13px] text-gray-500">Update your photo</p>
-        </div>
 
-        <div className="flex flex-col gap-5">
-
-          {/* Row 1: Full Name + Contact Number */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Full Name{reqStar}</label>
-              <input
-                value={form.fullName}
-                onChange={(e) => update("fullName", e.target.value)}
-                placeholder="Type here"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Contact Number</label>
-              <div className={`${inputClass} flex items-center gap-0 p-0 overflow-hidden`}>
-                {phoneCode && (
-                  <span className="px-3 py-[1px] text-[13px] text-black border-r border-gray-200 flex-shrink-0 select-none">
-                    {phoneCode}
-                  </span>
-                )}
-                <input
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9]/g, ""))}
-                  placeholder="8012345678"
-                  inputMode="numeric"
-                  className="flex-1 px-3 py-[11px] text-[13px] text-black outline-none bg-white border-none"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Country dropdown */}
-          <div>
-            <label className={labelClass}>Country</label>
-            <div className="relative">
-              <select
-                value={form.country}
-                onChange={(e) => handleCountryChange(e.target.value)}
-                className={`${inputClass} appearance-none pr-9 cursor-pointer`}
+            {/* Back button */}
+            <div className="max-w-[760px] mx-auto mt-6">
+              <button
+                onClick={() => router.push("/client/my-profile")}
+                className="flex items-center gap-2 text-[13px] text-gray-500 hover:text-[#1a1a2e] transition-colors"
               >
-                <option value="" disabled>Select country</option>
-                {countries.map((c) => (
-                  <option key={c.id} value={c.name}>{c.name}</option>
-                ))}
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                <ChevronDown size={14} stroke="#6B7280" />
-              </div>
+                <ArrowLeft size={16} /> Back to Profile
+              </button>
             </div>
-          </div>
 
-          {/* State dropdown — only when country has states */}
-          {selectedCountry && selectedCountry.states.length > 0 && (
-            <div>
-              <label className={labelClass}>State</label>
-              <div className="relative">
-                <select
-                  value={selectedState}
-                  onChange={(e) => setSelectedState(e.target.value)}
-                  className={`${inputClass} appearance-none pr-9 cursor-pointer`}
-                >
-                  <option value="" disabled>Select state</option>
-                  {selectedCountry.states.map((s) => (
-                    <option key={s.id} value={s.name}>{s.name}</option>
-                  ))}
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <ChevronDown size={14} stroke="#6B7280" />
+            <h1 className="text-center text-[28px] font-black text-[#1a1a2e] mt-6 mb-6">Edit Profile</h1>
+
+            <div className="max-w-[760px] mx-auto mb-[60px] bg-[#fafafa] rounded-2xl px-12 py-10">
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-6 text-sm text-red-600">{error}</div>
+              )}
+              {success && (
+                <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-6 text-sm text-green-600">
+                  Profile updated successfully! Redirecting...
                 </div>
+              )}
+
+              {/* Avatar Upload */}
+              <div className="flex flex-col items-center mb-9">
+                <div className="relative mb-2.5">
+                  <div className="w-[90px] h-[90px] rounded-full bg-gray-200 overflow-hidden flex items-center justify-center">
+                    {avatar
+                      ? <img src={avatar} alt="avatar" className="w-full h-full object-cover" />
+                      : <User size={48} fill="#1a1a2e" stroke="none" />
+                    }
+                  </div>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute bottom-0.5 right-0.5 w-7 h-7 rounded-full bg-white border-2 border-white cursor-pointer flex items-center justify-center shadow-sm"
+                  >
+                    <Camera size={18} stroke="black" />
+                  </button>
+                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+                </div>
+                <p className="m-0 text-[13px] text-gray-500">Update your photo</p>
               </div>
-            </div>
-          )}
 
-          {/* Location City + Postal Code */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Location/City</label>
-              <input
-                value={form.locationCity}
-                onChange={(e) => update("locationCity", e.target.value)}
-                placeholder="Type here"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Postal Code</label>
-              <input
-                value={form.postalCode}
-                onChange={(e) => update("postalCode", e.target.value)}
-                placeholder="Type here"
-                className={inputClass}
-              />
-            </div>
-          </div>
+              <div className="flex flex-col gap-5">
 
-          {/* Street Address */}
-          <div>
-            <label className={labelClass}>Street Address</label>
-            <input
-              value={form.streetAddress}
-              onChange={(e) => update("streetAddress", e.target.value)}
-              placeholder="Type your street address"
-              className={inputClass}
-            />
-          </div>
-
-          {/* Social Link */}
-          <div>
-            <label className={labelClass}>Preferred Social Link</label>
-            <input
-              value={form.socialLink}
-              onChange={(e) => update("socialLink", e.target.value)}
-              placeholder="Type here"
-              className={inputClass}
-            />
-          </div>
-
-          {/* Communication + Language */}
-          <div className="grid grid-cols-2 gap-4">
-            <SelectField
-              label="Preferred Communication"
-              value={form.communication}
-              onChange={(v: string) => update("communication", v)}
-              options={commOptions}
-              required={false}
-            />
-            <SelectField
-              label="Language Preference"
-              value={form.language}
-              onChange={(v: string) => update("language", v)}
-              options={languages}
-              required={false}
-            />
-          </div>
-
-          {/* Categories */}
-          {availableCategories.length > 0 && (
-            <div>
-              <label className={labelClass}>Categories of Interest</label>
-              <div className="border border-gray-200 rounded-[10px] p-4 flex flex-wrap gap-2.5">
-                {availableCategories.map((cat) => {
-                  const selected = selectedCategories.includes(cat.id);
-                  return (
-                    <button
-                      key={cat.id}
-                      onClick={() => setSelectedCategories((prev) =>
-                        prev.includes(cat.id) ? prev.filter((c) => c !== cat.id) : [...prev, cat.id]
+                {/* Row 1: Full Name + Contact Number */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Full Name{reqStar}</label>
+                    <input
+                      value={form.fullName}
+                      onChange={(e) => update("fullName", e.target.value)}
+                      placeholder="Type here"
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Contact Number</label>
+                    <div className={`${inputClass} flex items-center gap-0 p-0 overflow-hidden`}>
+                      {phoneCode && (
+                        <span className="px-3 py-[1px] text-[13px] text-black border-r border-gray-200 flex-shrink-0 select-none">
+                          {phoneCode}
+                        </span>
                       )}
-                      className={`px-3.5 py-[7px] rounded-md cursor-pointer border-none text-[13px] flex items-center gap-1.5 transition-all duration-150
-                        ${selected ? "bg-[#1a1a2e] text-white font-semibold" : "bg-gray-100 text-gray-700 font-normal"}`}
+                      <input
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9]/g, ""))}
+                        placeholder="8012345678"
+                        inputMode="numeric"
+                        className="flex-1 px-3 py-[11px] text-[13px] text-black outline-none bg-white border-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Country dropdown */}
+                <div>
+                  <label className={labelClass}>Country</label>
+                  <div className="relative">
+                    <select
+                      value={form.country}
+                      onChange={(e) => handleCountryChange(e.target.value)}
+                      className={`${inputClass} appearance-none pr-9 cursor-pointer`}
                     >
-                      {selected && <Check size={12} stroke="white" strokeWidth={3} />}
-                      {cat.name}
-                    </button>
-                  );
-                })}
+                      <option value="" disabled>Select country</option>
+                      {countries.map((c) => (
+                        <option key={c.id} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <ChevronDown size={14} stroke="#6B7280" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* State dropdown — only when country has states */}
+                {selectedCountry && selectedCountry.states.length > 0 && (
+                  <div>
+                    <label className={labelClass}>State</label>
+                    <div className="relative">
+                      <select
+                        value={selectedState}
+                        onChange={(e) => setSelectedState(e.target.value)}
+                        className={`${inputClass} appearance-none pr-9 cursor-pointer`}
+                      >
+                        <option value="" disabled>Select state</option>
+                        {selectedCountry.states.map((s) => (
+                          <option key={s.id} value={s.name}>{s.name}</option>
+                        ))}
+                      </select>
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <ChevronDown size={14} stroke="#6B7280" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Location City + Postal Code */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Location/City</label>
+                    <input
+                      value={form.locationCity}
+                      onChange={(e) => update("locationCity", e.target.value)}
+                      placeholder="Type here"
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Postal Code</label>
+                    <input
+                      value={form.postalCode}
+                      onChange={(e) => update("postalCode", e.target.value)}
+                      placeholder="Type here"
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+
+                {/* Street Address */}
+                <div>
+                  <label className={labelClass}>Street Address</label>
+                  <input
+                    value={form.streetAddress}
+                    onChange={(e) => update("streetAddress", e.target.value)}
+                    placeholder="Type your street address"
+                    className={inputClass}
+                  />
+                </div>
+
+                {/* Social Link */}
+                <div>
+                  <label className={labelClass}>Preferred Social Link</label>
+                  <input
+                    value={form.socialLink}
+                    onChange={(e) => update("socialLink", e.target.value)}
+                    placeholder="Type here"
+                    className={inputClass}
+                  />
+                </div>
+
+                {/* Communication + Language */}
+                <div className="grid grid-cols-2 gap-4">
+                  <SelectField
+                    label="Preferred Communication"
+                    value={form.communication}
+                    onChange={(v: string) => update("communication", v)}
+                    options={commOptions}
+                    required={false}
+                  />
+                  <SelectField
+                    label="Language Preference"
+                    value={form.language}
+                    onChange={(v: string) => update("language", v)}
+                    options={languages}
+                    required={false}
+                  />
+                </div>
+
+                {/* Categories */}
+                {availableCategories.length > 0 && (
+                  <div>
+                    <label className={labelClass}>Categories of Interest</label>
+                    <div className="border border-gray-200 rounded-[10px] p-4 flex flex-wrap gap-2.5">
+                      {availableCategories.map((cat) => {
+                        const selected = selectedCategories.includes(cat.id);
+                        return (
+                          <button
+                            key={cat.id}
+                            onClick={() => setSelectedCategories((prev) =>
+                              prev.includes(cat.id) ? prev.filter((c) => c !== cat.id) : [...prev, cat.id]
+                            )}
+                            className={`px-3.5 py-[7px] rounded-md cursor-pointer border-none text-[13px] flex items-center gap-1.5 transition-all duration-150
+                        ${selected ? "bg-[#1a1a2e] text-white font-semibold" : "bg-gray-100 text-gray-700 font-normal"}`}
+                          >
+                            {selected && <Check size={12} stroke="white" strokeWidth={3} />}
+                            {cat.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
               </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3 mt-9">
+                <button
+                  onClick={() => router.push("/client/my-profile")}
+                  className="px-8 py-3.5 rounded-lg border border-gray-200 text-[13px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={loading}
+                  className="bg-[#E2554F] border-none rounded-lg px-12 py-3.5 cursor-pointer text-white font-bold text-[15px] hover:bg-[#d44a44] transition-colors disabled:opacity-70 flex items-center gap-2"
+                >
+                  {loading ? <><Loader2 size={16} className="animate-spin" /> Saving...</> : "Save Changes"}
+                </button>
+              </div>
+
             </div>
-          )}
+          </FadeInSection>
+        </>
+      </WithPageTransition>
 
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center justify-end gap-3 mt-9">
-          <button
-            onClick={() => router.push("/client/my-profile")}
-            className="px-8 py-3.5 rounded-lg border border-gray-200 text-[13px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={loading}
-            className="bg-[#E2554F] border-none rounded-lg px-12 py-3.5 cursor-pointer text-white font-bold text-[15px] hover:bg-[#d44a44] transition-colors disabled:opacity-70 flex items-center gap-2"
-          >
-            {loading ? <><Loader2 size={16} className="animate-spin" /> Saving...</> : "Save Changes"}
-          </button>
-        </div>
-
-      </div>
     </div>
   );
 };

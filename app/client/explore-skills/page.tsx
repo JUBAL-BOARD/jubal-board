@@ -1,12 +1,14 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import Sidebar from "@/app/components/client/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/client/dashboard/dashboardTopbar";
 import ExploreSearchBar from "../../components/client/explore-skills/exploreSearchBar";
 import SkillCategoryAccordion from "../../components/client/explore-skills/skillCategoryAccordion";
-import { X, Loader2 } from "lucide-react";
+import { X } from "lucide-react";
 import { useCategories } from "@/app/lib/hooks/useCategories";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 type ClientProfile = {
   name: string;
@@ -33,6 +35,8 @@ const ExploreSkills: React.FC = () => {
   const [profileLoading, setProfileLoading] = useState(true);
   const { categories, loading: categoriesLoading, error: categoriesError } = useCategories();
 
+  const isReady = usePageReady(profileLoading, categoriesLoading);
+
   const handleToggleSkill = (skill: string) => {
     setSelectedSkills((prev) =>
       prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]
@@ -58,13 +62,11 @@ const ExploreSkills: React.FC = () => {
         if (!tokenRes.ok) return;
         const { token } = await tokenRes.json();
         if (!token) return;
-
         const res = await fetch("/api/v1/clients/me", {
           headers: { Authorization: `Bearer ${token}` },
           credentials: "include",
         });
         if (!res.ok) return;
-
         const json = await res.json();
         setProfile(json.data);
       } catch {
@@ -73,7 +75,6 @@ const ExploreSkills: React.FC = () => {
         setProfileLoading(false);
       }
     };
-
     fetchProfile();
   }, []);
 
@@ -81,22 +82,6 @@ const ExploreSkills: React.FC = () => {
   const userAvatar =
     profile?.clientProfile?.imageUrl ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
-
-  if (profileLoading || categoriesLoading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-white">
-        <Loader2 className="animate-spin text-[#E2554F]" size={40} />
-      </div>
-    );
-  }
-
-  if (categoriesError) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-white">
-        <p className="text-red-500">{categoriesError}</p>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
@@ -133,26 +118,42 @@ const ExploreSkills: React.FC = () => {
         </div>
 
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <h1 className="text-[30px] font-extrabold text-[#1a1a2e] m-0 mb-6">
-            Hire A Pro by Categories
-          </h1>
+          {categoriesError && (
+            <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
+              {categoriesError}
+            </div>
+          )}
 
-          <ExploreSearchBar value={search} onChange={setSearch} />
+          <WithPageTransition isReady={isReady} variant="generic">
+            <>
+              <FadeInSection delay={0}>
+                <h1 className="text-[30px] font-extrabold text-[#1a1a2e] m-0 mb-6">
+                  Hire A Pro by Categories
+                </h1>
+              </FadeInSection>
 
-          <div className="bg-[#fafafa] p-10">
-            {filtered.map((category, i) => (
-              <SkillCategoryAccordion
-                key={category.id}
-                category={{
-                  ...category,
-                  skills: category.services.flatMap((s) => s.skills.map((sk) => sk.name)),
-                }}
-                selectedSkills={selectedSkills}
-                onToggleSkill={handleToggleSkill}
-                defaultOpen={i < 3}
-              />
-            ))}
-          </div>
+              <FadeInSection delay={80}>
+                <ExploreSearchBar value={search} onChange={setSearch} />
+              </FadeInSection>
+
+              <FadeInSection delay={160}>
+                <div className="bg-[#fafafa] p-10">
+                  {filtered.map((category, i) => (
+                    <SkillCategoryAccordion
+                      key={category.id}
+                      category={{
+                        ...category,
+                        skills: category.services.flatMap((s) => s.skills.map((sk) => sk.name)),
+                      }}
+                      selectedSkills={selectedSkills}
+                      onToggleSkill={handleToggleSkill}
+                      defaultOpen={i < 3}
+                    />
+                  ))}
+                </div>
+              </FadeInSection>
+            </>
+          </WithPageTransition>
         </main>
       </div>
     </div>

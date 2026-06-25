@@ -41,31 +41,29 @@ const WelcomeBar: React.FC<Props> = ({ userName }) => {
   }, []);
 
   const toggleOnlineStatus = async () => {
-  setIsOnline(prev => {
-    const newStatus = !prev;
-
-    (async () => {
-      setLoading(true);
-      try {
-        const headers = await getHeaders();
-        const res = await fetch("/api/v1/clients/me/online-status", {
-          method: "PATCH",
-          credentials: "include",
-          headers,
-          body: JSON.stringify({ showOnlineStatus: newStatus }),
-        });
-        if (!res.ok) throw new Error("Failed to update status");
-      } catch (err) {
-        console.error("Failed to update online status:", err);
-        setIsOnline(!newStatus);
-      } finally {
-        setLoading(false);
-      }
-    })();
-
-    return newStatus;
-  });
-};
+    setIsOnline((prev) => {
+      const newStatus = !prev;
+      (async () => {
+        setLoading(true);
+        try {
+          const headers = await getHeaders();
+          const res = await fetch("/api/v1/clients/me/online-status", {
+            method: "PATCH",
+            credentials: "include",
+            headers,
+            body: JSON.stringify({ showOnlineStatus: newStatus }),
+          });
+          if (!res.ok) throw new Error("Failed to update status");
+        } catch (err) {
+          console.error("Failed to update online status:", err);
+          setIsOnline(!newStatus);
+        } finally {
+          setLoading(false);
+        }
+      })();
+      return newStatus;
+    });
+  };
 
   return (
     <div className="lg:flex items-end justify-between mb-5">
@@ -73,7 +71,7 @@ const WelcomeBar: React.FC<Props> = ({ userName }) => {
       <div className="flex lg:block gap-3">
         <p className="m-0 text-lg lg:text-lg font-body text-black">Welcome Back</p>
         <h2 className="m-0 lg:mt-1 text-lg lg:text-2xl font-heading font-extrabold text-black">
-          {userName}
+          {userName} <span className="wave-emoji inline-block">👋</span>
         </h2>
       </div>
 
@@ -108,16 +106,39 @@ const WelcomeBar: React.FC<Props> = ({ userName }) => {
               key={type}
               onClick={() => setAccountType(type)}
               className={`px-3 py-1 rounded-full text-[12px] lg:text-[13px] font-semibold transition-all duration-200
-                ${accountType === type
+              ${
+                accountType === type
                   ? "bg-[#22C55E] text-black shadow-sm"
                   : "text-gray-400"
-                }`}
+              }`}
             >
               {type}
             </button>
           ))}
         </div>
       </div>
+
+      <style jsx global>{`
+        @keyframes wave {
+          0% { transform: rotate(0deg); }
+          10% { transform: rotate(14deg); }
+          20% { transform: rotate(-8deg); }
+          30% { transform: rotate(14deg); }
+          40% { transform: rotate(-4deg); }
+          50% { transform: rotate(10deg); }
+          60% { transform: rotate(0deg); }
+          100% { transform: rotate(0deg); }
+        }
+        .wave-emoji {
+          transform-origin: 70% 70%;
+          animation: wave 1s ease-in-out 2;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .wave-emoji {
+            animation: none;
+          }
+        }
+      `}</style>
     </div>
   );
 };

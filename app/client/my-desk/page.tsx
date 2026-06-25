@@ -9,6 +9,9 @@ import ProjectCard from "../../components/client/my-desk/projectCard";
 import Pagination from "../../components/client/my-desk/pagination";
 import { Search, ListFilter, ChevronDown, X, Loader2 } from "lucide-react";
 import { useClientProjects } from "../../lib/hooks/useClientProjects";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 type FilterTab = "All Projects" | "Active Projects" | "Recent Projects" | "Completed Projects" | "Revised Projects";
 
@@ -36,6 +39,7 @@ const MyDesk: React.FC = () => {
   const [profileLoading, setProfileLoading] = useState(true);
 
   const { projects, loading, error } = useClientProjects(tabStatusMap[activeTab]);
+  const isReady = usePageReady(loading);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -110,65 +114,72 @@ const MyDesk: React.FC = () => {
         </div>
 
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <Breadcrumb crumbs={[
-            { label: "Dashboard", path: "/client/dashboard" },
-            { label: "My Desk" },
-          ]} />
+          <WithPageTransition isReady={isReady} variant="gigs">
+            <>
+              <FadeInSection delay={0}>
+                <Breadcrumb crumbs={[
+                  { label: "Dashboard", path: "/client/dashboard" },
+                  { label: "My Desk" },
+                ]} />
 
-          <h1 className="text-[26px] font-extrabold text-[#1a1a2e] m-0 mb-5">My Desk</h1>
+                <h1 className="text-[26px] font-extrabold text-[#1a1a2e] m-0 mb-5">My Desk</h1>
 
-          {/* Search + Filter */}
-          <div className="flex gap-3 mb-5">
-            <div className="flex-1 flex items-center gap-2.5 border-[1.5px] border-gray-200 rounded-lg px-3.5 py-2.5 bg-white">
-              <Search size={18} stroke="black" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by projects or creatives"
-                className="border-none outline-none flex-1 text-[13px] bg-transparent text-black placeholder:text-gray-400"
-              />
-            </div>
-            <button className="flex items-center gap-2 bg-transparent border-none rounded-lg px-[18px] py-2.5 cursor-pointer text-[#e2554f] font-semibold text-[13px] hover:bg-gray-50 transition-colors">
-              <ListFilter size={16} stroke="#E2554F" />
-              Filter By
-              <ChevronDown size={12} stroke="#E2554F" />
-            </button>
-          </div>
+                {/* Search + Filter */}
+                <div className="flex gap-3 mb-5">
+                  <div className="flex-1 flex items-center gap-2.5 border-[1.5px] border-gray-200 rounded-lg px-3.5 py-2.5 bg-white">
+                    <Search size={18} stroke="black" />
+                    <input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search by projects or creatives"
+                      className="border-none outline-none flex-1 text-[13px] bg-transparent text-black placeholder:text-gray-400"
+                    />
+                  </div>
+                  <button className="flex items-center gap-2 bg-transparent border-none rounded-lg px-[18px] py-2.5 cursor-pointer text-[#e2554f] font-semibold text-[13px] hover:bg-gray-50 transition-colors">
+                    <ListFilter size={16} stroke="#E2554F" />
+                    Filter By
+                    <ChevronDown size={12} stroke="#E2554F" />
+                  </button>
+                </div>
 
-          {/* Tabs */}
-          <ProjectFilterTabs
-            active={activeTab}
-            onChange={(tab) => {
-              setActiveTab(tab);
-              setCurrentPage(1);
-            }}
-          />
+                {/* Tabs */}
+                <ProjectFilterTabs
+                  active={activeTab}
+                  onChange={(tab) => {
+                    setActiveTab(tab);
+                    setCurrentPage(1);
+                  }}
+                />
 
-          {loading && (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="animate-spin text-[#E2554F]" size={36} />
-            </div>
-          )}
+                {loading && (
+                  <div className="flex items-center justify-center py-20">
+                    <Loader2 className="animate-spin text-[#E2554F]" size={36} />
+                  </div>
+                )}
 
-          {error && (
-            <p className="text-sm text-red-500 text-center py-10">{error}</p>
-          )}
+                {error && (
+                  <p className="text-sm text-red-500 text-center py-10">{error}</p>
+                )}
 
-          {!loading && !error && filtered.length === 0 && (
-            <p className="text-gray-500 text-[14px] text-center mt-10">No projects found.</p>
-          )}
+                {!loading && !error && filtered.length === 0 && (
+                  <p className="text-gray-500 text-[14px] text-center mt-10">No projects found.</p>
+                )}
 
-          {!loading && !error && filtered.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
+                {!loading && !error && filtered.map((project) => (
+                  <ProjectCard key={project.id} project={project} />
+                ))}
 
-          <Pagination
-            currentPage={currentPage}
-            totalPages={Math.ceil(filtered.length / perPage)}
-            perPage={perPage}
-            onPageChange={setCurrentPage}
-            onPerPageChange={setPerPage}
-          />
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={Math.ceil(filtered.length / perPage)}
+                  perPage={perPage}
+                  onPageChange={setCurrentPage}
+                  onPerPageChange={setPerPage}
+                />
+              </FadeInSection>
+            </>
+          </WithPageTransition>
+
         </main>
       </div>
     </div>

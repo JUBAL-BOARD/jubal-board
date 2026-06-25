@@ -3,7 +3,10 @@ import Sidebar from "@/app/components/client/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/client/dashboard/dashboardTopbar";
 import MyProfileContent from "@/app/components/client/explore-skills/creative-profile/myProfileContent";
 import { useEffect, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { X } from "lucide-react";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 type ClientProfile = {
   name: string;
@@ -19,8 +22,9 @@ const CreativeProfilePage = () => {
   const [profileLoading, setProfileLoading] = useState(true);
   const [creativeId, setCreativeId] = useState<string>("");
 
+  const isReady = usePageReady(profileLoading);
+
   useEffect(() => {
-    // Get creativeId from the URL
     const segments = window.location.pathname.split("/");
     setCreativeId(segments[segments.length - 1]);
 
@@ -40,7 +44,6 @@ const CreativeProfilePage = () => {
         setProfileLoading(false);
       }
     };
-
     fetchProfile();
   }, []);
 
@@ -48,14 +51,6 @@ const CreativeProfilePage = () => {
   const userAvatar =
     profile?.clientProfile?.imageUrl ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
-
-  if (profileLoading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-white">
-        <Loader2 className="animate-spin text-[#E2554F]" size={40} />
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
@@ -88,8 +83,13 @@ const CreativeProfilePage = () => {
           </button>
           <Sidebar activeItem="Hire A Pro" />
         </div>
+
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <MyProfileContent creativeId={creativeId} />
+          <WithPageTransition isReady={isReady} variant="profile">
+            <FadeInSection delay={0}>
+              <MyProfileContent creativeId={creativeId} />
+            </FadeInSection>
+          </WithPageTransition>
         </main>
       </div>
     </div>

@@ -6,7 +6,10 @@ import Breadcrumb from "../../components/client/my-desk/breadcrumb";
 import FavoriteCreativeCard from "../../components/client/my-favorites/favoriteCreativeCard";
 import SendBriefForm from "../../components/client/my-favorites/sendBriefForm";
 import { FavoriteCreative } from "../../data/favoritesData";
-import { Loader2, Search, X } from "lucide-react";
+import { Search, X } from "lucide-react";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 type ClientProfile = {
   name: string;
@@ -25,6 +28,7 @@ const Favorites: React.FC = () => {
   const [favorites, setFavorites] = useState<FavoriteCreative[]>([]);
   const [favoritesLoading, setFavoritesLoading] = useState(true);
 
+  const isReady = usePageReady(profileLoading, favoritesLoading);
 
   // fetch profile
   useEffect(() => {
@@ -72,8 +76,6 @@ const Favorites: React.FC = () => {
       }
 
       const favJson = await favRes.json();
-      console.log("Sample fav item:", JSON.stringify(favJson.data?.[0], null, 2));
-      console.log("Full fav response:", JSON.stringify(favJson, null, 2));
 
       const favList = Array.isArray(favJson.data) ? favJson.data : [];
 
@@ -141,14 +143,6 @@ const Favorites: React.FC = () => {
       userName
     )}&background=1a1a2e&color=fff&size=128`;
 
-  if (profileLoading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-white">
-        <Loader2 className="animate-spin text-[#E2554F]" size={40} />
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <DashboardTopbar
@@ -182,56 +176,58 @@ const Favorites: React.FC = () => {
         </div>
 
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <Breadcrumb
-            crumbs={[
-              { label: "Dashboard", path: "/client/dashboard" },
-              { label: "My Favorites" },
-            ]}
-          />
-          <h1 className="text-[26px] font-extrabold text-[#1a1a2e] m-0 mb-6">
-            My Favorites
-          </h1>
-
-          <div className="flex gap-6" style={{ height: "calc(100vh - 200px)" }}>
-            {/* Left — Creatives List */}
-            <div className="w-[320px] flex-shrink-0 bg-[#fafafa] px-2 py-4 flex flex-col gap-0">
-              <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2.5 bg-white mb-3.5">
-                <Search size={15} stroke="#9CA3AF" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search creative or services"
-                  className="border-none outline-none text-[13px] flex-1 text-black bg-transparent placeholder:text-gray-400"
+          <WithPageTransition isReady={isReady} variant="profile">
+            <>
+              <FadeInSection delay={0}>
+                <Breadcrumb
+                  crumbs={[
+                    { label: "Dashboard", path: "/client/dashboard" },
+                    { label: "My Favorites" },
+                  ]}
                 />
-              </div>
+                <h1 className="text-[26px] font-extrabold text-[#1a1a2e] m-0 mb-6">
+                  My Favorites
+                </h1>
 
-              <div className="overflow-y-auto flex-1">
-                {favoritesLoading ? (
-                  <div className="flex items-center justify-center py-10">
-                    <Loader2 className="animate-spin text-[#E2554F]" size={28} />
+                <div className="flex gap-6" style={{ height: "calc(100vh - 200px)" }}>
+                  {/* Left — Creatives List */}
+                  <div className="w-[320px] flex-shrink-0 bg-[#fafafa] px-2 py-4 flex flex-col gap-0">
+                    <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2.5 bg-white mb-3.5">
+                      <Search size={15} stroke="#9CA3AF" />
+                      <input
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search creative or services"
+                        className="border-none outline-none text-[13px] flex-1 text-black bg-transparent placeholder:text-gray-400"
+                      />
+                    </div>
+
+                    <div className="overflow-y-auto flex-1">
+                      {filtered.length === 0 ? (
+                        <p className="text-center text-sm text-black py-10">
+                          No favorites yet.
+                        </p>
+                      ) : (
+                        filtered.map((creative) => (
+                          <FavoriteCreativeCard
+                            key={creative.id}
+                            creative={creative}
+                            isSelected={selectedId === String(creative.id)}
+                            onSelect={(id) => setSelectedId(String(id))}
+                          />
+                        ))
+                      )}
+                    </div>
                   </div>
-                ) : filtered.length === 0 ? (
-                  <p className="text-center text-sm text-black py-10">
-                    No favorites yet.
-                  </p>
-                ) : (
-                  filtered.map((creative) => (
-                    <FavoriteCreativeCard
-                      key={creative.id}
-                      creative={creative}
-                      isSelected={selectedId === String(creative.id)}
-                      onSelect={(id) => setSelectedId(String(id))}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
 
-            {/* Right — Send Brief Form */}
-            <div className="flex-1 bg-[#fafafa] border border-gray-200 rounded-[10px] p-6 overflow-y-auto flex flex-col">
-              <SendBriefForm />
-            </div>
-          </div>
+                  {/* Right — Send Brief Form */}
+                  <div className="flex-1 bg-[#fafafa] border border-gray-200 rounded-[10px] p-6 overflow-y-auto flex flex-col">
+                    <SendBriefForm />
+                  </div>
+                </div>
+              </FadeInSection>
+            </>
+          </WithPageTransition>
         </main>
       </div>
     </div>

@@ -5,6 +5,9 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Sidebar from "@/app/components/client/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/client/dashboard/dashboardTopbar";
 import Breadcrumb from "@/app/components/client/my-desk/breadcrumb";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 import {
     X,
     Loader2,
@@ -144,6 +147,7 @@ const OrderReviewPage: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
+    const isReady = usePageReady(loading);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -350,7 +354,9 @@ const OrderReviewPage: React.FC = () => {
                 </div>
 
                 <main className="flex-1 w-full px-4 lg:px-8 py-6 overflow-y-auto">
-                    <Breadcrumb
+                    <WithPageTransition isReady={isReady} variant="pitches">
+                        <FadeInSection delay={0}>
+                            <Breadcrumb
                         crumbs={[
                             { label: "Dashboard", path: "/client/dashboard" },
                             { label: "Incoming Pitches", path: "/client/pitches" },
@@ -552,6 +558,8 @@ const OrderReviewPage: React.FC = () => {
                             )}
                         </div>
                     </div>
+                        </FadeInSection>
+                    </WithPageTransition>
                 </main>
             </div>
         </div>

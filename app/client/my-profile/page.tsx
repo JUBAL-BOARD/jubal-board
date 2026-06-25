@@ -7,6 +7,9 @@ import Breadcrumb from "../../components/client/my-desk/breadcrumb";
 import ProfileHeader from "../../components/client/my-profile/profileHeader";
 import ProfileInfoSection from "../../components/client/my-profile/profileInfoSection";
 import { X } from "lucide-react";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 type ClientProfile = {
   name: string;
@@ -30,6 +33,7 @@ const Profile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isReady = usePageReady(loading);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -75,20 +79,20 @@ const Profile: React.FC = () => {
   } : null;
 
   const personalFields = cp ? [
-    { label: "Full Name",        value: cp.fullName ?? "—" },
-    { label: "Email Address",    value: profile?.email ?? "—" },
-    { label: "Contact Number",   value: cp.contactNumber ?? "—" },
-    { label: "Location",         value: cp.locationCity ?? "—" },
-    { label: "Communication",    value: cp.preferredCommunication ?? "—" },
-    { label: "Language",         value: cp.languagePreference ?? "—" },
+    { label: "Full Name", value: cp.fullName ?? "—" },
+    { label: "Email Address", value: profile?.email ?? "—" },
+    { label: "Contact Number", value: cp.contactNumber ?? "—" },
+    { label: "Location", value: cp.locationCity ?? "—" },
+    { label: "Communication", value: cp.preferredCommunication ?? "—" },
+    { label: "Language", value: cp.languagePreference ?? "—" },
   ] : [];
 
   const addressFields = cp ? [
-    { label: "Country",        value: cp.country ?? "—" },
-    { label: "City",           value: cp.locationCity ?? "—" },
-    { label: "State",          value: cp.state ?? "—" },
+    { label: "Country", value: cp.country ?? "—" },
+    { label: "City", value: cp.locationCity ?? "—" },
+    { label: "State", value: cp.state ?? "—" },
     { label: "Street Address", value: cp.streetAddress ?? "—" },
-    { label: "Postal Code",    value: cp.postalCode ?? "—" },
+    { label: "Postal Code", value: cp.postalCode ?? "—" },
   ] : [];
 
   return (
@@ -126,50 +130,56 @@ const Profile: React.FC = () => {
         </div>
 
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <Breadcrumb crumbs={[
-            { label: "Dashboard", path: "/client/dashboard" },
-            { label: "My Profile" },
-          ]} />
-
-          <h1 className="text-[26px] font-extrabold text-[#1a1a2e] m-0 mb-6">
-            My Profile
-          </h1>
-
-          {loading && (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#E2554F] mb-4" />
-              <p className="text-gray-500 font-medium">Syncing your profile data...</p>
-            </div>
-          )}
-
-          {error && !loading && (
-            <div className="flex flex-col items-center justify-center py-20">
-              <p className="text-red-500 font-medium mb-4">Offline: {error}</p>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-6 py-2 bg-gray-100 rounded-lg text-sm font-semibold"
-              >
-                Retry Connection
-              </button>
-            </div>
-          )}
-
-          {profileForDisplay && !loading && (
+          <WithPageTransition isReady={isReady} variant="profile">
             <>
-              <ProfileHeader
-                profile={profileForDisplay}
-                onEditProfile={() => alert("Edit Profile clicked")}
-              />
-              <ProfileInfoSection
-                title="Personal Information"
-                fields={personalFields}
-              />
-              <ProfileInfoSection
-                title="Address Information"
-                fields={addressFields}
-              />
+              <FadeInSection delay={0}>
+                <Breadcrumb crumbs={[
+                  { label: "Dashboard", path: "/client/dashboard" },
+                  { label: "My Profile" },
+                ]} />
+
+                <h1 className="text-[26px] font-extrabold text-[#1a1a2e] m-0 mb-6">
+                  My Profile
+                </h1>
+
+                {loading && (
+                  <div className="flex flex-col items-center justify-center py-20">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#E2554F] mb-4" />
+                    <p className="text-gray-500 font-medium">Syncing your profile data...</p>
+                  </div>
+                )}
+
+                {error && !loading && (
+                  <div className="flex flex-col items-center justify-center py-20">
+                    <p className="text-red-500 font-medium mb-4">Offline: {error}</p>
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="px-6 py-2 bg-gray-100 rounded-lg text-sm font-semibold"
+                    >
+                      Retry Connection
+                    </button>
+                  </div>
+                )}
+
+                {profileForDisplay && !loading && (
+                  <>
+                    <ProfileHeader
+                      profile={profileForDisplay}
+                      onEditProfile={() => alert("Edit Profile clicked")}
+                    />
+                    <ProfileInfoSection
+                      title="Personal Information"
+                      fields={personalFields}
+                    />
+                    <ProfileInfoSection
+                      title="Address Information"
+                      fields={addressFields}
+                    />
+                  </>
+                )}
+              </FadeInSection>
             </>
-          )}
+          </WithPageTransition>
         </main>
       </div>
     </div>

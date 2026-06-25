@@ -1,12 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Sidebar from "@/app/components/client/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/client/dashboard/dashboardTopbar";
 import Breadcrumb from "@/app/components/client/my-desk/breadcrumb";
 import { useParams } from "next/navigation";
 import { X } from "lucide-react";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
+
+type ClientProfile = {
+  name: string;
+  clientProfile: {
+    fullName: string;
+    imageUrl: string | null;
+  };
+};
 
 const StarIcon = () => (
   <svg viewBox="0 0 20 20" fill="#F5A623" className="w-4 h-4">
@@ -46,12 +57,41 @@ export default function OrderReviewPage() {
   const params = useParams();
   const creativeName = decodeURIComponent(params.creativeName as string);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profile, setProfile] = useState<ClientProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  const isReady = usePageReady(profileLoading);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const tokenRes = await fetch("/api/auth/session/token");
+        const { token } = await tokenRes.json();
+        const res = await fetch("/api/v1/clients/me", {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
+        });
+        const json = await res.json();
+        setProfile(json.data);
+      } catch {
+        // fail silently
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const userName = profile?.clientProfile?.fullName || profile?.name || "Client";
+  const userAvatar =
+    profile?.clientProfile?.imageUrl ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <DashboardTopbar
-        userName="Charles Eden"
-        userAvatar="https://i.pravatar.cc/150?img=33"
+        userName={userName}
+        userAvatar={userAvatar}
         sidebarOpen={sidebarOpen}
         onMenuClick={() => setSidebarOpen(!sidebarOpen)}
       />
@@ -67,124 +107,132 @@ export default function OrderReviewPage() {
         </div>
 
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <Breadcrumb crumbs={[
-            { label: "Dashboard",      path: "/client/dashboard" },
-            { label: "Hire a Pro",     path: "/client/explore-skills" },
-            { label: "Creative Pitch", path: -1 as any },
-            { label: "Order Review" },
-          ]} />
+          <WithPageTransition isReady={isReady} variant="generic">
+            <>
+              <FadeInSection delay={0}>
+                <Breadcrumb crumbs={[
+                  { label: "Dashboard",      path: "/client/dashboard" },
+                  { label: "Hire a Pro",     path: "/client/explore-skills" },
+                  { label: "Creative Pitch", path: -1 as any },
+                  { label: "Order Review" },
+                ]} />
+                <h1 className="text-2xl font-bold text-gray-900 mb-5">Order Review</h1>
+              </FadeInSection>
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-5">Order Review</h1>
+              <FadeInSection delay={80}>
+                <Section title="Brief Summary">
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {briefRows.map((row) => (
+                        <tr key={row.label} className="border-b border-gray-50 last:border-0">
+                          <td className="py-3 pr-6 text-gray-400 font-medium w-44 align-top">{row.label}</td>
+                          <td className="py-3 text-[#1c1c3a]">
+                            {row.isFile ? (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 border border-orange-200 text-orange-500 rounded text-xs font-medium">
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                                </svg>
+                                {row.value}
+                              </span>
+                            ) : (
+                              row.value
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Section>
+              </FadeInSection>
 
-          {/* Brief Summary */}
-          <Section title="Brief Summary">
-            <table className="w-full text-sm">
-              <tbody>
-                {briefRows.map((row) => (
-                  <tr key={row.label} className="border-b border-gray-50 last:border-0">
-                    <td className="py-3 pr-6 text-gray-400 font-medium w-44 align-top">{row.label}</td>
-                    <td className="py-3 text-[#1c1c3a]">
-                      {row.isFile ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 border border-orange-200 text-orange-500 rounded text-xs font-medium">
-                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
-                          </svg>
-                          {row.value}
-                        </span>
-                      ) : (
-                        row.value
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Section>
+              <FadeInSection delay={160}>
+                <div className="bg-[#fafafa] p-6 mb-4 border border-gray-100">
+                  <div className="flex items-start justify-between">
+                    <h2 className="text-base font-bold text-[#1c1c3a]">Creative</h2>
+                    <span className="px-4 py-1.5 bg-orange-400 text-white text-xs font-semibold rounded-md">Premium</span>
+                  </div>
+                  <div className="flex items-start gap-4 mt-4">
+                    <div className="relative shrink-0">
+                      <Image
+                        src="https://i.pravatar.cc/80?img=47"
+                        alt={creativeName}
+                        width={64}
+                        height={64}
+                        className="rounded-full object-cover"
+                      />
+                      <span className="absolute bottom-1 right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-[#1c1c3a] text-base">{creativeName}</p>
+                      <p className="text-xs text-green-500 font-medium mt-0.5">● Online</p>
+                      <p className="text-xs text-gray-400 mt-2">Verification Status:</p>
+                      <span className="inline-block mt-1 px-3 py-0.5 bg-green-100 text-green-600 text-xs font-semibold rounded-full">
+                        Verified
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-8 mt-4 pt-4 border-t border-gray-100 text-sm text-gray-600">
+                    <div className="flex items-center gap-1">
+                      <StarIcon />
+                      <span className="font-medium text-[#1c1c3a]">5.0</span>
+                      <span className="text-gray-400">(35 Reviews)</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-[#1c1c3a]">12</span>{" "}
+                      <span className="text-gray-400">Completed Projects</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-[#1c1c3a]">100%</span>{" "}
+                      <span className="text-gray-400">Job Success</span>
+                    </div>
+                  </div>
+                </div>
+              </FadeInSection>
 
-          {/* Creative */}
-          <div className="bg-[#fafafa] p-6 mb-4 border border-gray-100">
-            <div className="flex items-start justify-between">
-              <h2 className="text-base font-bold text-[#1c1c3a]">Creative</h2>
-              <span className="px-4 py-1.5 bg-orange-400 text-white text-xs font-semibold rounded-md">Premium</span>
-            </div>
-            <div className="flex items-start gap-4 mt-4">
-              <div className="relative shrink-0">
-                <Image
-                  src="https://i.pravatar.cc/80?img=47"
-                  alt={creativeName}
-                  width={64}
-                  height={64}
-                  className="rounded-full object-cover"
-                />
-                <span className="absolute bottom-1 right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white" />
-              </div>
-              <div>
-                <p className="font-semibold text-[#1c1c3a] text-base">{creativeName}</p>
-                <p className="text-xs text-green-500 font-medium mt-0.5">● Online</p>
-                <p className="text-xs text-gray-400 mt-2">Verification Status:</p>
-                <span className="inline-block mt-1 px-3 py-0.5 bg-green-100 text-green-600 text-xs font-semibold rounded-full">
-                  Verified
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-8 mt-4 pt-4 border-t border-gray-100 text-sm text-gray-600">
-              <div className="flex items-center gap-1">
-                <StarIcon />
-                <span className="font-medium text-[#1c1c3a]">5.0</span>
-                <span className="text-gray-400">(35 Reviews)</span>
-              </div>
-              <div>
-                <span className="font-medium text-[#1c1c3a]">12</span>{" "}
-                <span className="text-gray-400">Completed Projects</span>
-              </div>
-              <div>
-                <span className="font-medium text-[#1c1c3a]">100%</span>{" "}
-                <span className="text-gray-400">Job Success</span>
-              </div>
-            </div>
-          </div>
+              <FadeInSection delay={240}>
+                <Section title="Deliverables">
+                  <div className="flex flex-wrap gap-2">
+                    {deliverables.map((d) => (
+                      <span key={d} className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 bg-gray-50">
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+                </Section>
+              </FadeInSection>
 
-          {/* Deliverables */}
-          <Section title="Deliverables">
-            <div className="flex flex-wrap gap-2">
-              {deliverables.map((d) => (
-                <span key={d} className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 bg-gray-50">
-                  {d}
-                </span>
-              ))}
-            </div>
-          </Section>
+              <FadeInSection delay={0}>
+                <Section title="Pricing Breakdown">
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {pricingRows.map((row) => (
+                        <tr key={row.label} className="border-b border-gray-50 last:border-0">
+                          <td className={`py-3 ${row.bold ? "font-bold text-[#1c1c3a]" : "text-gray-500"}`}>
+                            {row.label}
+                          </td>
+                          <td className={`py-3 text-right ${row.bold ? "font-bold text-[#1c1c3a]" : "text-gray-700"}`}>
+                            {row.value}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Section>
 
-          {/* Pricing Breakdown */}
-          <Section title="Pricing Breakdown">
-            <table className="w-full text-sm">
-              <tbody>
-                {pricingRows.map((row) => (
-                  <tr key={row.label} className="border-b border-gray-50 last:border-0">
-                    <td className={`py-3 ${row.bold ? "font-bold text-[#1c1c3a]" : "text-gray-500"}`}>
-                      {row.label}
-                    </td>
-                    <td className={`py-3 text-right ${row.bold ? "font-bold text-[#1c1c3a]" : "text-gray-700"}`}>
-                      {row.value}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Section>
-
-          {/* Actions */}
-          <div className="flex justify-end gap-3 mt-6 pb-10">
-            <button className="flex items-center gap-2 px-6 py-2.5 bg-[#1c1c3a] text-white text-sm font-medium rounded-lg hover:bg-[#2a2a50] transition-colors">
-              <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              Cancel
-            </button>
-            <button className="px-6 py-2.5 bg-[#e84545] text-white text-sm font-medium rounded-lg hover:bg-[#d03535] transition-colors">
-              Continue
-            </button>
-          </div>
+                <div className="flex justify-end gap-3 mt-6 pb-10">
+                  <button className="flex items-center gap-2 px-6 py-2.5 bg-[#1c1c3a] text-white text-sm font-medium rounded-lg hover:bg-[#2a2a50] transition-colors">
+                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    Cancel
+                  </button>
+                  <button className="px-6 py-2.5 bg-[#e84545] text-white text-sm font-medium rounded-lg hover:bg-[#d03535] transition-colors">
+                    Continue
+                  </button>
+                </div>
+              </FadeInSection>
+            </>
+          </WithPageTransition>
         </main>
       </div>
     </div>

@@ -4,6 +4,9 @@ import DashboardTopbar from "@/app/components/client/dashboard/dashboardTopbar";
 import DisputesContent from "@/app/components/client/dispute/disputesContent";
 import { useEffect, useState } from "react";
 import { Loader2, X } from "lucide-react";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 type ClientProfile = {
   name: string;
@@ -17,6 +20,7 @@ const HelpSupportPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const isReady = usePageReady(profileLoading);
 
 
   useEffect(() => {
@@ -85,7 +89,13 @@ const HelpSupportPage: React.FC = () => {
         </div>
 
         <main className="flex-1 px-4 lg:px-7 py-6">
-          <DisputesContent />
+          <WithPageTransition isReady={isReady} variant="generic">
+            <>
+              <FadeInSection delay={0}>
+                <DisputesContent />
+              </FadeInSection>
+            </>
+          </WithPageTransition>
         </main>
       </div>
     </div>

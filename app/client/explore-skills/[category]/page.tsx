@@ -3,10 +3,13 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Sidebar from "@/app/components/client/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/client/dashboard/dashboardTopbar";
-import { Search, SlidersHorizontal, ChevronDown, BadgeCheck, X, Loader2 } from "lucide-react";
+import { Search, SlidersHorizontal, ChevronDown, BadgeCheck, X } from "lucide-react";
 import Breadcrumb from "@/app/components/client/my-desk/breadcrumb";
 import Image from "next/image";
 import Link from "next/link";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 type ClientProfile = {
   name: string;
@@ -111,14 +114,12 @@ const CreativeCard: React.FC<CreativeCardProps> = ({ id, name, role, rating, ava
 
 const CategoryGigsPage: React.FC = () => {
   const params = useParams();
-  // ✅ FIX: Read the param as an ID, not a name
   const categoryId = params.category as string;
-
   const [activeChip, setActiveChip] = useState("All");
   const [search, setSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
-  const [categoryName, setCategoryName] = useState(""); // ✅ FIX: Fetch name from API
+  const [categoryName, setCategoryName] = useState("");
   const [services, setServices] = useState<Service[]>([]);
   const [categoryCreatives, setCategoryCreatives] = useState<CategoryCreatives>({
     recommended: [],
@@ -127,90 +128,83 @@ const CategoryGigsPage: React.FC = () => {
   });
   const [loading, setLoading] = useState(true);
 
+  const isReady = usePageReady(loading);
+
   useEffect(() => {
-  const fetchAll = async () => {
-    setLoading(true);
-    try {
-      const tokenRes = await fetch("/api/auth/session/token");
-      const { token } = await tokenRes.json();
-      const headers = { Authorization: `Bearer ${token}` };
+    const fetchAll = async () => {
+      setLoading(true);
+      try {
+        const tokenRes = await fetch("/api/auth/session/token");
+        const { token } = await tokenRes.json();
+        const headers = { Authorization: `Bearer ${token}` };
 
-      // ✅ FIX: params.category is the category NAME (URL-decoded), not an id.
-      // Resolve it to the actual category id via /api/v1/categories first.
-      const decodedName = decodeURIComponent(categoryId);
+        const decodedName = decodeURIComponent(categoryId);
+        const categoriesRes = await fetch("/api/v1/categories", { headers, credentials: "include" });
+        const categoriesJson = categoriesRes.ok ? await categoriesRes.json() : { data: [] };
+        const categoriesList = Array.isArray(categoriesJson.data) ? categoriesJson.data : [];
+        const matchedCategory = categoriesList.find((c: any) => c.name === decodedName);
+        if (!matchedCategory) {
+          setLoading(false);
+          return;
+        }
 
-      const categoriesRes = await fetch("/api/v1/categories", { headers, credentials: "include" });
-      const categoriesJson = categoriesRes.ok ? await categoriesRes.json() : { data: [] };
-      const categoriesList = Array.isArray(categoriesJson.data) ? categoriesJson.data : [];
-      const matchedCategory = categoriesList.find((c: any) => c.name === decodedName);
+        const resolvedCategoryId = matchedCategory.id;
+        const [profileRes, suggestedRes, detailRes, recommendedRes, topRatedRes, verifiedRes] = await Promise.all([
+          fetch("/api/v1/clients/me", { headers, credentials: "include" }),
+          fetch("/api/v1/creatives/suggested", { headers, credentials: "include" }),
+          fetch(`/api/v1/categories/${resolvedCategoryId}`, { headers, credentials: "include" }),
+          fetch(`/api/v1/creatives?categoryId=${resolvedCategoryId}&recommended=true&sort=recommended`, { headers, credentials: "include" }),
+          fetch(`/api/v1/creatives?categoryId=${resolvedCategoryId}&sort=rating`, { headers, credentials: "include" }),
+          fetch(`/api/v1/creatives?categoryId=${resolvedCategoryId}&verified=true`, { headers, credentials: "include" }),
+        ]);
 
-      if (!matchedCategory) {
+        if (profileRes.ok) {
+          const profileJson = await profileRes.json();
+          setProfile(profileJson.data);
+        }
+
+        const imageMap: Record<string, string> = {};
+        if (suggestedRes.ok) {
+          const suggestedJson = await suggestedRes.json();
+          (Array.isArray(suggestedJson.data) ? suggestedJson.data : []).forEach((c: any) => {
+            if (c.id && c.imageUrl) imageMap[c.id] = c.imageUrl;
+          });
+        }
+
+        if (detailRes.ok) {
+          const detailJson = await detailRes.json();
+          const detail = detailJson.data ?? detailJson;
+          setCategoryName(detail.name ?? matchedCategory.name ?? "");
+          setServices(Array.isArray(detail.services) ? detail.services : []);
+        } else {
+          setCategoryName(matchedCategory.name ?? "");
+          setServices(Array.isArray(matchedCategory.services) ? matchedCategory.services : []);
+        }
+
+        const parseCreatives = async (res: Response): Promise<SuggestedCreative[]> => {
+          if (!res.ok) return [];
+          const json = await res.json();
+          return (Array.isArray(json.data) ? json.data : []).map((c: any) => ({
+            ...c,
+            imageUrl: imageMap[c.id] ?? c.photo ?? null,
+          }));
+        };
+
+        const [recommended, topRated, verified] = await Promise.all([
+          parseCreatives(recommendedRes),
+          parseCreatives(topRatedRes),
+          parseCreatives(verifiedRes),
+        ]);
+
+        setCategoryCreatives({ recommended, topRated, verified });
+      } catch {
+        // fail silently
+      } finally {
         setLoading(false);
-        return;
       }
-
-      const resolvedCategoryId = matchedCategory.id;
-
-      const [profileRes, suggestedRes, detailRes, recommendedRes, topRatedRes, verifiedRes] = await Promise.all([
-        fetch("/api/v1/clients/me", { headers, credentials: "include" }),
-        fetch("/api/v1/creatives/suggested", { headers, credentials: "include" }),
-        fetch(`/api/v1/categories/${resolvedCategoryId}`, { headers, credentials: "include" }),
-        fetch(`/api/v1/creatives?categoryId=${resolvedCategoryId}&recommended=true&sort=recommended`, { headers, credentials: "include" }),
-        fetch(`/api/v1/creatives?categoryId=${resolvedCategoryId}&sort=rating`, { headers, credentials: "include" }),
-        fetch(`/api/v1/creatives?categoryId=${resolvedCategoryId}&verified=true`, { headers, credentials: "include" }),
-      ]);
-
-      // Profile
-      if (profileRes.ok) {
-        const profileJson = await profileRes.json();
-        setProfile(profileJson.data);
-      }
-
-      // Build imageUrl lookup map from suggested endpoint
-      const imageMap: Record<string, string> = {};
-      if (suggestedRes.ok) {
-        const suggestedJson = await suggestedRes.json();
-        (Array.isArray(suggestedJson.data) ? suggestedJson.data : []).forEach((c: any) => {
-          if (c.id && c.imageUrl) imageMap[c.id] = c.imageUrl;
-        });
-      }
-
-      if (detailRes.ok) {
-        const detailJson = await detailRes.json();
-        const detail = detailJson.data ?? detailJson;
-        setCategoryName(detail.name ?? matchedCategory.name ?? "");
-        setServices(Array.isArray(detail.services) ? detail.services : []);
-      } else {
-        setCategoryName(matchedCategory.name ?? "");
-        setServices(Array.isArray(matchedCategory.services) ? matchedCategory.services : []);
-      }
-
-      const parseCreatives = async (res: Response): Promise<SuggestedCreative[]> => {
-        if (!res.ok) return [];
-        const json = await res.json();
-        return (Array.isArray(json.data) ? json.data : []).map((c: any) => ({
-          ...c,
-          imageUrl: imageMap[c.id] ?? c.photo ?? null,
-        }));
-      };
-
-      const [recommended, topRated, verified] = await Promise.all([
-        parseCreatives(recommendedRes),
-        parseCreatives(topRatedRes),
-        parseCreatives(verifiedRes),
-      ]);
-
-      setCategoryCreatives({ recommended, topRated, verified });
-
-    } catch {
-      // fail silently
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchAll();
-}, [categoryId]); // ✅ FIX: depend on categoryId, not categoryName
+    };
+    fetchAll();
+  }, [categoryId]);
 
   const userName = profile?.clientProfile?.fullName || profile?.name || "Client";
   const userAvatar =
@@ -231,14 +225,6 @@ const CategoryGigsPage: React.FC = () => {
         c.professionalRole.toLowerCase().includes(search.toLowerCase())
     );
 
-  if (loading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-white">
-        <Loader2 className="animate-spin text-[#E2554F]" size={40} />
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <DashboardTopbar
@@ -252,8 +238,9 @@ const CategoryGigsPage: React.FC = () => {
           <div className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />
         )}
         <div
-          className={`fixed top-0 left-0 h-full z-40 transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
-            } lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:z-10`}
+          className={`fixed top-0 left-0 h-full z-40 transition-transform duration-300 ease-in-out ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          } lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:z-10`}
         >
           <button className="absolute top-4 right-4 z-50 lg:hidden" onClick={() => setSidebarOpen(false)}>
             <X size={22} />
@@ -262,110 +249,117 @@ const CategoryGigsPage: React.FC = () => {
         </div>
 
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          {/* ✅ FIX: breadcrumb now uses fetched categoryName */}
-          <Breadcrumb
-            crumbs={[
-              { label: "Dashboard", path: "/client/dashboard" },
-              { label: "Hire A Pro", path: "/client/explore-skills" },
-              { label: categoryName },
-            ]}
-          />
+          <WithPageTransition isReady={isReady} variant="generic">
+            <>
+              <FadeInSection delay={0}>
+                <Breadcrumb
+                  crumbs={[
+                    { label: "Dashboard", path: "/client/dashboard" },
+                    { label: "Hire A Pro", path: "/client/explore-skills" },
+                    { label: categoryName },
+                  ]}
+                />
+                <h1 className="text-2xl font-bold text-gray-900 mb-5">Hire A Pro</h1>
+              </FadeInSection>
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-5">Hire A Pro</h1>
-
-          {/* Search + Filter */}
-          <div className="flex items-center gap-3 mb-5">
-            <div className="flex-1 relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-300 transition-all"
-              />
-            </div>
-            <button className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 font-medium hover:bg-gray-50 transition-colors">
-              <SlidersHorizontal size={15} className="text-red-400" />
-              Filter By
-              <ChevronDown size={14} />
-            </button>
-          </div>
-
-          {/* Filter chips */}
-          <div className="flex items-center gap-2 mb-7 flex-wrap">
-            {filterChips.map((chip) => (
-              <button
-                key={chip}
-                onClick={() => setActiveChip(chip)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeChip === chip
-                  ? "bg-red-500 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-              >
-                {chip}
-              </button>
-            ))}
-          </div>
-
-          {/* Services */}
-          <div className="mb-8 bg-[#fafafa] p-6">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Services ({services.length})
-            </h2>
-            {services.length === 0 ? (
-              <p className="text-sm text-gray-400">No services found for this category.</p>
-            ) : (
-              <div className="flex gap-3.5 overflow-x-auto pb-1 scroll-smooth">
-                {services.map((service) => (
-                  <div
-                    key={service.id}
-                    className="relative rounded-lg overflow-hidden h-[300px] flex-shrink-0 cursor-pointer group"
-                  >
-                    <Image
-                      src={service.imageUrl || "/placeholder.png"}
-                      alt={service.name}
-                      width={300}
-                      height={300}
-                      className="w-[300px] h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              <FadeInSection delay={80}>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="flex-1 relative">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-300 transition-all"
                     />
-                    <div className="absolute inset-0 bg-black/40" />
-                    <div className="absolute bottom-0 left-0 right-0 h-[20%] flex items-center justify-center px-3 bg-[#1c1c3a]">
-                      <p className="text-white font-semibold text-sm">{service.name}</p>
-                    </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <button className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 font-medium hover:bg-gray-50 transition-colors">
+                    <SlidersHorizontal size={15} className="text-red-400" />
+                    Filter By
+                    <ChevronDown size={14} />
+                  </button>
+                </div>
 
-          {/* Creative groups */}
-          {creativeGroups.map((group) => (
-            <div key={group.label} className="bg-[#fafafa] p-6 mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">{group.label}</h2>
-              {filterCreatives(group.creatives).length === 0 ? (
-                <p className="text-sm text-gray-400">No creatives found.</p>
-              ) : (
-                <div className="flex gap-4 overflow-x-auto pb-2 scroll-smooth">
-                  {filterCreatives(group.creatives).map((c) => (
-                    <CreativeCard
-                      key={c.id}
-                      id={c.id}
-                      name={c.name}
-                      role={c.professionalRole}
-                      rating={c.overallRating}
-                      avatar={
-                        c.imageUrl ??
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=1a1a2e&color=fff&size=128`
-                      }
-                      verified={c.isVerified}
-                      premium={c.isPremium}
-                    />
+                <div className="flex items-center gap-2 mb-7 flex-wrap">
+                  {filterChips.map((chip) => (
+                    <button
+                      key={chip}
+                      onClick={() => setActiveChip(chip)}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                        activeChip === chip
+                          ? "bg-red-500 text-white"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {chip}
+                    </button>
                   ))}
                 </div>
-              )}
-            </div>
-          ))}
+              </FadeInSection>
+
+              <FadeInSection delay={160}>
+                <div className="mb-8 bg-[#fafafa] p-6">
+                  <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                    Services ({services.length})
+                  </h2>
+                  {services.length === 0 ? (
+                    <p className="text-sm text-gray-400">No services found for this category.</p>
+                  ) : (
+                    <div className="flex gap-3.5 overflow-x-auto pb-1 scroll-smooth">
+                      {services.map((service) => (
+                        <div
+                          key={service.id}
+                          className="relative rounded-lg overflow-hidden h-[300px] flex-shrink-0 cursor-pointer group"
+                        >
+                          <Image
+                            src={service.imageUrl || "/placeholder.png"}
+                            alt={service.name}
+                            width={300}
+                            height={300}
+                            className="w-[300px] h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <div className="absolute inset-0 bg-black/40" />
+                          <div className="absolute bottom-0 left-0 right-0 h-[20%] flex items-center justify-center px-3 bg-[#1c1c3a]">
+                            <p className="text-white font-semibold text-sm">{service.name}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </FadeInSection>
+
+              <FadeInSection delay={0}>
+                {creativeGroups.map((group) => (
+                  <div key={group.label} className="bg-[#fafafa] p-6 mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">{group.label}</h2>
+                    {filterCreatives(group.creatives).length === 0 ? (
+                      <p className="text-sm text-gray-400">No creatives found.</p>
+                    ) : (
+                      <div className="flex gap-4 overflow-x-auto pb-2 scroll-smooth">
+                        {filterCreatives(group.creatives).map((c) => (
+                          <CreativeCard
+                            key={c.id}
+                            id={c.id}
+                            name={c.name}
+                            role={c.professionalRole}
+                            rating={c.overallRating}
+                            avatar={
+                              c.imageUrl ??
+                              `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=1a1a2e&color=fff&size=128`
+                            }
+                            verified={c.isVerified}
+                            premium={c.isPremium}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </FadeInSection>
+            </>
+          </WithPageTransition>
         </main>
       </div>
     </div>

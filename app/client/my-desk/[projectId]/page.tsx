@@ -12,6 +12,9 @@ import { showPartiallyToast } from "@/app/components/ui/toasts";
 import { showRevisionToast } from "@/app/components/ui/toasts";
 import { raiseDispute } from "@/app/lib/api/disputeApi";
 import toast from "react-hot-toast";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 const ISSUE_TYPES = [
   "POOR_QUALITY",
@@ -558,6 +561,7 @@ export default function ViewProjectPage() {
   const [milestoneSubmittingId, setMilestoneSubmittingId] = useState<string | null>(null);
   const [bookingFeeSubmitting, setBookingFeeSubmitting] = useState(false);
   const [bookingFeeReleased, setBookingFeeReleased] = useState(false);
+  const isReady = usePageReady(loading);
 
   const getAuthToken = async () => {
     const tokenRes = await fetch("/api/auth/session/token");
@@ -962,7 +966,10 @@ export default function ViewProjectPage() {
         </div>
 
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <Breadcrumb crumbs={[
+          <WithPageTransition isReady={isReady} variant="gigs">
+            <>
+              <FadeInSection delay={0}>
+                <Breadcrumb crumbs={[
             { label: "Dashboard", path: "/client/dashboard" },
             { label: "My Desk", path: "/client/my-desk" },
             { label: "View Project" },
@@ -1373,6 +1380,10 @@ export default function ViewProjectPage() {
             </>
           )}
           <div className="pb-10" />
+              </FadeInSection>
+            </>
+          </WithPageTransition>
+          
         </main>
       </div>
     </div>

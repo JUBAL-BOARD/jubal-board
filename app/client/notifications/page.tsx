@@ -8,6 +8,9 @@ import NotificationItem from "../../components/client/notifications/notification
 import type { NotifTab } from "../../components/client/notifications/notificationFilterTabs";
 import type { Notification, NotificationGroup } from "../../data/notificationsData";
 import { Loader2, X } from "lucide-react";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 type ClientProfile = {
   name: string;
@@ -72,6 +75,8 @@ const Notifications: React.FC = () => {
   const [profileLoading, setProfileLoading] = useState(true);
   const [notifsLoading, setNotifsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const isReady = usePageReady(profileLoading, notifsLoading);
 
   // fetch profile
   useEffect(() => {
@@ -329,80 +334,86 @@ const Notifications: React.FC = () => {
         </div>
 
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <Breadcrumb crumbs={[
-            { label: "Dashboard", path: "/client/dashboard" },
-            { label: "Notifications" },
-          ]} />
-
-          <div className="flex items-center justify-between mb-5">
-            <h1 className="text-[26px] font-extrabold text-[#1a1a2e] m-0">
-              Notification
-            </h1>
-            <button
-              onClick={handleMarkAllRead}
-              className="bg-[#E2554F] border-none rounded-lg px-6 py-[11px] cursor-pointer text-white font-bold text-[14px] hover:bg-[#d44a44] transition-colors"
-            >
-              Mark All Read
-            </button>
-          </div>
-
-          <NotificationFilterTabs active={activeTab} onChange={setActiveTab} />
-
-          {notifsLoading && (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="animate-spin text-[#E2554F]" size={32} />
-            </div>
-          )}
-
-          {error && (
-            <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg mb-4">
-              {error}
-            </div>
-          )}
-
-          {!notifsLoading && !error && (
+          <WithPageTransition isReady={isReady} variant="generic">
             <>
-              <div className="bg-white border border-gray-200 rounded-[10px] overflow-hidden">
-                {GROUPS.map((group) => {
-                  const groupItems = visible.filter((n) => n.group === group);
-                  if (groupItems.length === 0) return null;
-                  return (
-                    <div key={group}>
-                      <div className="px-5 py-3 bg-gray-50 border-b border-gray-100">
-                        <h3 className="m-0 text-[15px] font-bold text-[#1a1a2e]">{group}</h3>
-                      </div>
-                      <div className="flex flex-col gap-2.5 bg-[#fafafa]">
-                        {groupItems.map((notif) => (
-                          <NotificationItem
-                            key={notif.id}
-                            notification={notif}
-                            onRead={handleRead}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
+              <FadeInSection delay={0}>
+                <Breadcrumb crumbs={[
+                  { label: "Dashboard", path: "/client/dashboard" },
+                  { label: "Notifications" },
+                ]} />
 
-                {visible.length === 0 && (
-                  <div className="p-10 text-center text-gray-500 text-[14px]">
-                    No notifications found.
-                  </div>
-                )}
-              </div>
-
-              {hasMore && (
-                <div className="flex justify-center mt-7">
+                <div className="flex items-center justify-between mb-5">
+                  <h1 className="text-[26px] font-extrabold text-[#1a1a2e] m-0">
+                    Notification
+                  </h1>
                   <button
-                    onClick={() => setVisibleCount((prev) => prev + VISIBLE_COUNT)}
-                    className="bg-[#E85D3A] border-none rounded-lg px-12 py-3 cursor-pointer text-white font-bold text-[14px] hover:bg-[#d44a44] transition-colors"
+                    onClick={handleMarkAllRead}
+                    className="bg-[#E2554F] border-none rounded-lg px-6 py-[11px] cursor-pointer text-white font-bold text-[14px] hover:bg-[#d44a44] transition-colors"
                   >
-                    Load More
+                    Mark All Read
                   </button>
                 </div>
-              )}
+
+                <NotificationFilterTabs active={activeTab} onChange={setActiveTab} />
+
+                {notifsLoading && (
+                  <div className="flex items-center justify-center py-20">
+                    <Loader2 className="animate-spin text-[#E2554F]" size={32} />
+                  </div>
+                )}
+
+                {error && (
+                  <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg mb-4">
+                    {error}
+                  </div>
+                )}
+
+                {!notifsLoading && !error && (
+                  <>
+                    <div className="bg-white border border-gray-200 rounded-[10px] overflow-hidden">
+                      {GROUPS.map((group) => {
+                        const groupItems = visible.filter((n) => n.group === group);
+                        if (groupItems.length === 0) return null;
+                        return (
+                          <div key={group}>
+                            <div className="px-5 py-3 bg-gray-50 border-b border-gray-100">
+                              <h3 className="m-0 text-[15px] font-bold text-[#1a1a2e]">{group}</h3>
+                            </div>
+                            <div className="flex flex-col gap-2.5 bg-[#fafafa]">
+                              {groupItems.map((notif) => (
+                                <NotificationItem
+                                  key={notif.id}
+                                  notification={notif}
+                                  onRead={handleRead}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {visible.length === 0 && (
+                        <div className="p-10 text-center text-gray-500 text-[14px]">
+                          No notifications found.
+                        </div>
+                      )}
+                    </div>
+
+                    {hasMore && (
+                      <div className="flex justify-center mt-7">
+                        <button
+                          onClick={() => setVisibleCount((prev) => prev + VISIBLE_COUNT)}
+                          className="bg-[#E85D3A] border-none rounded-lg px-12 py-3 cursor-pointer text-white font-bold text-[14px] hover:bg-[#d44a44] transition-colors"
+                        >
+                          Load More
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </FadeInSection>
             </>
-          )}
+          </WithPageTransition>
         </main>
       </div>
     </div>

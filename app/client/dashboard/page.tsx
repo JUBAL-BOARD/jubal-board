@@ -12,9 +12,12 @@ import ActiveProjects from "@/app/components/client/dashboard/activeProjects";
 import IncomingPitches from "@/app/components/client/dashboard/incomingPitches";
 import { services } from "../../data";
 import { useState, useEffect } from "react";
-import { X, Loader2 } from "lucide-react";
+import { X } from "lucide-react";
 import { useKycStatus } from "../../lib/hooks/useKycStatus";
 import KycModal from "../../components/verification/kycModal";
+import usePageReady from "@/app/lib/hooks/usePageReady";
+import WithPageTransition from "@/app/components/shared/withPageTransition";
+import FadeInSection from "@/app/components/shared/fadeInSection";
 
 type ClientProfile = {
   name: string;
@@ -41,8 +44,9 @@ const ClientDashboard: React.FC = () => {
   const { kycStatus, loading: kycLoading } = useKycStatus();
   const [showKycModal, setShowKycModal] = useState(false);
 
+  const isReady = usePageReady(loading, kycLoading);
+
   useEffect(() => {
-    console.log("kycLoading:", kycLoading, "kycStatus:", kycStatus);
     if (!kycLoading && kycStatus !== null && kycStatus === "UNVERIFIED") {
       setShowKycModal(true);
     }
@@ -85,15 +89,6 @@ const ClientDashboard: React.FC = () => {
 
     fetchAll();
   }, []);
-
-  if (loading || kycLoading) {
-    return (
-      <div className="flex h-screen w-screen flex-col items-center justify-center bg-white">
-        <Loader2 className="animate-spin text-[#2563EB] mb-4" size={48} />
-        <p className="text-gray-500 font-medium">Loading Dashboard...</p>
-      </div>
-    );
-  }
 
   const userName = profile?.clientProfile?.fullName || profile?.name || "Client";
   const userAvatar =
@@ -142,16 +137,40 @@ const ClientDashboard: React.FC = () => {
         </div>
 
         <main className="flex-1 w-full px-4 lg:px-7 py-6 overflow-y-auto">
-          <UpdateBanner />
-          <WelcomeBar userName={userName} />
-          <SearchBar />
-          <QuickActions availableBalance={availableBalance} />
-          <SuggestedCreatives />
-          <ServicesCarousel />
-          <div className="lg:flex gap-6">
-            <ActiveProjects />
-            <IncomingPitches />
-          </div>
+          <WithPageTransition isReady={isReady} variant="dashboard">
+            <>
+              <FadeInSection delay={0}>
+                <UpdateBanner />
+              </FadeInSection>
+
+              <FadeInSection delay={80}>
+                <WelcomeBar userName={userName} />
+              </FadeInSection>
+
+              <FadeInSection delay={160}>
+                <SearchBar />
+              </FadeInSection>
+
+              <FadeInSection delay={240}>
+                <QuickActions availableBalance={availableBalance} />
+              </FadeInSection>
+
+              <FadeInSection delay={0}>
+                <SuggestedCreatives />
+              </FadeInSection>
+
+              <FadeInSection delay={0}>
+                <ServicesCarousel />
+              </FadeInSection>
+
+              <FadeInSection delay={0}>
+                <div className="lg:flex gap-6">
+                  <ActiveProjects />
+                  <IncomingPitches />
+                </div>
+              </FadeInSection>
+            </>
+          </WithPageTransition>
         </main>
       </div>
     </div>
