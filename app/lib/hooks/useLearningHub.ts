@@ -36,6 +36,10 @@ export interface MyCourses {
   active: CourseSummary[];
   completed: CourseSummary[];
   certifications: CourseSummary[];
+  // Paid courses with a PENDING_ACTIVATION enrollment — payment was
+  // initiated but the provider webhook hasn't activated it yet. Per the
+  // /purchase endpoint docs: poll this until the course leaves this array.
+  processing: CourseSummary[];
 }
 
 interface FetchCoursesParams {
@@ -76,6 +80,7 @@ export const useLearningHub = () => {
     active: [],
     completed: [],
     certifications: [],
+    processing: [],
   });
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,7 +112,7 @@ export const useLearningHub = () => {
   }, []);
 
   const fetchMyCourses = useCallback(async (): Promise<MyCourses> => {
-    const empty = { active: [], completed: [], certifications: [] };
+    const empty: MyCourses = { active: [], completed: [], certifications: [], processing: [] };
     try {
       const token = await getToken();
       if (!token) return empty;
@@ -122,6 +127,7 @@ export const useLearningHub = () => {
         active: toArray<CourseSummary>(d.active),
         completed: toArray<CourseSummary>(d.completed),
         certifications: toArray<CourseSummary>(d.certifications),
+        processing: toArray<CourseSummary>(d.processing),
       };
     } catch {
       return empty;
@@ -192,5 +198,8 @@ export const useLearningHub = () => {
     refetch: loadAll,
     fetchCourses,
     fetchResources,
+    // Exposed so components (e.g. paid-course purchase polling) can refresh
+    // myCourses on its own without re-fetching everything via loadAll.
+    fetchMyCourses,
   };
 };

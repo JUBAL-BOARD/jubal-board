@@ -31,6 +31,8 @@ const LearningHubContent: React.FC = () => {
     resources,
     loading,
     error,
+    refetch,
+    fetchMyCourses,
   } = useLearningHub();
 
   const handleChipClick = (chip: { label: string; level: string }) => {
@@ -63,9 +65,15 @@ const LearningHubContent: React.FC = () => {
           duration: typeof c.duration === "string" ? c.duration : "",
           instructor: typeof c.instructor === "string" ? c.instructor : "",
           progress: typeof c.progressPercentage === "number" ? c.progressPercentage : 0,
+          paid: typeof c.cost === "number" ? c.cost > 0 : false,
         }))
       : [],
   }));
+
+  // myCourses.active / myCourses.processing entries are enrollment records,
+  // not CourseSummary objects — the real course id lives under `courseId`.
+  const enrolledCourseIds = myCourses.active.map((c: any) => c.courseId);
+  const processingCourseIds = myCourses.processing.map((c: any) => c.courseId);
 
   return (
     <div>
@@ -144,6 +152,10 @@ const LearningHubContent: React.FC = () => {
           courses={section.courses}
           search={search}
           activeChip={activeChip}
+          enrolledCourseIds={enrolledCourseIds}
+          processingCourseIds={processingCourseIds}
+          onEnrolled={refetch}
+          fetchMyCourses={fetchMyCourses}
         />
       ))}
 

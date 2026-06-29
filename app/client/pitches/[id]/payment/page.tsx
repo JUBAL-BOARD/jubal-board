@@ -42,6 +42,14 @@ interface PaymentMethod {
   stripePaymentMethodId: string;
 }
 
+interface PaymentSummary {
+  agreedAmount: number;
+  serviceFee: number;
+  processingFee: number;
+  totalAmount: number;
+  currency: string;
+}
+
 type ClientProfile = {
   name: string;
   clientProfile: { fullName: string; imageUrl: string | null };
@@ -73,9 +81,13 @@ function getCardIcon(brand: string) {
   return <CreditCard size={20} className="text-gray-500" />;
 }
 
-const RadioCircle: React.FC<{ selected: boolean }> = ({ selected }) => (
-  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${selected ? "border-[#1a1a2e]" : "border-gray-300"}`}>
-    {selected && <div className="w-2.5 h-2.5 rounded-full bg-[#1a1a2e]" />}
+const RadioCircle: React.FC<{ selected: boolean; disabled?: boolean }> = ({ selected, disabled }) => (
+  <div
+    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+      disabled ? "border-gray-200" : selected ? "border-[#1a1a2e]" : "border-gray-300"
+    }`}
+  >
+    {selected && !disabled && <div className="w-2.5 h-2.5 rounded-full bg-[#1a1a2e]" />}
   </div>
 );
 
@@ -149,6 +161,9 @@ const StripeCheckoutForm: React.FC<{
       const tokenRes = await fetch("/api/auth/session/token");
       const { token } = await tokenRes.json();
 
+      // Per contract §1: Stripe project payments still require this explicit
+      // confirm step server-side (unlike add-funds/course purchase, which rely
+      // on webhook alone). This is correct as-is — kept unchanged.
       const confirmRes = await fetch(`/api/v1/orders/${projectId}/confirm-payment`, {
         method: "POST",
         headers: {
@@ -188,25 +203,33 @@ const StripeCheckoutForm: React.FC<{
   );
 };
 
+// Payment types that exist in the backend contract today.
+// "Cash" / PayPal / Apple Pay / Google Pay are UI-only placeholders with no
+// backend support yet — they're rendered as disabled "Coming soon" rows so
+// they can never silently fall through into a real charge.
+const SELECTABLE_TYPES = new Set(["WALLET", "CARD_SAVED", "NEW_CARD"]);
+
 const PaymentMethodPage: React.FC = () => {
   const { id } = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const projectId = searchParams.get("projectId");
-  const pitchId = searchParams.get("pitchId") ?? (id as string);
 
   const [wallet, setWallet] = useState<WalletData | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
+  const [summary, setSummary] = useState<PaymentSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [paymentFailed, setPaymentFailed] = useState(false);
   const isReady = usePageReady(loading);
 
+  // selectedType is either "WALLET", a saved card id, or "NEW_CARD"
   const [selectedType, setSelectedType] = useState<string>("");
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [showCongrats, setShowCongrats] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -222,11 +245,22 @@ const PaymentMethodPage: React.FC = () => {
           "Content-Type": "application/json",
         };
 
-        const [walletRes, methodsRes, profileRes] = await Promise.all([
+        const requests = [
           fetch("/api/v1/wallet", { headers, credentials: "include" }),
           fetch("/api/v1/payment-methods", { headers, credentials: "include" }),
           fetch("/api/v1/clients/me", { headers, credentials: "include" }),
-        ]);
+        ];
+
+        // Per contract §4: GET /orders/{projectId}/payment-summary — fetch the
+        // fee breakdown up front so the user sees the total before confirming,
+        // not buried inside the payment-initiation response.
+        if (projectId) {
+          requests.push(
+            fetch(`/api/v1/orders/${projectId}/payment-summary`, { headers, credentials: "include" })
+          );
+        }
+
+        const [walletRes, methodsRes, profileRes, summaryRes] = await Promise.all(requests);
 
         const walletJson = await walletRes.json();
         const methodsJson = await methodsRes.json();
@@ -241,6 +275,15 @@ const PaymentMethodPage: React.FC = () => {
         setPaymentMethods(methods);
         setProfile(profileJson.data ?? profileJson);
 
+        if (summaryRes) {
+          if (summaryRes.ok) {
+            const summaryJson = await summaryRes.json();
+            setSummary(summaryJson.data ?? summaryJson);
+          }
+          // if payment-summary fails, we just don't show the breakdown —
+          // not fatal to the page, so no error thrown here
+        }
+
         const defaultCard = methods.find((m: PaymentMethod) => m.isDefault);
         if (defaultCard) setSelectedType(defaultCard.id);
       } catch (e) {
@@ -250,7 +293,7 @@ const PaymentMethodPage: React.FC = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [projectId]);
 
   const handlePaymentSuccess = () => {
     setShowCongrats(true);
@@ -278,7 +321,15 @@ const PaymentMethodPage: React.FC = () => {
         "Content-Type": "application/json",
       };
 
-      // Wallet payment
+      // ── Wallet payment ──
+      // NOTE: the backend contract does not document a dedicated
+      // "pay project from internal wallet balance" endpoint — §1 only
+      // describes /orders/{projectId}/payment as provider-shaped
+      // (Flutterwave redirect or Stripe client-confirm). This branch is left
+      // wired to confirm-payment as before, but it should not be trusted
+      // until backend confirms a wallet-balance path actually exists here.
+      // The UI now disables this option by default (see SELECTABLE rows
+      // below) until that's confirmed — flip ALLOW_WALLET_PAYMENT once verified.
       if (selectedType === "WALLET") {
         const confirmRes = await fetch(`/api/v1/orders/${projectId}/confirm-payment`, {
           method: "POST",
@@ -297,7 +348,7 @@ const PaymentMethodPage: React.FC = () => {
         return;
       }
 
-      // Card payment (saved card or new card — both go through Stripe payment sheet)
+      // ── Card payment (saved card or new card) ──
       const paymentRes = await fetch(`/api/v1/orders/${projectId}/payment`, {
         method: "POST",
         headers,
@@ -310,14 +361,38 @@ const PaymentMethodPage: React.FC = () => {
         throw new Error(paymentJson.message ?? "Failed to initiate payment.");
       }
 
-      const publishableKey = paymentJson.data?.publishableKey ?? paymentJson.publishableKey;
-      const secret = paymentJson.data?.clientSecret ?? paymentJson.clientSecret;
+      const { provider } = paymentJson.data ?? {};
 
-      if (!publishableKey) throw new Error("No publishable key returned from server.");
-      if (!secret) throw new Error("No client secret returned from server.");
+      // ── Branch on provider, per backend contract §0/§1 ──
+      // Stripe = client-confirm (clientSecret + publishableKey)
+      // Flutterwave / Paystack = redirect (authorizationUrl) — webhook confirms,
+      // FE refetches the project resource on return.
+      if (provider === "STRIPE") {
+        const publishableKey = paymentJson.data?.publishableKey;
+        const secret = paymentJson.data?.clientSecret;
 
-      setStripePromise(loadStripe(publishableKey));
-      setClientSecret(secret);
+        if (!publishableKey || !secret) {
+          throw new Error("Stripe payment could not be initialized. Please try again.");
+        }
+
+        setStripePromise(loadStripe(publishableKey));
+        setClientSecret(secret);
+      } else {
+        const authorizationUrl = paymentJson.data?.authorizationUrl;
+
+        if (!authorizationUrl) {
+          throw new Error("Payment link could not be generated. Please try again.");
+        }
+
+        setRedirecting(true);
+        // Hosted checkout (Flutterwave). Escrow is funded server-side via
+        // webhook once paid; there is no client confirm step for this rail.
+        // On return, the project detail page's normal fetch should reflect
+        // the new status once the webhook has landed — consider polling a
+        // few times there if status isn't immediate.
+        window.location.href = authorizationUrl;
+        return;
+      }
     } catch (e: any) {
       setError(e.message ?? "Something went wrong.");
     } finally {
@@ -415,18 +490,48 @@ const PaymentMethodPage: React.FC = () => {
                 </div>
               )}
 
+              {/* ── Fee summary — per contract §4 payment-summary ── */}
+              {summary && (
+                <div className="bg-[#fafafa] border border-gray-200 rounded-2xl p-5 mb-5">
+                  <h2 className="font-bold text-black text-sm mb-3">Order Summary</h2>
+                  <div className="flex flex-col gap-1.5 text-sm">
+                    <div className="flex justify-between text-gray-600">
+                      <span>Agreed amount</span>
+                      <span>{formatCurrency(summary.agreedAmount, summary.currency)}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Service fee</span>
+                      <span>{formatCurrency(summary.serviceFee, summary.currency)}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Processing fee</span>
+                      <span>{formatCurrency(summary.processingFee, summary.currency)}</span>
+                    </div>
+                    <div className="flex justify-between text-black font-bold pt-2 border-t border-gray-200 mt-1.5">
+                      <span>Total</span>
+                      <span>{formatCurrency(summary.totalAmount, summary.currency)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {redirecting ? (
+                <div className="flex flex-col items-center gap-3 py-16 text-center">
+                  <Loader2 size={28} className="animate-spin text-[#E05C5C]" />
+                  <p className="text-sm text-gray-600">Redirecting you to complete your payment…</p>
+                </div>
+              ) : (
               <div className="w-full flex flex-col gap-4">
 
-                {/* ── Wallet ── */}
+                {/* ── Wallet ──
+                    NOTE: disabled until backend confirms a wallet-balance
+                    project-payment path exists (see comment in handler above). */}
                 <div className="bg-[#f5f5f5] rounded-2xl p-5">
                   <h2 className="font-bold text-black text-base mb-3">Wallet</h2>
                   <button
-                    onClick={() => {
-                      setSelectedType("WALLET");
-                      setClientSecret(null);
-                      setStripePromise(null);
-                    }}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                    disabled
+                    title="Coming soon — wallet-balance project payment is not yet available"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3.5 flex items-center justify-between opacity-50 cursor-not-allowed"
                   >
                     <div className="flex items-center gap-3">
                       <Wallet size={18} className="text-gray-500" />
@@ -435,39 +540,38 @@ const PaymentMethodPage: React.FC = () => {
                         <span className="font-semibold text-black">
                           {wallet ? formatCurrency(wallet.availableBalance, wallet.currency) : "—"}
                         </span>
+                        <span className="ml-2 text-xs text-gray-400">(Coming soon)</span>
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <button
+                      <span
                         onClick={(e) => {
                           e.stopPropagation();
                           router.push("/client/my-wallet");
                         }}
-                        className="text-xs font-semibold border border-[#E05C5C] text-[#E05C5C] px-3 py-1 rounded-md hover:bg-red-50 transition-colors"
+                        className="text-xs font-semibold border border-[#E05C5C] text-[#E05C5C] px-3 py-1 rounded-md hover:bg-red-50 transition-colors cursor-pointer"
                       >
                         Add Fund
-                      </button>
-                      <RadioCircle selected={selectedType === "WALLET"} />
+                      </span>
+                      <RadioCircle selected={false} disabled />
                     </div>
                   </button>
                 </div>
 
-                {/* ── Cash ── */}
+                {/* ── Cash ── (no backend support — coming soon) */}
                 <div className="bg-[#f5f5f5] rounded-2xl p-5">
                   <h2 className="font-bold text-black text-base mb-3">Cash</h2>
                   <button
-                    onClick={() => {
-                      setSelectedType("CASH");
-                      setClientSecret(null);
-                      setStripePromise(null);
-                    }}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                    disabled
+                    title="Coming soon"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3.5 flex items-center justify-between opacity-50 cursor-not-allowed"
                   >
                     <div className="flex items-center gap-3">
                       <Banknote size={18} className="text-gray-500" />
                       <span className="text-sm text-gray-700">Cash</span>
+                      <span className="text-xs text-gray-400">(Coming soon)</span>
                     </div>
-                    <RadioCircle selected={selectedType === "CASH"} />
+                    <RadioCircle selected={false} disabled />
                   </button>
                 </div>
 
@@ -497,7 +601,7 @@ const PaymentMethodPage: React.FC = () => {
                       </button>
                     ))}
 
-                    {/* Pay with new card — goes straight to Stripe payment sheet on Confirm */}
+                    {/* Pay with new card — goes to the provider-branched flow on Confirm */}
                     <button
                       onClick={() => {
                         setSelectedType("NEW_CARD");
@@ -515,7 +619,7 @@ const PaymentMethodPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* ── More Payment Options ── */}
+                {/* ── More Payment Options ── (no backend support yet — coming soon) */}
                 <div className="bg-[#f5f5f5] rounded-2xl p-5">
                   <h2 className="font-bold text-black text-base mb-3">More Payment Options</h2>
                   <div className="flex flex-col gap-2">
@@ -557,18 +661,16 @@ const PaymentMethodPage: React.FC = () => {
                     ].map((opt) => (
                       <button
                         key={opt.id}
-                        onClick={() => {
-                          setSelectedType(opt.id);
-                          setClientSecret(null);
-                          setStripePromise(null);
-                        }}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                        disabled
+                        title="Coming soon"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3.5 flex items-center justify-between opacity-50 cursor-not-allowed"
                       >
                         <div className="flex items-center gap-3">
                           {opt.icon}
                           <span className="text-sm text-gray-700">{opt.label}</span>
+                          <span className="text-xs text-gray-400">(Coming soon)</span>
                         </div>
-                        <RadioCircle selected={selectedType === opt.id} />
+                        <RadioCircle selected={false} disabled />
                       </button>
                     ))}
                   </div>
@@ -639,6 +741,7 @@ const PaymentMethodPage: React.FC = () => {
                 )}
 
               </div>
+              )}
             </FadeInSection>
           </WithPageTransition>
 

@@ -53,6 +53,11 @@ const CheckoutForm: React.FC<{ onClose: () => void; onSuccess?: () => void }> = 
     ) {
       onClose();
       showFundAddedToast();
+      // NOTE: per contract, add-funds has no client-confirm endpoint for Stripe —
+      // the wallet is credited via webhook. onSuccess() here just refetches /wallet,
+      // which may briefly show the old balance if the webhook hasn't landed yet.
+      // If that's visible in the UI, consider polling a couple of times instead
+      // of a single refetch.
       onSuccess?.();
     } else {
       setError("Payment was not completed. Please try again.");
@@ -83,6 +88,7 @@ const AddFundModal: React.FC<Props> = ({ onClose, onSuccess }) => {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [stripePromise, setStripePromise] = useState<ReturnType<typeof loadStripe> | null>(null);
   const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleContinue = async () => {
@@ -104,19 +110,43 @@ const AddFundModal: React.FC<Props> = ({ onClose, onSuccess }) => {
         body: JSON.stringify({
           amount: Number(amount),
           currency: "USD",
-          paymentMethodType: "automatic",
         }),
       });
 
       const json = await res.json();
 
-      if (!res.ok) throw new Error(json.message ?? "Failed to create payment intent");
+      if (!res.ok) throw new Error(json.message ?? "Failed to create payment");
 
-      const { clientSecret, publishableKey } = json.data;
+      const { provider } = json.data;
 
-      // ✅ FIX: don't await loadStripe — pass the Promise directly to <Elements>
-      setStripePromise(loadStripe(publishableKey));
-      setClientSecret(clientSecret);
+      // ── Branch on provider, per backend contract §0/§1 ──
+      // Stripe = client-confirm (clientSecret + publishableKey)
+      // Flutterwave / Paystack = redirect (authorizationUrl) — webhook confirms later
+      if (provider === "STRIPE") {
+        const { clientSecret, publishableKey } = json.data;
+
+        if (!clientSecret || !publishableKey) {
+          throw new Error("Stripe payment could not be initialized. Please try again.");
+        }
+
+        setStripePromise(loadStripe(publishableKey));
+        setClientSecret(clientSecret);
+      } else {
+        // FLUTTERWAVE (or PAYSTACK if re-enabled later)
+        const { authorizationUrl } = json.data;
+
+        if (!authorizationUrl) {
+          throw new Error("Payment link could not be generated. Please try again.");
+        }
+
+        setRedirecting(true);
+        // Hosted checkout — funds are credited server-side via webhook once paid.
+        // No client confirm step exists for this path; on return, the wallet
+        // page's normal fetch (GET /wallet) will reflect the new balance once
+        // the webhook has landed.
+        window.location.href = authorizationUrl;
+        return; // don't fall through to setLoading(false) below — we're navigating away
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -136,9 +166,18 @@ const AddFundModal: React.FC<Props> = ({ onClose, onSuccess }) => {
           </button>
         </div>
 
+        {/* Redirecting state — shown briefly before window.location.href kicks in */}
+        {redirecting && (
+          <div className="px-6 py-10 flex flex-col items-center gap-3 text-center">
+            <Loader2 size={28} className="animate-spin text-[#e84545]" />
+            <p className="text-sm text-gray-600">
+              Redirecting you to complete your payment…
+            </p>
+          </div>
+        )}
+
         {/* Step 1 — pick amount */}
-        {!clientSecret && (
-          // ✅ FIX: scrollable content area
+        {!clientSecret && !redirecting && (
           <div className="overflow-y-auto px-6 py-5">
             <div className="mb-5">
               <label className="block text-sm font-semibold text-black mb-2">
@@ -185,8 +224,7 @@ const AddFundModal: React.FC<Props> = ({ onClose, onSuccess }) => {
           </div>
         )}
 
-        {/* Step 2 — Stripe payment form */}
-        {/* ✅ FIX: removed duplicate <Elements> block; this is the only one */}
+        {/* Step 2 — Stripe payment form (only reached when provider === "STRIPE") */}
         {clientSecret && stripePromise && (
           <div className="overflow-y-auto">
             <Elements

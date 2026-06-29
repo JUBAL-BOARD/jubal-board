@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import { fetchConversations, createConversation, fetchChatTopics } from "@/app/lib/api/messageApi";
 import { useRouter } from "next/navigation";
+import logo from "@/app/assets/icononly.png";
 
 interface OngoingGig {
   id: string;
@@ -15,6 +16,7 @@ interface OngoingGig {
   paymentMode: string;
   requiredCollaborators: number;
   collabDeadline: string | null;
+  referenceFileUrls?: string[];
 }
 
 interface MappedGig {
@@ -127,7 +129,7 @@ export default function OngoingGigs() {
                   id: detail.id,
                   title: detail.title,
                   clientId: g.clientId,
-                  thumbnail: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
+                  thumbnail: g.referenceFileUrls?.[0] ?? {logo},
                   client: {
                     name: g.clientName,
                     avatar: clientAvatarMap[g.clientName] ?? getAvatarFallback(g.clientName),
@@ -145,7 +147,7 @@ export default function OngoingGigs() {
                   id: g.id,
                   title: g.title,
                   clientId: g.clientId,
-                  thumbnail: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
+                  thumbnail: g.referenceFileUrls?.[0] ?? {logo},
                   client: {
                     name: g.clientName,
                     avatar: clientAvatarMap[g.clientName] ?? getAvatarFallback(g.clientName),

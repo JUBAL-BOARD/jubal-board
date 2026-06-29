@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Sidebar from "@/app/components/creative/dashboard/sideBar";
 import DashboardTopbar from "@/app/components/creative/dashboard/dashboardTopbar";
 import Breadcrumb from "@/app/components/creative/dashboard/breadcrumb";
 import { useRouter, useParams } from "next/navigation";
-import { Loader2, X, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { Loader2, X, ChevronDown, ChevronUp, Download, FileText, PlayCircle, Headphones, Check, BookOpen } from "lucide-react";
 import { useCourseStore } from "../../../lib/stores/courseStore";
 import { useCreativeProfile } from "@/app/lib/hooks/useCreativeProfile";
 import { useCourseDetail } from "@/app/lib/hooks/useCourseDetail";
+import { apiRequest } from "@/app/lib/api";
 
-// Extracts a YouTube video ID from common URL formats, or null if not YouTube
 function getYouTubeId(url?: string): string | null {
   if (!url) return null;
   const match = url.match(
@@ -18,6 +18,36 @@ function getYouTubeId(url?: string): string | null {
   );
   return match ? match[1] : null;
 }
+
+function isDocumentResource(resource?: { resourceType: string; resourceUrl: string }): boolean {
+  if (!resource) return false;
+  if (resource.resourceType === "ARTICLE") return true;
+  return resource.resourceUrl?.toLowerCase().endsWith(".pdf") ?? false;
+}
+
+function ResourceTypeIcon({ resourceType, resourceUrl }: { resourceType: string; resourceUrl: string }) {
+  if (isDocumentResource({ resourceType, resourceUrl })) {
+    return <FileText size={13} className="text-gray-400 shrink-0" />;
+  }
+  if (resourceType === "AUDIO") {
+    return <Headphones size={13} className="text-gray-400 shrink-0" />;
+  }
+  return <PlayCircle size={13} className="text-gray-400 shrink-0" />;
+}
+
+interface EnrollmentState {
+  courseId: string;
+  enrolled: boolean;
+  status: string; // "PENDING_ACTIVATION" | "IN_PROGRESS" | "COMPLETED"
+  progressPercentage: number;
+  completedSections: string[];
+  certificateIncluded: boolean;
+  certificateReady: boolean;
+  certificatePending: boolean;
+}
+
+const CERT_POLL_INTERVAL_MS = 5000;
+const CERT_MAX_POLL_ATTEMPTS = 12;
 
 const CourseDetailPage = () => {
   const router = useRouter();
@@ -29,71 +59,191 @@ const CourseDetailPage = () => {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [activeResourceId, setActiveResourceId] = useState<string | null>(null);
-  const [openModule, setOpenModule] = useState<string | null>(null);
-  const [showCertificate, setShowCertificate] = useState(false);
+  // Resources have no id field from the API — resourceUrl is unique per
+  // resource, so it's used as the stable identifier throughout this page.
+  const [activeResourceKey, setActiveResourceKey] = useState<string | null>(null);
+  // Modules have no id field either — moduleNumber is the stable identifier
+  // the API does provide.
+  const [openModuleNumber, setOpenModuleNumber] = useState<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { profile, loading: profileLoading, error } = useCreativeProfile();
 
-  // Guard against direct URL access — kept above all early returns
+  const [enrollment, setEnrollment] = useState<EnrollmentState | null>(null);
+  const [enrollmentChecked, setEnrollmentChecked] = useState(false);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollError, setEnrollError] = useState<string | null>(null);
+
+  const [progressSubmitting, setProgressSubmitting] = useState(false);
+  const [completeSubmitting, setCompleteSubmitting] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
+
+  const [certificateUrl, setCertificateUrl] = useState<string | null>(null);
+  const [certPolling, setCertPolling] = useState(false);
+  const [certError, setCertError] = useState<string | null>(null);
+  const [addingToProfile, setAddingToProfile] = useState(false);
+  const [addedToProfile, setAddedToProfile] = useState(false);
+  const certAttemptsRef = useRef(0);
+  const certCancelledRef = useRef(false);
+
   useEffect(() => {
     if (!courseLoading && !course && !storeCourse) {
       router.replace("/creative/learning-hub");
     }
   }, [course, storeCourse, courseLoading, router]);
 
-  // Default to first module open + first video resource active once full detail loads
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    const tokenRes = await fetch("/api/auth/session/token", { credentials: "include" });
+    const { token } = await tokenRes.json();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
+  const fetchCertificate = useCallback(async () => {
+    if (!course) return;
+    certCancelledRef.current = false;
+    certAttemptsRef.current = 0;
+    setCertPolling(true);
+    setCertError(null);
+
+    const poll = async () => {
+      if (certCancelledRef.current) return;
+      try {
+        const headers = await getAuthHeaders();
+        const res = await apiRequest<any>(`/api/v1/learning/courses/${course.id}/certificate`, {
+          method: "GET",
+          headers,
+        });
+        const data = res.data?.data ?? res.data;
+        if (data?.certificateUrl) {
+          setCertificateUrl(data.certificateUrl);
+          setAddedToProfile(Boolean(data.addedToProfile));
+          setCertPolling(false);
+          return;
+        }
+      } catch (err: any) {
+        const status = err?.status ?? err?.response?.status;
+        if (status && status !== 404) {
+          setCertError("Couldn't load your certificate. Please try again shortly.");
+          setCertPolling(false);
+          return;
+        }
+      }
+
+      certAttemptsRef.current += 1;
+      if (certAttemptsRef.current >= CERT_MAX_POLL_ATTEMPTS) {
+        setCertPolling(false);
+        setCertError(
+          "Your certificate is taking longer than usual to generate. Check back in a few minutes."
+        );
+        return;
+      }
+
+      setTimeout(poll, CERT_POLL_INTERVAL_MS);
+    };
+
+    poll();
+  }, [course]);
+
   useEffect(() => {
-    if (course?.modules?.length && !activeResourceId) {
-      setOpenModule(course.modules[0].id);
+    if (!course || enrollmentChecked) return;
+
+    const hasRealEnrollment = Boolean(course.enrollment) && course.enrollment?.enrolled !== false;
+
+    if (hasRealEnrollment && course.enrollment) {
+      setEnrollment({
+        courseId: course.id,
+        enrolled: course.enrollment.enrolled,
+        status: course.enrollment.status,
+        progressPercentage: course.enrollment.progressPercentage,
+        completedSections: course.enrollment.completedSections ?? [],
+        certificateIncluded: course.enrollment.certificateIncluded,
+        certificateReady: course.enrollment.certificateReady,
+        certificatePending: course.enrollment.certificatePending,
+      });
+
+      if (course.enrollment.status === "COMPLETED" && course.enrollment.certificateReady) {
+        fetchCertificate();
+      }
+    }
+
+    if (course.modules?.length && !activeResourceKey) {
+      setOpenModuleNumber(course.modules[0].moduleNumber);
       const firstVideo = course.modules
         .flatMap((m) => m.resources)
         .find((r) => r.resourceType === "VIDEO");
-      if (firstVideo) setActiveResourceId(firstVideo.id);
+      if (firstVideo) setActiveResourceKey(firstVideo.resourceUrl);
     }
-  }, [course, activeResourceId]);
 
-  if (profileLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 size={48} className="animate-spin text-gray-500" />
-      </div>
-    );
-  }
+    setEnrollmentChecked(true);
+  }, [course, enrollmentChecked, activeResourceKey, fetchCertificate]);
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-red-500">Error loading profile: {error}</p>
-      </div>
-    );
-  }
-
-  // Nothing to show at all yet (no detail, no summary) — bail out (the
-  // redirect effect above will fire if this persists after loading).
-  if (!course && !storeCourse) return null;
-
-  const userName = profile?.fullName || "Creative";
-  const userAvatar =
-    profile?.avatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
-
-  // Title/thumbnail can come from the lightweight summary while the real
-  // detail is loading, but modules/enrollment/pricing ONLY ever come from
-  // `course` (the real fetched detail) — a CourseSummary never has them.
-  const displayTitle = course?.title ?? storeCourse?.title ?? "";
-  const displayThumbnail = course?.thumbnailUrl ?? storeCourse?.thumbnail;
+  useEffect(() => {
+    return () => {
+      certCancelledRef.current = true;
+    };
+  }, []);
 
   const allResources = (course?.modules ?? []).flatMap((m) => m.resources);
-  const activeResource = allResources.find((r) => r.id === activeResourceId) ?? allResources[0];
-  const youTubeId = getYouTubeId(activeResource?.resourceUrl);
+  const totalResources = allResources.length;
+  const activeResource =
+    allResources.find((r) => r.resourceUrl === activeResourceKey) ?? allResources[0];
 
-  const toggleModule = (id: string) => {
-    setOpenModule((prev) => (prev === id ? null : id));
+  const isDocument = isDocumentResource(activeResource);
+  const youTubeId =
+    activeResource?.resourceType === "VIDEO" ? getYouTubeId(activeResource?.resourceUrl) : null;
+
+  const handleEnroll = async () => {
+    if (!course) return;
+    setEnrolling(true);
+    setEnrollError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await apiRequest<any>(`/api/v1/learning/courses/${course.id}/enroll`, {
+        method: "POST",
+        headers,
+      });
+      const data = res.data?.data ?? res.data;
+      if (data) setEnrollment(data);
+    } catch (err: any) {
+      setEnrollError(err?.message ?? "Couldn't enroll in this course. Please try again.");
+    } finally {
+      setEnrolling(false);
+    }
   };
 
-  const handleSelectResource = (resourceId: string) => {
-    setActiveResourceId(resourceId);
+  const markResourceComplete = useCallback(
+    async (resourceKey: string) => {
+      if (!course || !enrollment) return;
+      if (enrollment.completedSections.includes(resourceKey)) return;
+
+      const updatedSections = [...enrollment.completedSections, resourceKey];
+      const newPercentage = totalResources > 0
+        ? Math.round((updatedSections.length / totalResources) * 100)
+        : 0;
+
+      setProgressSubmitting(true);
+      try {
+        const headers = await getAuthHeaders();
+        const res = await apiRequest<any>(`/api/v1/learning/courses/${course.id}/progress`, {
+          method: "PATCH",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            completedSections: updatedSections,
+            progressPercentage: newPercentage,
+          }),
+        });
+        const updated = res.data?.data ?? res.data;
+        if (updated) setEnrollment(updated);
+      } catch (err) {
+        console.error("Failed to update progress:", err);
+      } finally {
+        setProgressSubmitting(false);
+      }
+    },
+    [course, enrollment, totalResources]
+  );
+
+  const handleSelectResource = (resourceKey: string) => {
+    setActiveResourceKey(resourceKey);
     setIsPlaying(false);
   };
 
@@ -114,8 +264,90 @@ const CourseDetailPage = () => {
     }
   };
 
-  const handleComplete = () => {
-    setShowCertificate(true);
+  const handleVideoEnded = () => {
+    setIsPlaying(false);
+    if (activeResource) markResourceComplete(activeResource.resourceUrl);
+  };
+
+  const handleComplete = async () => {
+    if (!course) return;
+    setCompleteSubmitting(true);
+    setCompleteError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await apiRequest<any>(`/api/v1/learning/courses/${course.id}/complete`, {
+        method: "POST",
+        headers,
+      });
+      const updated = res.data?.data ?? res.data;
+      if (updated) setEnrollment(updated);
+      if (updated?.certificateIncluded) {
+        fetchCertificate();
+      }
+    } catch (err: any) {
+      setCompleteError(
+        err?.message ?? "Couldn't mark this course as completed. Please try again."
+      );
+    } finally {
+      setCompleteSubmitting(false);
+    }
+  };
+
+  const handleAddToProfile = async () => {
+    if (!course) return;
+    setAddingToProfile(true);
+    try {
+      const headers = await getAuthHeaders();
+      await apiRequest<any>(`/api/v1/learning/courses/${course.id}/certificate/add-to-profile`, {
+        method: "POST",
+        headers,
+      });
+      setAddedToProfile(true);
+    } catch (err) {
+      console.error("Failed to add certificate to profile:", err);
+    } finally {
+      setAddingToProfile(false);
+    }
+  };
+
+  if (profileLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 size={48} className="animate-spin text-gray-500" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-red-500">Error loading profile: {error}</p>
+      </div>
+    );
+  }
+
+  if (!course && !storeCourse) return null;
+
+  const userName = profile?.fullName || "Creative";
+  const userAvatar =
+    profile?.avatar ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=1a1a2e&color=fff&size=128`;
+
+  const displayTitle = course?.title ?? storeCourse?.title ?? "";
+  const displayThumbnail = course?.thumbnailUrl ?? storeCourse?.thumbnail;
+
+  const isResourceComplete = (resourceKey: string) =>
+    enrollment?.completedSections.includes(resourceKey) ?? false;
+
+  const allSectionsComplete =
+    totalResources > 0 && (enrollment?.completedSections.length ?? 0) >= totalResources;
+  const isCourseCompleted = enrollment?.status === "COMPLETED";
+
+  const needsEnrollment = enrollmentChecked && !enrollment;
+  const isFreeCourse = course?.isFree || course?.cost === 0;
+
+  const toggleModule = (moduleNumber: number) => {
+    setOpenModuleNumber((prev) => (prev === moduleNumber ? null : moduleNumber));
   };
 
   return (
@@ -146,8 +378,6 @@ const CourseDetailPage = () => {
 
           <h1 className="text-2xl font-bold text-gray-900 mb-5">Course Details</h1>
 
-          {/* While the real detail is still loading, show a lightweight skeleton
-              using only the summary data — no modules/video exist yet */}
           {courseLoading || courseError ? (
             <div className="mb-5">
               <div className="relative bg-black rounded-xl overflow-hidden mb-2 aspect-video flex items-center justify-center">
@@ -163,16 +393,70 @@ const CourseDetailPage = () => {
             <div className="flex items-center justify-center py-20">
               <p className="text-gray-400 text-sm">Course details unavailable.</p>
             </div>
+          ) : needsEnrollment && isFreeCourse ? (
+            <div className="flex flex-col items-center text-center py-16 px-4">
+              <div className="w-20 h-20 rounded-full bg-[#fafafa] flex items-center justify-center mb-5">
+                <BookOpen size={36} className="text-[#e84545]" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">{course.title}</h2>
+              <p className="text-sm text-gray-500 mb-6 max-w-md">
+                Enroll in this free course to start tracking your progress and
+                unlock the certificate on completion.
+              </p>
+              {enrollError && <p className="text-sm text-red-500 mb-4">{enrollError}</p>}
+              <button
+                onClick={handleEnroll}
+                disabled={enrolling}
+                className="px-10 py-3 bg-[#e84545] hover:bg-[#d03535] text-white font-bold rounded-xl transition-colors text-sm disabled:opacity-50 flex items-center gap-2"
+              >
+                {enrolling && <Loader2 size={15} className="animate-spin" />}
+                Enroll Now — Free
+              </button>
+            </div>
+          ) : needsEnrollment && !isFreeCourse ? (
+            <div className="flex flex-col items-center text-center py-16 px-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">{course.title}</h2>
+              <p className="text-sm text-gray-500 mb-6 max-w-md">
+                This is a paid course. Purchase it from the Learning Hub to get started.
+              </p>
+              <button
+                onClick={() => router.push("/creative/learning-hub")}
+                className="px-10 py-3 bg-[#1a1a2e] hover:bg-[#121220] text-white font-bold rounded-xl transition-colors text-sm"
+              >
+                Back to Learning Hub
+              </button>
+            </div>
           ) : (
             <>
-              {/* Video player */}
+              {enrollment && (
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm font-semibold text-black">Your Progress</span>
+                    <span className="text-sm font-semibold text-black">{enrollment.progressPercentage}%</span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#e84545] rounded-full transition-all"
+                      style={{ width: `${enrollment.progressPercentage}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="relative bg-black rounded-xl overflow-hidden mb-2 aspect-video">
                 {!activeResource ? (
                   <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
-                    No video available for this course yet.
+                    No content available for this course yet.
+                  </div>
+                ) : isDocument ? (
+                  <div className="w-full h-full bg-white flex flex-col">
+                    <iframe
+                      src={activeResource.resourceUrl}
+                      title={activeResource.title}
+                      className="w-full h-full"
+                    />
                   </div>
                 ) : youTubeId ? (
-                  // YouTube embed — native controls, no custom play/pause/skip
                   <iframe
                     className="w-full h-full"
                     src={`https://www.youtube.com/embed/${youTubeId}`}
@@ -181,7 +465,6 @@ const CourseDetailPage = () => {
                     allowFullScreen
                   />
                 ) : (
-                  // Direct file URL (mp4/S3/etc) — native <video> with custom controls
                   <>
                     <video
                       ref={videoRef}
@@ -190,6 +473,7 @@ const CourseDetailPage = () => {
                       poster={activeResource.thumbnailUrl ?? displayThumbnail}
                       onPlay={() => setIsPlaying(true)}
                       onPause={() => setIsPlaying(false)}
+                      onEnded={handleVideoEnded}
                     />
                     <div className="absolute inset-0 flex items-center justify-center gap-8">
                       <button
@@ -232,10 +516,41 @@ const CourseDetailPage = () => {
               </div>
 
               {activeResource && (
-                <p className="text-sm text-gray-500 mb-5">Now playing: {activeResource.title}</p>
+                <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-gray-500">
+                      {isDocument ? "Now viewing" : "Now playing"}: {activeResource.title}
+                    </p>
+                    {isDocument && (
+                      <a
+                        href={activeResource.resourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-xs font-semibold text-[#e84545] hover:text-[#d03535] transition-colors"
+                      >
+                        <FileText size={13} />
+                        Open in new tab
+                      </a>
+                    )}
+                  </div>
+
+                  {isResourceComplete(activeResource.resourceUrl) ? (
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600">
+                      <Check size={14} /> Completed
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => markResourceComplete(activeResource.resourceUrl)}
+                      disabled={progressSubmitting}
+                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {progressSubmitting && <Loader2 size={12} className="animate-spin" />}
+                      Mark as {isDocument ? "Read" : "Complete"}
+                    </button>
+                  )}
+                </div>
               )}
 
-              {/* Course title + meta */}
               <div className="flex items-start justify-between mb-5">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900 mb-2">{course.title}</h2>
@@ -255,7 +570,6 @@ const CourseDetailPage = () => {
                 </span>
               </div>
 
-              {/* Course Description */}
               <div className="mb-4">
                 <h3 className="text-xl font-bold text-black mb-3">Course Description</h3>
                 <p className="bg-[#fafafa] p-6 text-md text-black leading-relaxed">
@@ -263,37 +577,42 @@ const CourseDetailPage = () => {
                 </p>
               </div>
 
-              {/* Course Outline — built from modules/resources */}
               <div className="mb-5">
                 <h3 className="text-xl font-bold text-black mb-3">Course Outline</h3>
                 <div className="flex flex-col gap-2">
                   {(course.modules ?? []).map((module) => (
-                    <div key={module.id} className="overflow-hidden">
+                    <div key={module.moduleNumber} className="overflow-hidden">
                       <button
-                        onClick={() => toggleModule(module.id)}
+                        onClick={() => toggleModule(module.moduleNumber)}
                         className="w-full flex items-center justify-between px-4 py-3 bg-[#fafafa] hover:bg-gray-100 transition-colors text-left"
                       >
                         <span className="text-sm font-semibold text-black">
                           {module.moduleNumber}. {module.title}
                         </span>
-                        {openModule === module.id ? (
+                        {openModuleNumber === module.moduleNumber ? (
                           <ChevronUp size={16} className="text-gray-500 shrink-0" />
                         ) : (
                           <ChevronDown size={16} className="text-gray-500 shrink-0" />
                         )}
                       </button>
-                      {openModule === module.id && (
+                      {openModuleNumber === module.moduleNumber && (
                         <div className="px-4 py-2 bg-white">
                           {module.resources.map((resource) => (
                             <button
-                              key={resource.id}
-                              onClick={() => handleSelectResource(resource.id)}
+                              key={resource.resourceUrl}
+                              onClick={() => handleSelectResource(resource.resourceUrl)}
                               className={`w-full text-left bg-[#fafafa] p-6 flex items-center gap-2 py-1.5 text-sm mb-1 rounded ${
-                                resource.id === activeResourceId ? "ring-2 ring-[#e84545]" : ""
+                                resource.resourceUrl === activeResourceKey ? "ring-2 ring-[#e84545]" : ""
                               } text-black`}
                             >
-                              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0" />
+                              <ResourceTypeIcon
+                                resourceType={resource.resourceType}
+                                resourceUrl={resource.resourceUrl}
+                              />
                               <span>{resource.title}</span>
+                              {isResourceComplete(resource.resourceUrl) && (
+                                <Check size={13} className="text-green-500 shrink-0" />
+                              )}
                               <span className="ml-auto text-xs text-gray-400">({resource.duration})</span>
                             </button>
                           ))}
@@ -304,67 +623,76 @@ const CourseDetailPage = () => {
                 </div>
               </div>
 
-              {/* Complete Course button */}
-              <div className="flex justify-center mb-6">
+              <div className="flex flex-col items-center mb-6">
+                {completeError && (
+                  <p className="text-sm text-red-500 mb-3">{completeError}</p>
+                )}
                 <button
                   onClick={handleComplete}
-                  className="px-16 py-3 bg-[#e84545] hover:bg-[#d03535] text-white font-bold rounded-xl transition-colors text-sm"
+                  disabled={!allSectionsComplete || completeSubmitting || isCourseCompleted}
+                  className="px-16 py-3 bg-[#e84545] hover:bg-[#d03535] text-white font-bold rounded-xl transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  Complete Course
+                  {completeSubmitting && <Loader2 size={15} className="animate-spin" />}
+                  {isCourseCompleted
+                    ? "Course Completed"
+                    : allSectionsComplete
+                    ? "Complete Course"
+                    : `Complete all sections to finish (${enrollment?.completedSections.length ?? 0}/${totalResources})`}
                 </button>
               </div>
 
-              {/* Certificate section */}
-              {showCertificate && (
-                <div className="bg-[#fafafa] border border-gray-100 rounded-xl p-6 mb-10 relative">
-                  <button onClick={() => setShowCertificate(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
-                    <ChevronUp size={18} />
-                  </button>
-                  <h3 className="text-lg font-bold text-center text-[#1c1c3a] mb-5">Your Certificate is Ready</h3>
-                  <div className="border-2 border-teal-200 rounded-lg p-8 max-w-lg mx-auto mb-6 bg-white relative">
-                    <div className="absolute inset-2 border border-teal-100 rounded pointer-events-none" />
-                    <div className="text-center mb-2">
-                      <span className="font-serif text-3xl italic text-gray-700">J</span>
+              {isCourseCompleted && enrollment?.certificateIncluded && (
+                <div className="bg-[#fafafa] border border-gray-100 rounded-xl p-6 mb-10">
+                  {certificateUrl ? (
+                    <>
+                      <h3 className="text-lg font-bold text-center text-[#1c1c3a] mb-5">
+                        Your Certificate is Ready
+                      </h3>
+                      <div className="flex justify-center mb-6">
+                        <iframe
+                          src={certificateUrl}
+                          title="Certificate"
+                          className="w-full max-w-lg aspect-[1.4/1] rounded-lg border border-gray-200 bg-white"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between px-4">
+                        <a
+                          href={certificateUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-5 py-2.5 bg-[#e84545] hover:bg-[#d03535] text-white text-sm font-semibold rounded-lg transition-colors"
+                        >
+                          <Download size={15} />
+                          Download Certificate
+                        </a>
+                        <button
+                          onClick={handleAddToProfile}
+                          disabled={addingToProfile || addedToProfile}
+                          className="px-5 py-2.5 bg-[#e84545] hover:bg-[#d03535] text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                        >
+                          {addingToProfile && <Loader2 size={14} className="animate-spin" />}
+                          {addedToProfile ? "Added to Profile" : "Add to Profile"}
+                        </button>
+                      </div>
+                    </>
+                  ) : certPolling ? (
+                    <div className="flex flex-col items-center py-6">
+                      <Loader2 size={28} className="animate-spin text-[#e84545] mb-3" />
+                      <p className="text-sm text-gray-500">
+                        Generating your certificate — this usually takes a few seconds…
+                      </p>
                     </div>
-                    <h4 className="text-center text-sm font-bold tracking-widest text-gray-800 uppercase mb-4">
-                      Certificate of Completion
-                    </h4>
-                    <p className="text-center text-xs text-gray-500 mb-6">
-                      This is to certify that the student has successfully completed the course:
-                    </p>
-                    <div className="border-b border-gray-300 mb-4" />
-                    <p className="text-center text-sm font-bold text-gray-800 mb-6">{course.title}</p>
-                    <div className="flex items-end justify-between mt-4">
-                      <div className="text-center">
-                        <div className="border-b border-gray-400 w-24 mb-1" />
-                        <span className="text-xs text-gray-400">Date</span>
-                      </div>
-                      <div className="flex flex-col items-center -mt-4">
-                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-600 flex items-center justify-center shadow-md border-4 border-yellow-200">
-                          <svg viewBox="0 0 24 24" fill="white" className="w-7 h-7">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                          </svg>
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="font-serif italic text-sm text-gray-600 mb-1">Jm—</div>
-                        <div className="border-b border-gray-400 w-24 mb-1" />
-                        <span className="text-xs text-gray-400">Instructor</span>
-                      </div>
+                  ) : certError ? (
+                    <div className="flex flex-col items-center py-6">
+                      <p className="text-sm text-red-500 mb-3">{certError}</p>
+                      <button
+                        onClick={fetchCertificate}
+                        className="text-sm font-semibold text-[#e84545] hover:text-[#d03535] underline"
+                      >
+                        Try again
+                      </button>
                     </div>
-                  </div>
-                  <div className="flex items-center justify-between px-4">
-                    <button
-                      onClick={() => window.print()}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-[#e84545] hover:bg-[#d03535] text-white text-sm font-semibold rounded-lg transition-colors"
-                    >
-                      <Download size={15} />
-                      Download Certificate
-                    </button>
-                    <button className="px-5 py-2.5 bg-[#e84545] hover:bg-[#d03535] text-white text-sm font-semibold rounded-lg transition-colors">
-                      Add to Profile
-                    </button>
-                  </div>
+                  ) : null}
                 </div>
               )}
             </>

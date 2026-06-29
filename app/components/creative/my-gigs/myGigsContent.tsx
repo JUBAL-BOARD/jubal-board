@@ -7,6 +7,8 @@ import GigsPagination from "@/app/components/creative/my-gigs/gigsPagination";
 import { Search, SlidersHorizontal, ChevronDown } from "lucide-react";
 import { MyGig } from "@/app/types";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+import logo from "@/app/assets/icononly.png";
 
 interface ApiGig {
   id: string;
@@ -18,6 +20,7 @@ interface ApiGig {
   collabDeadline: string | null;
   paymentMode: string;
   requiredCollaborators: number;
+  referenceFileUrls?: string[];
 }
 
 interface ApiGigDetail {
@@ -198,7 +201,7 @@ const MyGigsContent: React.FC = () => {
               return {
                 id: detail.id,
                 title: detail.title,
-                thumbnail: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
+                thumbnail: g.referenceFileUrls?.[0] ?? {logo},
                 client: {
                   id: g.clientId,
                   name: g.clientName ?? "Unknown Client",
@@ -221,7 +224,7 @@ const MyGigsContent: React.FC = () => {
               return {
                 id: g.id,
                 title: g.title,
-                thumbnail: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=120&q=80",
+                thumbnail: g.referenceFileUrls?.[0] ?? {logo},
                 client: {
                   id: g.clientId,
                   name: g.clientName ?? "Unknown Client",
