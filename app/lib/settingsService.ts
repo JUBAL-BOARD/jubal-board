@@ -75,7 +75,7 @@ export async function getSecuritySettings() {
 }
 
 export async function updateSecuritySettings(payload: UpdateSecurityPayload) {
-  return apiRequest("/api/v1/users/me/settings/notifications", {
+  return apiRequest("/api/v1/account/security-settings", {
     method: "PATCH",
     body: JSON.stringify(payload),
   });
@@ -85,7 +85,7 @@ export async function updateSecuritySettings(payload: UpdateSecurityPayload) {
 
 export async function deactivateAccount() {
   return apiRequest<DeactivateResponse>(
-    "/api/v1/users/me/settings/deactivate",
+    "/api/v1/account/deactivate",
     { method: "POST" }
   );
 }

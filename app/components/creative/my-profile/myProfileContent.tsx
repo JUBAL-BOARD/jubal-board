@@ -24,28 +24,28 @@ const MyProfileContent: React.FC<MyProfileContentProps> = ({ profile, loading, e
   // 1. DATA MAPPING LOGIC
   // This maps the backend "ugly" names to your "pretty" UI components
   const displayProfile = profile ? {
-    name: profile.fullName || "Creative Professional",
-    avatar: profile.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.fullName || "C")}&background=1a1a2e&color=fff&size=128`,
-    isOnline: true,
-    isVerified: true,
-    rating: 5.0,
-    totalReviews: 0,
-    completedProjects: 0,
-    jobSuccess: 100,
-    bio: (profile as any).describeYourselfInOneLine || "No bio available",
-    skills: (profile as any).categoriesOfInterest?.map((cat: any) => {
-      if (typeof cat === "string") return cat; // plain string ID — nothing to map
-      return cat.name || cat.categoryName || cat.title || cat.label || "";
-    }).filter(Boolean) || [],
-    services: [
-      (profile as any).professionalRole || "Creative Professional",
-      (profile as any).rateType ? `${(profile as any).currency || '$'}${(profile as any).rateRangeMin}-${(profile as any).rateRangeMax} (${(profile as any).rateType})` : ""
-    ].filter(Boolean),
-    yearsOfExperience: 0,
-    totalClients: 0,
-    portfolioImages: [],
-    socialLinks: (profile as any).preferredSocialLinks || [],
-  } : creativeProfile;
+  name: profile.fullName || "Creative Professional",
+  avatar: profile.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.fullName || "C")}&background=1a1a2e&color=fff&size=128`,
+  isOnline: true,        // no equivalent in payload
+  isVerified: true,      // no equivalent in payload
+  rating: 5.0,           // no equivalent in payload
+  totalReviews: profile.totalReviews,
+  completedProjects: profile.completedProjects,
+  jobSuccess: profile.jobSuccessRate,
+  bio: profile.describeYourselfInOneLine || "No bio available",
+  skills: profile.categoriesOfInterest?.map((cat: any) => {
+    if (typeof cat === "string") return cat;
+    return cat.name || cat.categoryName || cat.title || cat.label || "";
+  }).filter(Boolean) || [],
+  services: [
+    profile.professionalRole || "Creative Professional",
+    profile.rateType ? `${profile.currency || '$'}${profile.rateRangeMin}-${profile.rateRangeMax} (${profile.rateType})` : ""
+  ].filter(Boolean),
+  yearsOfExperience: 0,  // no equivalent in payload
+  totalClients: 0,       // no equivalent in payload
+  portfolioImages: profile.portfolioImages || [],
+  socialLinks: profile.preferredSocialLinks || [],
+} : creativeProfile;
 
   if (loading) {
     return (

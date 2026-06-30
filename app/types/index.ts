@@ -328,7 +328,7 @@ export interface CreativeProfile {
   yearsOfExperience: number;
   totalClients: number;
   portfolioImages: string[];
-  socialLinks: SocialLink[];
+  socialLinks: (SocialLink | string)[];  // ← changed
 }
 
 export interface AppNotification {
