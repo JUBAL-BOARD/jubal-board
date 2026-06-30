@@ -10,7 +10,7 @@ import ProfileServices from "./profileServices";
 import ProfileStats from "./profileStats";
 import ProfilePortfolio from "./profilePortfolio";
 import ProfileSocialLinks from "./profileSocialLinks";
-import { CreativeProfile, SocialLink } from "@/app/types";
+import { CreativeProfile } from "@/app/types";
 
 type PublicCreativeProfile = {
   id: string;
@@ -123,18 +123,11 @@ const MyProfileContent: React.FC<Props> = ({ creativeId }) => {
     services: profile.services?.map((s) => s.title) ?? [],
     yearsOfExperience: profile.yearsOfExperience ?? 0,
     totalClients: profile.totalClients ?? 0,
-    portfolioImages: profile.portfolio
-      ?.filter((p) => p.mimeType.startsWith("image/"))
-      .map((p) => p.fileUrl) ?? [],
-    socialLinks: (profile.preferredSocialLinks ?? []).map((url) => {
-      const lower = url.toLowerCase();
-      const platform = lower.includes("instagram")
-        ? "instagram"
-        : lower.includes("behance")
-        ? "behance"
-        : "instagram";
-      return { platform, url } as SocialLink;
-    }),
+    portfolioImages:
+      profile.portfolio
+        ?.filter((p) => p.mimeType.startsWith("image/"))
+        .map((p) => p.fileUrl) ?? [],
+    socialLinks: profile.preferredSocialLinks ?? [],
   };
 
   return (
